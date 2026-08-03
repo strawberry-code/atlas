@@ -12,7 +12,8 @@ Harness di task a grafo, distribuito come singolo installer. Qui si sviluppa Atl
 
 - **Zero dipendenze in `payload/`.** Un import di terze parti qui rompe la promessa dell'installer. Nei test e in `build.py` vale la stessa regola, per non dover installare niente prima di poter costruire.
 - **Dopo ogni modifica a `payload/` va rigenerato l'installer** con `python3 build.py`, altrimenti `dist/` mente.
-- I file di `payload/core/` stanno sotto le 200 righe. Il rimedio al superamento è spezzare, non comprimere.
+- I file di `payload/core/` stanno sotto le 200 righe. Il rimedio al superamento è spezzare, non comprimere: un file che sfora di solito sta facendo due lavori.
+- **Eccezione dichiarata: `core/cli.py`.** Un dispatcher di comandi cresce in larghezza, non in profondità, e spezzarlo produrrebbe moduli che esistono solo per rispettare un numero. La sua parte stampabile è già uscita in `report.py`, e le mutazioni non ci passano affatto. Resta un file solo finché resta un dispatcher: se ci finisce dentro della logica che non sia parsing e smistamento, quella va altrove.
 - La prosa dei documenti generati (ticket, `map.md`, dashboard) è in italiano, con gli accenti scritti alla fonte. Il codice e i nomi dei simboli in inglese.
 
 ## Verifica
