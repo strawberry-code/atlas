@@ -1,59 +1,75 @@
 # Atlas
 
-Harness di task a grafo per progetti guidati da agenti. Ogni task è un nodo, le dipendenze sono archi, e in ogni momento esiste una **frontiera**: i nodi aperti i cui blocker sono tutti chiusi, cioè il lavoro prendibile adesso.
+Harness di task a grafo. I task sono nodi, le dipendenze sono archi, la **frontiera** è quel che si può prendere adesso. Ogni nodo dichiara se la sua risposta si scrive con l'umano (**HITL**) o la scrive l'agente da solo (**AFK**).
 
-Nasce come generalizzazione del `wayfinder/` di Ars Goetia, reso indipendente dal progetto ospite e capace di reggere più grafi in parallelo.
-
-## Installazione
-
-Copia `dist/atlas-install.py` dentro il progetto e lancialo:
+## Installare in un progetto
 
 ```bash
-python3 atlas-install.py --yes --graph epic-primo
+cp ~/cristiano/10-projects/15-ai-claude-tooling/atlas/dist/atlas-install.py .
+python3 atlas-install.py --yes --graph mio-epic
 ```
 
-L'installer scompatta l'harness in `.atlas/`, registra l'hook di fine sessione in `.claude/settings.json` senza toccare gli hook già presenti, crea i symlink delle due skill sotto `.claude/skills/` e appende il contratto operativo a `CLAUDE.md` in un blocco delimitato. È idempotente: rilanciarlo aggiorna il motore e lascia intatti configurazione, grafi e script.
+Serve Python 3.10+ su POSIX. Niente rete, niente venv, niente dipendenze.
 
-Serve Python 3.10 o superiore su un sistema POSIX. Nessuna dipendenza esterna, nessun venv, nessuna rete.
+Finisce tutto in `.atlas/`, più due symlink in `.claude/skills/`, l'hook di fine sessione in `.claude/settings.json` e il contratto in `CLAUDE.md`. Rilanciarlo aggiorna il motore e lascia intatti config, grafi e script.
 
-## Le due idee
-
-**Il grafo comanda il lavoro.** Non si sceglie cosa fare leggendo una lista: si guarda la frontiera. Un nodo si rivendica prima di toccarlo, e il claim è un lucchetto legato al PID della sessione, non un post-it. Quando il processo che l'ha preso non esiste più, il lucchetto è orfano e va riconfermato o rilasciato.
-
-**HITL o AFK.** Ogni nodo dichiara se la risposta si scrive insieme all'umano oppure se l'agente la scrive da solo. È la riga che separa il lavoro delegabile dalla decisione che nessuno può prendere al posto tuo.
-
-## Uso quotidiano
+## Lavorare
 
 ```bash
-.atlas/bin/atlas status              # frontiera, nodi in lavorazione, avanzamento
-.atlas/bin/atlas claim F01           # rivendica
-.atlas/bin/atlas close F01 -s "..."  # chiude, dopo aver scritto la Risposta nel ticket
-.atlas/bin/atlas fog "una riga"      # appunta ciò che è emerso e non ha ancora un nodo
-.atlas/bin/atlas render --open       # rigenera la dashboard e la apre
-.atlas/bin/atlas graphs              # elenca i grafi del progetto
-.atlas/bin/atlas use epic-secondo    # cambia grafo attivo
+.atlas/bin/atlas status              # frontiera, lucchetti, avanzamento
+.atlas/bin/atlas claim F01           # rivendica, prima di toccare qualsiasi cosa
+.atlas/bin/atlas show F01            # domanda, dipendenze, path del ticket
+# lavori, poi scrivi la sezione Risposta in .atlas/graphs/<slug>/tickets/F01.md
+.atlas/bin/atlas close F01 -s "sintesi in una riga"
+.atlas/bin/atlas render --open       # dashboard
 ```
 
-## Come si modifica un grafo
+Un nodo per sessione. `close` rifiuta se la Risposta è vuota.
 
-Mai a mano. `graph.json` si tocca solo eseguendo uno script Python che passa dall'API di `core/mutate.py`:
+## Cambiare il grafo
+
+Mai a mano, sempre con uno script:
 
 ```bash
-.atlas/bin/atlas new-script aggiunge-ramo-deploy   # crea .atlas/scripts/003-aggiunge-ramo-deploy.py
-.atlas/bin/atlas exec .atlas/scripts/003-aggiunge-ramo-deploy.py
+.atlas/bin/atlas new-script aggiunge-ramo-deploy
+# scrivi le mutazioni in .atlas/scripts/002-aggiunge-ramo-deploy.py
+.atlas/bin/atlas exec .atlas/scripts/002-aggiunge-ramo-deploy.py
 ```
 
-Gli script restano in `.atlas/scripts/`, numerati e versionati: sono la storia delle modifiche al grafo, rileggibile in diff e rieseguibile. Ogni mutazione valida il grafo prima di scrivere, quindi un ciclo o un arco verso un nodo inesistente vengono rifiutati e la transazione non tocca il disco.
+```python
+from core import mutate
 
-## Più grafi nello stesso progetto
+def run(g):
+    mutate.add_branch(g, "X", "Consegna", "#0f766e")
+    mutate.add_node(g, id="X01", branch="X", type="task", mode="AFK",
+                    title="Pipeline di build",
+                    question="Che cosa produce, e come si verifica che sia buono?",
+                    blockedBy=["F03"])
+```
 
-Un grafo per epic. Ognuno vive in `.atlas/graphs/<slug>/` con il suo `graph.json`, i suoi ticket e la sua dashboard, isolato dagli altri. Lo switch è a carico di chi lavora, con `atlas use <slug>`, con `--graph <slug>` sul singolo comando, o con la variabile `ATLAS_GRAPH` quando due sessioni lavorano grafi diversi in parallelo.
+Tutto gira in una transazione sola e viene validato prima di scrivere: cicli, archi verso il nulla e id duplicati fanno fallire lo script senza toccare il file.
 
-## Sviluppo di Atlas stesso
+Altre funzioni: `edit_node`, `link`, `unlink`, `drop` (fuori scopo), `remove_node`, `reopen`, `fog_add`, `note_add`, `set_meta`.
+
+## Più grafi
+
+Uno per epic, isolati.
 
 ```bash
-python3 -m unittest discover -s tests -v   # test del motore
-python3 build.py                            # rigenera dist/atlas-install.py
+.atlas/bin/atlas new altro-epic -t "Titolo" -d "Dove si arriva."
+.atlas/bin/atlas graphs
+.atlas/bin/atlas use altro-epic       # oppure -g <slug>, oppure ATLAS_GRAPH=<slug>
 ```
 
-`payload/` è ciò che finisce dentro il progetto ospite. `build.py` lo impacchetta in un tar.gz codificato base64 dentro un unico file installabile.
+## Le due skill
+
+`atlas-new-graph` costruisce un grafo nuovo, da un testo che hai già o tracciandolo col wayfinder. `atlas-work` lavora un nodo dalla frontiera alla chiusura. Si invocano da sole quando serve.
+
+## Sviluppare Atlas
+
+```bash
+python3 -m unittest discover -s tests   # motore
+python3 build.py && python3 tests/e2e.py  # installer, provato davvero
+```
+
+`payload/` è ciò che finisce nel progetto ospite, e deve restare stdlib pura. Dopo ogni modifica va rigenerato `dist/atlas-install.py` con `build.py`.
