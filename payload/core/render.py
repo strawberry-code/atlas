@@ -12,6 +12,7 @@ from html import escape
 from . import claims, theme
 from .config import Graph
 from .model import claimed, frontier, levels, progress
+from .strings import current, t
 from .theme import STATE, state_of
 
 W, H, GAP_X, GAP_Y, PAD = 236, 92, 26, 48, 24
@@ -83,7 +84,7 @@ def boxes(data: dict, pos: dict, front: set[str]) -> str:
         bordo, sfondo, testo, glifo, _, dash = STATE[state_of(node, front)]
         ramo = data["branches"][node["branch"]].get("color", theme.EDGE)
         tratto = f' stroke-dasharray="{dash}"' if dash else ""
-        deps = ", ".join(node["blockedBy"]) or "libero"
+        deps = ", ".join(node["blockedBy"]) or t("render.libero")
         righe = wrap(node["title"])
         titolo = "".join(
             f'<text class="ntt" x="{x + 16}" y="{y + 40 + i * 16}" fill="{theme.INK}">{escape(r)}</text>'
@@ -108,8 +109,8 @@ def boxes(data: dict, pos: dict, front: set[str]) -> str:
 def _card_avanzamento(data: dict, fatti: int, totale: int) -> str:
     quota = round(100 * fatti / totale) if totale else 0
     return (
-        f'<section class="box"><h2>avanzamento</h2>'
-        f'<p class="pct">{quota}%<span>{fatti} di {totale} nodi</span></p>'
+        f'<section class="box"><h2>{t("render.avanzamento")}</h2>'
+        f'<p class="pct">{quota}%<span>{t("render.nodi_conteggio", fatti=fatti, totale=totale)}</span></p>'
         f'<div class="track"><div class="fill" style="width:{quota}%"></div></div>'
         f'<p class="dest">{escape(data["meta"]["destination"])}</p></section>'
     )
@@ -132,13 +133,14 @@ def panels(ref: Graph, data: dict, front: list[dict], presi: list[dict]) -> str:
         conteggi[node["branch"]] += 1
     voci_rami = [
         f'<li><span class="dot" style="background:{r.get("color", theme.EDGE)}"></span>'
-        f'<b>{k}</b> {escape(r["label"])}<span class="tag">{conteggi[k]} nodi</span></li>'
+        f'<b>{k}</b> {escape(r["label"])}'
+        f'<span class="tag">{t("render.nodi_del_ramo", n=conteggi[k])}</span></li>'
         for k, r in data["branches"].items()
     ]
     cards = [
         _card_avanzamento(data, fatti, totale),
-        _card_lista("frontiera", voci_front, "niente di prendibile: o è tutto chiuso, o è tutto bloccato"),
-        _card_lista("rami", voci_rami, "nessun ramo"),
+        _card_lista(t("render.frontiera"), voci_front, t("render.frontiera_vuota")),
+        _card_lista(t("render.rami"), voci_rami, t("render.nessun_ramo")),
     ]
     if presi:
         voci = [
@@ -146,7 +148,7 @@ def panels(ref: Graph, data: dict, front: list[dict], presi: list[dict]) -> str:
             f'<span class="tag">{escape(n["assignee"] or "?")} · '
             f'{claims.claim_state(n, agente)}</span></li>' for n in presi
         ]
-        cards.append(_card_lista("in lavorazione", voci, ""))
+        cards.append(_card_lista(t("render.in_lavorazione"), voci, ""))
     return "".join(cards)
 
 
@@ -159,20 +161,20 @@ def build(ref: Graph, data: dict) -> str:
     altezza = max((y + H for _, y in pos.values()), default=200) + PAD
     legenda = "".join(
         f'<span><i class="dot" style="background:{STATE[s][1]};border:1.5px solid {STATE[s][0]}"></i>'
-        f'{STATE[s][3]} {STATE[s][4]}</span>' for s in theme.ORDER
+        f'{STATE[s][3]} {t(STATE[s][4])}</span>' for s in theme.ORDER
     )
     meta = data["meta"]
+    sottotitolo = t("render.sottotitolo", slug=escape(meta["slug"]),
+                    progetto=escape(ref.workspace.config["project"]), data=escape(meta["updated"]))
     return (
-        '<!doctype html><html lang="it"><head><meta charset="utf-8">'
+        f'<!doctype html><html lang="{current()}"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         f'<title>{escape(meta["title"])} · atlas</title><style>{theme.CSS}</style></head><body>'
         f'<header><h1>{escape(meta["title"])}</h1>'
-        f'<p class="sub">grafo <code>{escape(meta["slug"])}</code> · '
-        f'{escape(ref.workspace.config["project"])} · aggiornato al {escape(meta["updated"])}</p></header>'
+        f'<p class="sub">{sottotitolo}</p></header>'
         f'<div class="grid">{panels(ref, data, front, presi)}</div>'
         f'<div class="legend">{legenda}'
-        '<span style="margin-left:auto">passa il puntatore su un nodo per leggerne la domanda, '
-        'cliccalo per aprirne il ticket</span></div>'
+        f'<span style="margin-left:auto">{t("render.legenda_caption")}</span></div>'
         f'<div class="wrap"><div class="canvas">'
         f'<svg viewBox="0 0 {larghezza} {altezza}" width="{larghezza}" height="{altezza}" '
         'xmlns="http://www.w3.org/2000/svg">'
@@ -181,7 +183,7 @@ def build(ref: Graph, data: dict) -> str:
         '</marker></defs>'
         f'{edges(data, pos)}{boxes(data, pos, {n["id"] for n in front})}'
         '</svg></div></div>'
-        '<footer>generato da atlas · la verità sta in graph.json, e si cambia solo con uno script'
+        f'<footer>{t("render.footer")}'
         '</footer></body></html>'
     )
 

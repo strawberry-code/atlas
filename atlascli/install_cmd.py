@@ -18,6 +18,7 @@ from pathlib import Path
 
 from . import registry
 from .registry import RegistryError
+from .strings import set_language, t
 
 DIRNAME = ".atlas"
 BEGIN, END = "<!-- atlas:begin -->", "<!-- atlas:end -->"
@@ -26,6 +27,7 @@ IGNORE = [f"{DIRNAME}/graphs/*/dashboard.html", f"{DIRNAME}/current", "__pycache
 
 CONFIG = {
     "project": None,
+    "language": "it",
     "agent": {"process_name": "claude", "default_assignee": "claude",
               "idle_hours": 4, "max_claims_per_session": 1},
     "git": {"commit_on_close": False, "commit_type": "feat", "stage": "node-paths"},
@@ -36,8 +38,8 @@ CONFIG = {
 
 
 class Installer:
-    def __init__(self, target: Path, args):
-        self.target, self.args = target, args
+    def __init__(self, target: Path, args, lingua: str = "it"):
+        self.target, self.args, self.lingua = target, args, lingua
         self.root = target / DIRNAME
         self.fatti: list[str] = []
 
@@ -48,7 +50,7 @@ class Installer:
 
     def scrive(self, path: Path, testo: str) -> None:
         if self.args.dry_run:
-            self.dice(f"scriverebbe {path.relative_to(self.target)}")
+            self.dice(t("install.scriverebbe", path=path.relative_to(self.target)))
             return
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(testo, encoding="utf-8")
@@ -60,7 +62,7 @@ class Installer:
         blob = base64.b64decode(_payload.PAYLOAD_B64)
         with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tf:
             if self.args.dry_run:
-                self.dice(f"scompatterebbe {len(tf.getnames())} file in {DIRNAME}/")
+                self.dice(t("install.scompatterebbe", n=len(tf.getnames()), dirname=DIRNAME))
                 return
             for voce in SOSTITUIBILI:
                 vecchio = self.root / voce
@@ -72,25 +74,38 @@ class Installer:
         (self.root / "bin" / "atlas").chmod(0o755)
         for cartella in ("graphs", "scripts"):
             (self.root / cartella).mkdir(exist_ok=True)
-        shutil.copyfile(self.root / "templates" / "contract.md", self.root / "CONTRACT.md")
+        for skill in (self.root / "skills").iterdir():
+            if skill.is_dir():
+                shutil.copyfile(skill / f"SKILL.{self.lingua}.md", skill / "SKILL.md")
+        shutil.copyfile(self.root / "templates" / f"contract.{self.lingua}.md", self.root / "CONTRACT.md")
         versione = (self.root / "VERSION").read_text(encoding="utf-8").strip()
-        self.dice(f"motore in {DIRNAME}/ (versione {versione})")
+        self.dice(t("install.motore_in", dirname=DIRNAME, versione=versione))
 
     def configura(self) -> None:
         path = self.root / "config.json"
         if path.is_file():
-            self.dice("config.json già presente, lasciato com'era")
+            self.dice(t("install.config_presente"))
             return
         nome = self.target.name if self.args.yes else (
-            input(f"  nome del progetto [{self.target.name}]: ").strip() or self.target.name)
-        cfg = dict(CONFIG, project=nome)
+            input(t("install.nome_progetto", default=self.target.name)).strip() or self.target.name)
+        cfg = dict(CONFIG, project=nome, language=self.lingua)
         self.scrive(path, json.dumps(cfg, ensure_ascii=False, indent=2) + "\n")
-        self.dice(f"config.json creato per '{nome}'")
+        self.dice(t("install.config_creato", nome=nome))
+
+    def imposta_lingua(self) -> None:
+        """Patch chirurgica della sola chiave 'language': gira sempre, config.json
+        esista gia' o no, a differenza di configura() che si ferma se il file c'e'."""
+        if self.args.dry_run:
+            return
+        path = self.root / "config.json"
+        dati = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else dict(CONFIG, project=self.target.name)
+        dati["language"] = self.lingua
+        path.write_text(json.dumps(dati, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
     def collega_skill(self) -> None:
         dest = self.target / ".claude" / "skills"
         if self.args.dry_run:
-            self.dice("collegherebbe le skill in .claude/skills/")
+            self.dice(t("install.skill_dry_run"))
             return
         dest.mkdir(parents=True, exist_ok=True)
         for skill in sorted((self.root / "skills").iterdir()):
@@ -101,10 +116,10 @@ class Installer:
                 if link.is_symlink():
                     link.unlink()
                 else:
-                    self.dice(f"{link.name} esiste e non è un symlink: lasciato com'è")
+                    self.dice(t("install.skill_non_symlink", nome=link.name))
                     continue
             link.symlink_to(Path("..") / ".." / DIRNAME / "skills" / skill.name, target_is_directory=True)
-        self.dice("skill collegate in .claude/skills/")
+        self.dice(t("install.skill_collegate"))
 
     def registra_hook(self) -> None:
         if self.args.no_hooks:
@@ -114,12 +129,12 @@ class Installer:
         comando = f'python3 "$CLAUDE_PROJECT_DIR/{DIRNAME}/hooks/session_end.py"'
         gruppi = dati.setdefault("hooks", {}).setdefault("SessionEnd", [])
         if any(DIRNAME in json.dumps(g) for g in gruppi):
-            self.dice("hook SessionEnd già registrato")
+            self.dice(t("install.hook_esiste"))
             return
         gruppi.append({"hooks": [{"type": "command", "command": comando,
-                                  "statusMessage": "Aggiornamento delle dashboard Atlas"}]})
+                                  "statusMessage": t("install.hook_status")}]})
         self.scrive(path, json.dumps(dati, ensure_ascii=False, indent=2) + "\n")
-        self.dice("hook SessionEnd registrato, hook preesistenti intatti")
+        self.dice(t("install.hook_registrato"))
 
     def contratto(self) -> None:
         if self.args.no_claude_md:
@@ -130,13 +145,13 @@ class Installer:
             testo = path.read_text(encoding="utf-8")
             if BEGIN in testo:
                 nuovo = re.sub(re.escape(BEGIN) + r".*?" + re.escape(END), blocco, testo, flags=re.S)
-                self.dice("blocco Atlas in CLAUDE.md aggiornato")
+                self.dice(t("install.claude_md_aggiornato"))
             else:
                 nuovo = testo.rstrip() + f"\n\n{blocco}\n"
-                self.dice("contratto appeso a CLAUDE.md")
+                self.dice(t("install.claude_md_appeso"))
         else:
             nuovo = f"# CLAUDE.md\n\n{blocco}\n"
-            self.dice("CLAUDE.md creato col contratto")
+            self.dice(t("install.claude_md_creato"))
         self.scrive(path, nuovo)
 
     def gitignore(self) -> None:
@@ -145,10 +160,11 @@ class Installer:
         mancanti = [r for r in IGNORE if r not in testo]
         if not mancanti:
             return
+        commento = t("install.gitignore_commento")
         coda = "\n".join(mancanti)
-        self.scrive(path, f"{testo.rstrip()}\n\n# Atlas: artefatti rigenerabili\n{coda}\n"
-                    if testo.strip() else f"# Atlas: artefatti rigenerabili\n{coda}\n")
-        self.dice(f".gitignore: aggiunte {len(mancanti)} righe")
+        self.scrive(path, f"{testo.rstrip()}\n\n{commento}\n{coda}\n"
+                    if testo.strip() else f"{commento}\n{coda}\n")
+        self.dice(t("install.gitignore_righe", n=len(mancanti)))
 
     def primo_grafo(self) -> None:
         if not self.args.graph or self.args.dry_run:
@@ -165,9 +181,11 @@ class Installer:
             slug = registry.register(self.target, slug=getattr(self.args, "slug", None),
                                       yes=self.args.yes)
         except RegistryError as errore:
-            self.dice(f"registro globale: {errore}")
+            self.dice(t("install.registro_errore", errore=errore))
             return
-        self.dice(f"registrato come '{slug}' in ~/.atlas/registry.json")
+        if getattr(self.args, "lang", None):
+            registry.set_language(self.args.lang, slug=slug)
+        self.dice(t("install.registrato", slug=slug))
 
     def disinstalla(self) -> int:
         for voce in SOSTITUIBILI + ("CONTRACT.md",):
@@ -191,13 +209,13 @@ class Installer:
         slug = registry.find_by_path(self.target)
         if slug:
             registry.unregister(slug)
-        print(f"\n  Motore rimosso. Restano i tuoi dati in {DIRNAME}/: "
-              f"graphs/, scripts/, config.json.\n  Cancellali a mano se non ti servono più.\n")
+        print(t("install.rimosso", dirname=DIRNAME))
         return 0
 
     def run(self) -> int:
         self.scompatta()
         self.configura()
+        self.imposta_lingua()
         self.collega_skill()
         self.registra_hook()
         self.contratto()
@@ -206,27 +224,41 @@ class Installer:
         self.registra_globalmente()
         versione = (self.root / "VERSION").read_text(encoding="utf-8").strip() \
             if (self.root / "VERSION").is_file() else "?"
-        print(f"\n  Atlas {versione} in {self.target}\n")
+        print(t("install.riepilogo", versione=versione, target=self.target))
         for riga in self.fatti:
             print(f"    · {riga}")
-        print(f"\n  Prova con:  {DIRNAME}/bin/atlas doctor")
+        print(t("install.prova_con", dirname=DIRNAME))
         if not self.args.graph:
-            print(f"  Primo grafo: {DIRNAME}/bin/atlas new <slug> -t \"Titolo\"")
+            print(t("install.primo_grafo", dirname=DIRNAME))
         print()
         return 0
 
 
 def cmd_install(args) -> int:
     if sys.version_info < (3, 10):
-        print("  Atlas richiede Python 3.10 o superiore.", file=sys.stderr)
+        print(t("install.python_richiesto"), file=sys.stderr)
         return 1
     try:
         import fcntl  # noqa: F401
     except ImportError:
-        print("  Atlas richiede un sistema POSIX: il lock del grafo usa fcntl.", file=sys.stderr)
+        print(t("install.posix_richiesto"), file=sys.stderr)
         return 1
-    return Installer(Path(args.path).resolve(), args).run()
+    target = Path(args.path).resolve()
+    lingua = _lingua_per_install(target, getattr(args, "lang", None))
+    set_language(lingua)  # i messaggi di questo comando seguono la lingua risolta per il progetto
+    return Installer(target, args, lingua).run()
+
+
+def _lingua_per_install(target: Path, lang_esplicito: str | None) -> str:
+    """Reinstall senza --lang su uno slug gia' noto: rispetta la lingua gia' risolta
+    per quello slug, non forza silenziosamente il default globale corrente."""
+    if lang_esplicito:
+        return lang_esplicito
+    slug_esistente = registry.find_by_path(target)
+    return registry.language_for(slug_esistente)
 
 
 def cmd_uninstall(args) -> int:
-    return Installer(Path(args.path).resolve(), args).disinstalla()
+    target = Path(args.path).resolve()
+    set_language(registry.language_for(registry.find_by_path(target)))
+    return Installer(target, args).disinstalla()

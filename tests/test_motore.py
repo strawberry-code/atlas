@@ -28,9 +28,10 @@ class Base(unittest.TestCase):
         os.environ["ATLAS_ROOT"] = str(self.root)
         for modulo in [m for m in sys.modules if m == "core" or m.startswith("core.")]:
             del sys.modules[modulo]
-        from core import config, docs, mutate, render, store, model, claims
+        from core import config, docs, mutate, render, store, model, claims, strings
         self.config, self.docs, self.mutate = config, docs, mutate
         self.render, self.store, self.model, self.claims = render, store, model, claims
+        self.strings = strings
         self.ws = config.workspace(self.tmp)
         self.ref = mutate.create_graph(self.ws, "prova", "Grafo di prova", "Verificare il motore.")
 
@@ -232,6 +233,32 @@ class PiuGrafi(Base):
     def test_slug_inesistente(self):
         with self.assertRaises(self.config.ConfigError):
             self.ws.graph("mai-esistito")
+
+
+class Lingua(Base):
+    def test_default_italiano_se_assente_dal_config(self):
+        self.assertEqual("it", self.ws.config.get("language", "it"))
+        self.assertEqual("chiuso", self.strings.t("state.closed"))
+
+    def test_t_cambia_con_set_language(self):
+        self.strings.set_language("en")
+        self.assertEqual("closed", self.strings.t("state.closed"))
+        self.strings.set_language("it")
+        self.assertEqual("chiuso", self.strings.t("state.closed"))
+
+    def test_t_ricade_su_it_per_lingua_sconosciuta(self):
+        self.strings.set_language("fr")
+        self.assertEqual("it", self.strings.current())
+
+    def test_template_sceglie_lingua_semplice(self):
+        (self.root / "config.json").write_text(json.dumps({"language": "en"}), encoding="utf-8")
+        self.assertIn("## Question", self.ws.template("ticket.md"))
+        (self.root / "config.json").write_text(json.dumps({"language": "it"}), encoding="utf-8")
+        self.assertIn("## Domanda", self.ws.template("ticket.md"))
+
+    def test_template_sceglie_lingua_estensione_composta(self):
+        (self.root / "config.json").write_text(json.dumps({"language": "en"}), encoding="utf-8")
+        self.assertIn("Run with:", self.ws.template("migration.py.tmpl"))
 
 
 if __name__ == "__main__":

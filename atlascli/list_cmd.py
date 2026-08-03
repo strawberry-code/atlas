@@ -4,6 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from . import registry
+from .strings import t
 
 
 def scheda_progetto(slug: str) -> int:
@@ -11,11 +12,7 @@ def scheda_progetto(slug: str) -> int:
     path = registry.resolve(slug)
     stato = registry.status_of(path)
     versione = registry.installed_version(path) or "-"
-    print(f"\n  {slug}\n"
-          f"  path      {path}\n"
-          f"  stato     {stato}\n"
-          f"  versione  {versione}\n\n"
-          f"  Aggiorna con: atlas {slug} update\n")
+    print(t("list.scheda", slug=slug, path=path, stato=stato, versione=versione))
     return 0
 
 
@@ -23,14 +20,14 @@ def cmd_list(args) -> int:
     if getattr(args, "prune", False):
         tolti = registry.prune()
         if tolti:
-            print(f"\n  rimossi dal registro: {', '.join(tolti)}\n")
+            print(t("list.prune_fatto", elenco=", ".join(tolti)))
         else:
-            print("\n  nessuna voce morta da rimuovere\n")
+            print(t("list.prune_niente"))
         return 0
 
     progetti = registry.load()["projects"]
     if not progetti:
-        print("\n  nessun progetto registrato. Installa con 'atlas install <path>'.\n")
+        print(t("list.vuoto"))
         return 0
 
     righe = []

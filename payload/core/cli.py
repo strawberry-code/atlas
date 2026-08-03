@@ -12,18 +12,19 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import claims, docs, mutate, render as dash, report
+from . import claims, docs, mutate, render as dash, report, strings
 from .config import ConfigError, Workspace, workspace
 from .model import node_of
 from .mutate import editing, validate
 from .store import StateError, load, transaction
+from .strings import t
 
 
 def refresh(ref, data: dict, aprila: bool = False) -> None:
     """Ticket mancanti, liste della mappa e dashboard: i tre artefatti derivati."""
     docs.ensure_map(ref, data)
     if creati := docs.write_stubs(ref, data):
-        print(f"  {creati} ticket creati in {ref.tickets_dir}")
+        print(t("refresh.ticket_creati", n=creati, dir=ref.tickets_dir))
     docs.rewrite_lists(ref, data)
     dash.write(ref, data)
     if aprila:
@@ -43,15 +44,15 @@ def commit(ws: Workspace, ref, node: dict, tipo: str) -> None:
     subprocess.run(["git", "add", *percorsi], cwd=radice, check=False)
     messaggio = f"{tipo}({node['id']}): {node['title'].lower()}"
     subprocess.run(["git", "commit", "-m", messaggio], cwd=radice, check=False)
-    print(f"  commit: {messaggio}")
+    print(t("commit.fatto", messaggio=messaggio))
 
 
 def cmd_new(ws: Workspace, args) -> int:
     ref = mutate.create_graph(ws, args.slug, args.title, args.destination)
     ws.pin(args.slug)
     refresh(ref, load(ref.json_path))
-    print(f"  grafo '{args.slug}' creato in {ref.dir} e reso attivo.")
-    print("  Ora popolalo con uno script: 'atlas new-script primo-disegno'.")
+    print(t("new.creato", slug=args.slug, dir=ref.dir))
+    print(t("new.suggerimento"))
     return 0
 
 
@@ -71,23 +72,22 @@ def cmd_exec(ws: Workspace, args) -> int:
     ref = ws.graph(args.graph)
     script = Path(args.script).resolve()
     if not script.is_file():
-        raise ConfigError(f"{script} non esiste")
+        raise ConfigError(t("exec.script_assente", script=script))
     sys.path.insert(0, str(ws.root))
     modulo = runpy.run_path(str(script))
     if "run" not in modulo:
-        raise StateError(f"{script.name} non definisce run(g)")
+        raise StateError(t("exec.senza_run", nome=script.name))
     try:
         with editing(ref) as g:
             modulo["run"](g)
     except StateError:
         raise
     except Exception as errore:                       # lo script e' codice altrui
-        raise StateError(f"{script.name} è morto durante l'esecuzione: "
-                         f"{type(errore).__name__}: {errore}\n"
-                         f"  Il grafo non è stato toccato.") from errore
+        raise StateError(t("exec.morto", nome=script.name,
+                            tipo=type(errore).__name__, errore=errore)) from errore
     data = load(ref.json_path)
     refresh(ref, data)
-    print(f"  {script.name} applicato a '{ref.slug}' · {len(data['nodes'])} nodi")
+    print(t("exec.applicato", nome=script.name, slug=ref.slug, n=len(data["nodes"])))
     report.show_status(ref, data)
     return 0
 
@@ -96,55 +96,59 @@ def cmd_validate(ws: Workspace, args) -> int:
     for slug in ([args.graph] if args.graph else ws.slugs()):
         ref = ws.graph(slug)
         validate(load(ref.json_path), ws.config["vocab"])
-        print(f"  {slug}: forma valida")
+        print(t("validate.ok", slug=slug))
     return 0
 
 
 def cmd_doctor(ws: Workspace, args) -> int:
-    print(f"\n  radice   {ws.root}")
-    print(f"  progetto {ws.config['project']} · {ws.project_root}")
-    print(f"  versione {(ws.root / 'VERSION').read_text().strip()}")
-    print(f"  grafi    {', '.join(ws.slugs()) or 'nessuno'}")
+    print()
+    print(t("doctor.radice", root=ws.root))
+    print(t("doctor.progetto", progetto=ws.config["project"], root=ws.project_root))
+    print(t("doctor.versione", versione=(ws.root / "VERSION").read_text().strip()))
+    print(t("doctor.grafi", grafi=", ".join(ws.slugs()) or t("doctor.nessuno")))
     skills = ws.project_root / ".claude" / "skills"
     attese = [d.name for d in (ws.root / "skills").iterdir() if d.is_dir()]
     mancanti = [s for s in attese if not (skills / s).exists()]
-    print(f"  skill    {'tutte collegate' if not mancanti else 'mancano ' + ', '.join(mancanti)}")
+    stato_skill = t("doctor.skill_ok") if not mancanti else t("doctor.skill_mancanti", elenco=", ".join(mancanti))
+    print(t("doctor.skill", stato=stato_skill))
     hook = ws.project_root / ".claude" / "settings.json"
-    print(f"  hook     {'registrato' if hook.is_file() and 'atlas' in hook.read_text() else 'assente'}")
-    print(f"  git      {'sì' if (ws.project_root / '.git').exists() else 'no'} · "
-          f"commit alla chiusura: {'sì' if ws.config['git']['commit_on_close'] else 'no'}\n")
+    stato_hook = t("doctor.hook_ok") if hook.is_file() and "atlas" in hook.read_text() else t("doctor.hook_assente")
+    print(t("doctor.hook", stato=stato_hook))
+    presente = t("si") if (ws.project_root / ".git").exists() else t("no")
+    commit_ = t("si") if ws.config["git"]["commit_on_close"] else t("no")
+    print(t("doctor.git", presente=presente, commit=commit_))
     return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="atlas", description="Harness di task a grafo.")
-    parser.add_argument("-g", "--graph", help="slug del grafo, se non è quello attivo")
+    parser = argparse.ArgumentParser(prog="atlas", description=t("parser.description"))
+    parser.add_argument("-g", "--graph", help=t("opt.graph"))
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    sub.add_parser("status", help="frontiera, lucchetti, avanzamento")
-    sub.add_parser("graphs", help="i grafi di questo progetto")
-    p = sub.add_parser("use", help="rende attivo un grafo"); p.add_argument("slug")
-    p = sub.add_parser("show", help="scheda di un nodo"); p.add_argument("node")
+    sub.add_parser("status", help=t("help.status"))
+    sub.add_parser("graphs", help=t("help.graphs"))
+    p = sub.add_parser("use", help=t("help.use")); p.add_argument("slug")
+    p = sub.add_parser("show", help=t("help.show")); p.add_argument("node")
 
-    p = sub.add_parser("claim", help="rivendica un nodo per questa sessione")
+    p = sub.add_parser("claim", help=t("help.claim"))
     p.add_argument("node"); p.add_argument("-a", "--assignee"); p.add_argument("--force", action="store_true")
-    p = sub.add_parser("release", help="restituisce un nodo alla frontiera"); p.add_argument("node")
-    p = sub.add_parser("close", help="chiude un nodo con la sua sintesi")
+    p = sub.add_parser("release", help=t("help.release")); p.add_argument("node")
+    p = sub.add_parser("close", help=t("help.close"))
     p.add_argument("node"); p.add_argument("-s", "--sintesi", required=True)
     p.add_argument("-t", "--tipo", default=None); p.add_argument("--force", action="store_true")
-    p = sub.add_parser("fog", help="appunta ciò che è emerso e non ha ancora un nodo")
+    p = sub.add_parser("fog", help=t("help.fog"))
     p.add_argument("riga")
-    p = sub.add_parser("render", help="rigenera ticket, mappa e dashboard")
+    p = sub.add_parser("render", help=t("help.render"))
     p.add_argument("--open", dest="aprila", action="store_true")
 
-    p = sub.add_parser("new", help="crea un grafo nuovo")
+    p = sub.add_parser("new", help=t("help.new"))
     p.add_argument("slug"); p.add_argument("-t", "--title", required=True)
-    p.add_argument("-d", "--destination", default="Da scrivere: dove si arriva quando questo grafo è finito.")
-    p = sub.add_parser("new-script", help="crea uno script di mutazione numerato")
+    p.add_argument("-d", "--destination", default=t("default.destination"))
+    p = sub.add_parser("new-script", help=t("help.new_script"))
     p.add_argument("nome")
-    p = sub.add_parser("exec", help="esegue uno script di mutazione"); p.add_argument("script")
-    sub.add_parser("validate", help="verifica la forma dei grafi")
-    sub.add_parser("doctor", help="stato dell'installazione")
+    p = sub.add_parser("exec", help=t("help.exec")); p.add_argument("script")
+    sub.add_parser("validate", help=t("help.validate"))
+    sub.add_parser("doctor", help=t("help.doctor"))
     return parser
 
 
@@ -153,14 +157,14 @@ def dispatch(ws: Workspace, args) -> int:
         if args.cmd == "graphs":
             report.show_graphs(ws); return 0
         if args.cmd == "use":
-            ws.graph(args.slug); ws.pin(args.slug); print(f"  grafo attivo: {args.slug}"); return 0
+            ws.graph(args.slug); ws.pin(args.slug); print(t("use.attivo", slug=args.slug)); return 0
         return {"new": cmd_new, "new-script": cmd_new_script, "exec": cmd_exec,
                 "validate": cmd_validate, "doctor": cmd_doctor}[args.cmd](ws, args)
 
     ref = ws.graph(args.graph)
     if args.cmd == "close":
         node = claims.close(ref, args.node, args.sintesi, args.force)
-        print(f"  {node['id']} chiuso · riga aggiunta in map.md")
+        print(t("close.fatto", id=node["id"]))
         data = load(ref.json_path)
         refresh(ref, data)
         commit(ws, ref, node, args.tipo or ws.config["git"]["commit_type"])
@@ -169,13 +173,13 @@ def dispatch(ws: Workspace, args) -> int:
 
     if args.cmd == "claim":
         node = claims.claim(ref, args.node, args.assignee, args.force)
-        print(f"  {node['id']} rivendicato · ticket in {ref.ticket_path(node['id'])}")
+        print(t("claim.fatto", id=node["id"], path=ref.ticket_path(node["id"])))
     elif args.cmd == "release":
-        print(f"  {claims.release(ref, args.node)['id']} tornato alla frontiera")
+        print(t("release.fatto", id=claims.release(ref, args.node)["id"]))
     elif args.cmd == "fog":
         with transaction(ref.json_path) as data:
             data["fog"].append(args.riga)
-        print("  appuntato nella nebbia")
+        print(t("fog.fatto"))
     elif args.cmd == "show":
         report.show_node(ref, load(ref.json_path), args.node)
         return 0
@@ -191,9 +195,15 @@ def dispatch(ws: Workspace, args) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    ws = None
+    try:
+        ws = workspace()
+        strings.set_language(ws.config.get("language", "it"))
+    except ConfigError:
+        pass  # nessun progetto da qui: build_parser() mostra comunque --help, in italiano di default
     args = build_parser().parse_args(argv)
     try:
-        return dispatch(workspace(), args)
+        return dispatch(ws or workspace(), args)
     except (StateError, ConfigError) as errore:
         print(f"\n  {errore}\n", file=sys.stderr)
         return 1

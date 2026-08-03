@@ -15,15 +15,20 @@ Finisce in `~/.local/bin/atlas` (override con `ATLAS_INSTALL_DIR`). Serve Python
 ```bash
 atlas install .                      # oppure atlas install /path/al/progetto
 atlas install . --graph mio-epic     # crea subito il primo grafo
+atlas install . --lang en            # contenuti e skill in inglese invece che italiano
 ```
 
-Finisce tutto in `.atlas/`, più due symlink in `.claude/skills/`, l'hook di fine sessione in `.claude/settings.json` e il contratto in `CLAUDE.md`. Il progetto viene anche registrato in `~/.atlas/registry.json` con uno slug (default: nome della cartella; `--slug` per un nome diverso).
+Finisce tutto in `.atlas/`, più due symlink in `.claude/skills/`, l'hook di fine sessione in `.claude/settings.json` e il contratto in `CLAUDE.md`. Il progetto viene anche registrato in `~/.config/atlas.json` con uno slug (default: nome della cartella; `--slug` per un nome diverso).
 
 ```bash
 atlas list                           # progetti registrati e il loro stato
 atlas mio-progetto update            # aggiorna SOLO l'harness di quel progetto
 atlas update                         # aggiorna SOLO il CLI globale, mai i progetti
+atlas lang                           # lingua di default per i nuovi progetti (it/en)
+atlas mio-progetto lang en           # cambia lingua a un progetto già installato e rigenera skill/contratto
 ```
+
+Cambiare lingua a un progetto esistente rigenera `SKILL.md`, `CONTRACT.md` e prova a rirenderizzare ogni grafo: un `map.md` già scritto nella vecchia lingua non viene toccato (le sue intestazioni non combaciano più), quel grafo resta com'era finché non lo si aggiorna a mano — i ticket nuovi seguono comunque la lingua corrente.
 
 ## Lavorare
 

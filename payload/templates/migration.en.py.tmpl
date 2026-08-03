@@ -1,0 +1,24 @@
+"""{descrizione}
+
+Run with:  atlas exec .atlas/scripts/{filename}
+
+The script runs inside a single transaction: if something doesn't add up, the
+graph stays as it was. On close, the shape gets validated (unique ids, resolved
+edges, no cycles).
+"""
+from core import mutate
+
+
+def run(g):
+    # g.data is the open graph, g.node("X01") gets one, g.ids() lists them all.
+    #
+    # mutate.add_branch(g, "X", "Deployment", "#0f766e")
+    # mutate.add_node(g, id="X01", branch="X", type="task", mode="AFK",
+    #                 title="Signed build pipeline",
+    #                 question="What must the pipeline produce, and with which signing key?",
+    #                 blockedBy=["F03"])
+    # mutate.link(g, "X02", blocked_by="X01")
+    # mutate.edit_node(g, "F03", title="Corrected title")
+    # mutate.drop(g, "L05", reason="the Lite doesn't make this round")
+    # mutate.fog_add(g, "how updates get distributed outside the store")
+    raise NotImplementedError("write the mutations here, then remove this line")

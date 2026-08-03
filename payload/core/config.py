@@ -10,12 +10,15 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from .strings import t
+
 DIRNAME = ".atlas"
 ENV_GRAPH = "ATLAS_GRAPH"
 ENV_ROOT = "ATLAS_ROOT"
 
 DEFAULTS = {
     "project": "progetto",
+    "language": "it",
     "agent": {"process_name": "claude", "default_assignee": "claude",
               "idle_hours": 4, "max_claims_per_session": 1},
     "git": {"commit_on_close": False, "commit_type": "feat", "stage": "node-paths"},
@@ -44,9 +47,7 @@ def find_root(start: Path | None = None) -> Path:
     for folder in (here, *here.parents):
         if (folder / DIRNAME / "core").is_dir():
             return folder / DIRNAME
-    raise ConfigError(
-        f"nessun {DIRNAME}/ da qui in su: installa Atlas con 'python3 atlas-install.py'"
-    )
+    raise ConfigError(t("config.root_mancante", dirname=DIRNAME))
 
 
 @dataclass(frozen=True)
@@ -113,7 +114,13 @@ class Workspace:
         return _merge(DEFAULTS, stored)
 
     def template(self, name: str) -> str:
-        return (self.templates_dir / name).read_text(encoding="utf-8")
+        """Inserisce la lingua dopo il primo punto: 'map.md' -> 'map.it.md',
+        'migration.py.tmpl' -> 'migration.it.py.tmpl' (estensione composta:
+        va dopo il nome base, non prima dell'ultima estensione)."""
+        lingua = self.config.get("language", "it")
+        base, sep, resto = name.partition(".")
+        nome_lingua = f"{base}.{lingua}.{resto}" if sep else f"{base}.{lingua}"
+        return (self.templates_dir / nome_lingua).read_text(encoding="utf-8")
 
     def slugs(self) -> list[str]:
         if not self.graphs_dir.is_dir():
@@ -125,12 +132,11 @@ class Workspace:
         known = self.slugs()
         chosen = slug or os.environ.get(ENV_GRAPH) or self.pinned() or (known[0] if len(known) == 1 else None)
         if not chosen:
-            raise ConfigError(
-                "piu' grafi in questo progetto e nessuno attivo.\n"
-                f"  Scegline uno con 'atlas use <slug>' fra: {', '.join(known) or 'nessuno, creane uno con atlas new'}"
-            )
+            raise ConfigError(t("config.nessun_grafo_attivo",
+                                elenco=", ".join(known) or t("config.nessun_grafo")))
         if chosen not in known:
-            raise ConfigError(f"il grafo '{chosen}' non esiste: ci sono {', '.join(known) or 'zero grafi'}")
+            raise ConfigError(t("config.grafo_inesistente", scelto=chosen,
+                                elenco=", ".join(known) or t("config.zero_grafi")))
         return Graph(self, chosen)
 
     def pinned(self) -> str | None:

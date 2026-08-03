@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT))
 from core import claims, render as dash  # noqa: E402
 from core.config import Graph, Workspace  # noqa: E402
 from core.store import load  # noqa: E402
+from core.strings import set_language, t  # noqa: E402
 
 
 def sessione_corrente() -> tuple[str | None, int | None]:
@@ -33,6 +34,7 @@ def sessione_corrente() -> tuple[str | None, int | None]:
 
 def main() -> int:
     ws = Workspace(ROOT)
+    set_language(ws.config.get("language", "it"))
     sid, pid = sessione_corrente()
     rimasti: list[str] = []
     for slug in ws.slugs():
@@ -43,8 +45,7 @@ def main() -> int:
                     if n["status"] == "claimed"
                     and (claims.holder(n).get("session") == sid or claims.holder(n).get("pid") == pid)]
     if rimasti:
-        print(f"Atlas: {', '.join(rimasti)} resta rivendicato. "
-              f"Alla prossima sessione chiudilo con 'atlas close', oppure rilascialo.")
+        print(t("hook.rivendicato", elenco=", ".join(rimasti)))
     return 0
 
 

@@ -12,10 +12,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from .paths import registry_path
+from .paths import config_path
+from .strings import t
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 STATO_OK, STATO_MANCANTE, STATO_NON_VALIDO = "ok", "mancante", "non valido"
+LINGUE = ("it", "en")
 
 
 class RegistryError(Exception):
@@ -32,16 +34,44 @@ def _adesso() -> str:
 
 
 def load() -> dict:
-    path = registry_path()
+    path = config_path()
     if not path.is_file():
-        return {"version": SCHEMA_VERSION, "projects": {}}
-    return json.loads(path.read_text(encoding="utf-8"))
+        return {"version": SCHEMA_VERSION, "language": "it", "projects": {}}
+    dati = json.loads(path.read_text(encoding="utf-8"))
+    dati.setdefault("language", "it")
+    dati.setdefault("projects", {})
+    return dati
 
 
 def save(data: dict) -> None:
-    path = registry_path()
+    path = config_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def language_for(slug: str | None = None) -> str:
+    """Override per-progetto se c'e', altrimenti il default globale, altrimenti 'it'."""
+    data = load()
+    if slug:
+        voce = data["projects"].get(slug, {})
+        if "language" in voce:
+            return voce["language"]
+    return data.get("language", "it")
+
+
+def set_language(lingua: str, slug: str | None = None) -> None:
+    """Senza slug cambia il default globale; con slug l'override di quel progetto.
+
+    Lo slug deve gia' essere registrato: un override senza 'path' corromperebbe lo schema.
+    """
+    data = load()
+    if slug is None:
+        data["language"] = lingua
+    else:
+        if slug not in data["projects"]:
+            raise RegistryError(t("registry.slug_senza_progetto", slug=slug))
+        data["projects"][slug]["language"] = lingua
+    save(data)
 
 
 def _per_path(projects: dict, resolto: str) -> str | None:
@@ -74,12 +104,11 @@ def register(path: Path, slug: str | None = None, *, yes: bool = False,
     attuale = projects.get(slug)
     if attuale and attuale["path"] != resolto:
         if yes:
-            raise RegistryError(
-                f"'{slug}' è già registrato per {attuale['path']}: usa --slug per un nome diverso")
-        risposta = chiedi(f"  '{slug}' è già registrato per {attuale['path']}. "
-                           f"Sovrascrivere con {resolto}? [y/N] ").strip().lower()
+            raise RegistryError(t("registry.slug_occupato", slug=slug, path=attuale["path"]))
+        risposta = chiedi(t("registry.conferma_prompt", slug=slug,
+                            path=attuale["path"], nuovo=resolto)).strip().lower()
         if risposta != "y":
-            raise RegistryError("registrazione annullata")
+            raise RegistryError(t("registry.annullata"))
 
     projects[slug] = {
         "path": resolto,

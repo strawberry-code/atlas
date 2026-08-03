@@ -36,6 +36,35 @@ def _normalizza(info: tarfile.TarInfo) -> tarfile.TarInfo:
     return info
 
 
+def valida_coppie_lingua() -> None:
+    """Ogni template e ogni skill deve avere sia .it. sia .en.: mancarne una non fa
+    esplodere subito il build, ma scompatta() con un FileNotFoundError a runtime,
+    solo per chi sceglie la lingua mancante. Meglio fermarsi qui.
+    """
+    mancanti: set[str] = set()
+
+    template_dir = PAYLOAD_DIR / "templates"
+    for path in sorted(template_dir.iterdir()):
+        for lingua, altra in (("it", "en"), ("en", "it")):
+            marcatore = f".{lingua}."
+            if marcatore in path.name:
+                gemello = template_dir / path.name.replace(marcatore, f".{altra}.", 1)
+                if not gemello.is_file():
+                    mancanti.add(str(gemello.relative_to(PAYLOAD_DIR)))
+
+    for skill_dir in sorted((PAYLOAD_DIR / "skills").iterdir()):
+        if not skill_dir.is_dir():
+            continue
+        for lingua, altra in (("it", "en"), ("en", "it")):
+            atteso, gemello = skill_dir / f"SKILL.{lingua}.md", skill_dir / f"SKILL.{altra}.md"
+            if atteso.is_file() and not gemello.is_file():
+                mancanti.add(str(gemello.relative_to(PAYLOAD_DIR)))
+
+    if mancanti:
+        elenco = "\n".join(f"    {m}" for m in sorted(mancanti))
+        raise SystemExit(f"  Traduzioni mancanti, build interrotta:\n{elenco}\n")
+
+
 def pack_payload() -> tuple[str, str]:
     """Ritorna (versione, blob base64) del motore in payload/."""
     versione = (PAYLOAD_DIR / "VERSION").read_text(encoding="utf-8").strip()
@@ -55,6 +84,7 @@ def build_cli() -> None:
     Si zippa invece una cartella di staging che contiene 'atlascli/' come sottocartella,
     cosi' il package resta un package anche impacchettato.
     """
+    valida_coppie_lingua()
     versione, blob = pack_payload()
     PAYLOAD_MODULE.write_text(
         f'"""Generato da build.py: NON modificare a mano, NON committare."""\n'

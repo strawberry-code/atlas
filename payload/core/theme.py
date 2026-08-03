@@ -12,13 +12,13 @@ BORDER = "#dde3ea"
 EDGE = "#cbd5e1"
 ACCENT = "#4f46e5"
 
-# stato visivo -> bordo, riempimento, testo, glifo, etichetta, tratteggio
+# stato visivo -> bordo, riempimento, testo, glifo, chiave-etichetta (in strings.py), tratteggio
 STATE = {
-    "frontier": ("#b7791f", "#fffbeb", "#8a5a12", "▲", "prendibile adesso", None),
-    "claimed": ("#4f46e5", "#eef2ff", "#3730a3", "⬤", "in lavorazione", None),
-    "closed": ("#0f766e", "#f0fdfa", "#115e59", "✓", "chiuso", None),
-    "blocked": ("#cbd5e1", "#f8fafc", "#64748b", "·", "bloccato", None),
-    "out-of-scope": ("#cbd5e1", "#ffffff", "#94a3b8", "✕", "fuori scopo", "4 3"),
+    "frontier": ("#b7791f", "#fffbeb", "#8a5a12", "▲", "state.frontier", None),
+    "claimed": ("#4f46e5", "#eef2ff", "#3730a3", "⬤", "state.claimed", None),
+    "closed": ("#0f766e", "#f0fdfa", "#115e59", "✓", "state.closed", None),
+    "blocked": ("#cbd5e1", "#f8fafc", "#64748b", "·", "state.blocked", None),
+    "out-of-scope": ("#cbd5e1", "#ffffff", "#94a3b8", "✕", "state.out_of_scope", "4 3"),
 }
 
 ORDER = ["frontier", "claimed", "blocked", "closed", "out-of-scope"]

@@ -55,10 +55,11 @@ def main() -> int:
         return 1
     target = Path(tempfile.mkdtemp())
     atlas_home = Path(tempfile.mkdtemp())
-    env = dict(os.environ, ATLAS_HOME=str(atlas_home))
+    atlas_config = atlas_home / "atlas.json"
+    env = dict(os.environ, ATLAS_CONFIG=str(atlas_config))
     try:
         prepara(target)
-        print(f"\n  progetto finto in {target} · ATLAS_HOME in {atlas_home}\n")
+        print(f"\n  progetto finto in {target} · ATLAS_CONFIG in {atlas_config}\n")
 
         esito = globale(target, "install", str(target), "--yes", "--graph", "epic-test", env=env)
         verifica(esito.returncode == 0, "atlas install va a buon fine")
@@ -67,7 +68,7 @@ def main() -> int:
         verifica((radice / "bin" / "atlas").stat().st_mode & 0o111, "entrypoint eseguibile")
         verifica((target / ".claude" / "skills" / "atlas-work").is_symlink(), "skill collegate con symlink")
 
-        registro = json.loads((atlas_home / "registry.json").read_text(encoding="utf-8"))
+        registro = json.loads(atlas_config.read_text(encoding="utf-8"))
         slug = target.resolve().name
         verifica(slug in registro["projects"], "progetto registrato nel registro globale")
         verifica(registro["projects"][slug]["path"] == str(target.resolve()),
@@ -129,6 +130,29 @@ def main() -> int:
         verifica((target / "CLAUDE.md").read_text(encoding="utf-8").count("atlas:begin") == 1,
                  "slug update: contratto non duplicato")
 
+        mappa_it_prima = (radice / "graphs" / "epic-test" / "map.md").read_text(encoding="utf-8")
+        esito = globale(target, slug, "lang", "en", env=env)
+        verifica("regenerated" in esito.stdout, "'atlas <slug> lang en' produce un riepilogo")
+        verifica(json.loads((radice / "config.json").read_text(encoding="utf-8"))["language"] == "en",
+                 "lang en: config.json aggiornato")
+        verifica("Works a node" in (target / ".claude" / "skills" / "atlas-work" / "SKILL.md"
+                                    ).resolve().read_text(encoding="utf-8"),
+                 "lang en: SKILL.md rigenerato in inglese")
+        verifica("the graph runs the work" in (radice / "CONTRACT.md").read_text(encoding="utf-8"),
+                 "lang en: CONTRACT.md rigenerato in inglese")
+        verifica((radice / "graphs" / "epic-test" / "map.md").read_text(encoding="utf-8") == mappa_it_prima,
+                 "lang en: map.md di un grafo preesistente resta invariato (intestazioni italiane)")
+
+        locale(target, "new", "epic-en", "-t", "English stream", "-d", "Ships in English.")
+        ticket_nuovo = radice / "graphs" / "epic-en" / "tickets"
+        locale(target, "-g", "epic-en", "render")
+        verifica(ticket_nuovo.is_dir() and not any(ticket_nuovo.iterdir()),
+                 "lang en: nuovo grafo senza nodi, nessun ticket da creare")
+
+        esito = globale(target, slug, "lang", "it", env=env)
+        verifica(json.loads((radice / "config.json").read_text(encoding="utf-8"))["language"] == "it",
+                 "lang it: torna in italiano")
+
         rotti = [cosa for ok, cosa in esiti if not ok]
         print(f"\n  {len(esiti) - len(rotti)}/{len(esiti)} verifiche passate\n")
         return 1 if rotti else 0
@@ -137,5 +161,36 @@ def main() -> int:
         shutil.rmtree(atlas_home, ignore_errors=True)
 
 
+def verifica_install_in_inglese() -> None:
+    """Un progetto installato da zero con --lang en produce ticket in inglese dal primo grafo."""
+    target = Path(tempfile.mkdtemp())
+    atlas_home = Path(tempfile.mkdtemp())
+    env = dict(os.environ, ATLAS_CONFIG=str(atlas_home / "atlas.json"))
+    try:
+        subprocess.run(["git", "init", "-q"], cwd=target, check=True)
+        globale(target, "install", str(target), "--yes", "--lang", "en", "--graph", "demo", env=env)
+        radice = target / ".atlas"
+        locale(target, "new-script", "primo")
+        script = sorted((radice / "scripts").glob("*.py"))[0]
+        script.write_text(
+            "from core import mutate\n\n"
+            "def run(g):\n"
+            '    mutate.add_branch(g, "F", "Foundations", "#4f46e5")\n'
+            '    mutate.add_node(g, id="F01", branch="F", title="First", question="?")\n',
+            encoding="utf-8",
+        )
+        locale(target, "exec", f".atlas/scripts/{script.name}")
+        ticket = (radice / "graphs" / "demo" / "tickets" / "F01.md").read_text(encoding="utf-8")
+        verifica("## Question" in ticket and "## Domanda" not in ticket,
+                 "install --lang en: il primo ticket usa le intestazioni inglesi")
+    finally:
+        shutil.rmtree(target, ignore_errors=True)
+        shutil.rmtree(atlas_home, ignore_errors=True)
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    esito = main()
+    verifica_install_in_inglese()
+    rotti = [cosa for ok, cosa in esiti if not ok]
+    print(f"\n  totale: {len(esiti) - len(rotti)}/{len(esiti)} verifiche passate\n")
+    raise SystemExit(1 if rotti else esito)

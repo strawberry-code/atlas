@@ -16,6 +16,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from .strings import t
 from .version import current_version
 
 REPO = "strawberry-code/atlas"
@@ -60,24 +61,24 @@ def cmd_update(args) -> int:
     try:
         release = _get_json(f"{_base_url()}/repos/{REPO}/releases/latest")
     except (urllib.error.URLError, urllib.error.HTTPError, ValueError) as errore:
-        print(f"\n  impossibile controllare la nuova versione: {errore}\n", file=sys.stderr)
+        print(t("update.errore_rete", errore=errore), file=sys.stderr)
         return 1
 
     ultima = release.get("tag_name", "").lstrip("v")
     if not ultima:
-        print("\n  risposta di GitHub senza tag_name: aggiornamento annullato.\n", file=sys.stderr)
+        print(t("update.senza_tag"), file=sys.stderr)
         return 1
     if _parse_version(ultima) <= _parse_version(attuale):
-        print(f"\n  atlas è già alla versione più recente ({attuale})\n")
+        print(t("update.gia_ultima", versione=attuale))
         return 0
 
     asset_url = _asset_url(release, "atlas")
     if not asset_url:
-        print(f"\n  la release {ultima} non ha un asset 'atlas': aggiornamento annullato.\n", file=sys.stderr)
+        print(t("update.asset_assente", versione=ultima), file=sys.stderr)
         return 1
     blob = _get_bytes(asset_url)
     if not blob:
-        print("\n  download vuoto: aggiornamento annullato.\n", file=sys.stderr)
+        print(t("update.download_vuoto"), file=sys.stderr)
         return 1
 
     sha_url = _asset_url(release, "atlas.sha256")
@@ -85,8 +86,7 @@ def cmd_update(args) -> int:
         atteso = _get_bytes(sha_url).decode("utf-8").split()[0]
         trovato = hashlib.sha256(blob).hexdigest()
         if atteso != trovato:
-            print(f"\n  sha256 non combacia (atteso {atteso}, trovato {trovato}): "
-                  f"aggiornamento annullato.\n", file=sys.stderr)
+            print(t("update.sha_mismatch", atteso=atteso, trovato=trovato), file=sys.stderr)
             return 1
 
     target = Path(sys.argv[0]).resolve()
@@ -100,5 +100,5 @@ def cmd_update(args) -> int:
         os.unlink(tmp.name)
         raise
 
-    print(f"\n  atlas {attuale} → {ultima}  ({target})\n")
+    print(t("update.fatto", attuale=attuale, ultima=ultima, target=target))
     return 0

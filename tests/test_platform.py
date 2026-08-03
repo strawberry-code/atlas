@@ -1,6 +1,6 @@
-"""Test di registry.py e dispatch.py: nessuno tocca ~/.atlas reale.
+"""Test di registry.py e dispatch.py: nessuno tocca ~/.config/atlas.json reale.
 
-ATLAS_HOME punta sempre a una cartella temporanea, impostata in setUp e tolta
+ATLAS_CONFIG punta sempre a un file temporaneo, impostato in setUp e tolto
 in tearDown - stesso principio di isolamento di ATLAS_ROOT nei test del motore.
 """
 from __future__ import annotations
@@ -16,16 +16,17 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from atlascli import dispatch, registry  # noqa: E402
+from atlascli import strings as atlascli_strings  # noqa: E402
 
 
 class Registry(unittest.TestCase):
     def setUp(self):
         self.home = Path(tempfile.mkdtemp())
-        os.environ["ATLAS_HOME"] = str(self.home)
+        os.environ["ATLAS_CONFIG"] = str(self.home / "atlas.json")
         self.progetti = Path(tempfile.mkdtemp())
 
     def tearDown(self):
-        os.environ.pop("ATLAS_HOME", None)
+        os.environ.pop("ATLAS_CONFIG", None)
         shutil.rmtree(self.home, ignore_errors=True)
         shutil.rmtree(self.progetti, ignore_errors=True)
 
@@ -91,21 +92,46 @@ class Registry(unittest.TestCase):
         shutil.rmtree(path / ".atlas" / "core")
         self.assertEqual(registry.STATO_NON_VALIDO, registry.status_of(path))
 
+    def test_lingua_default_globale(self):
+        self.assertEqual("it", registry.language_for())
+        registry.set_language("en")
+        self.assertEqual("en", registry.language_for())
+
+    def test_lingua_override_per_progetto(self):
+        path = self._finto_progetto("delta")
+        registry.register(path, slug="delta")
+        registry.set_language("it")
+        self.assertEqual("it", registry.language_for("delta"))  # eredita il default globale
+        registry.set_language("en", slug="delta")
+        self.assertEqual("en", registry.language_for("delta"))  # override
+        self.assertEqual("it", registry.language_for())  # il default globale non cambia
+
+    def test_lingua_su_slug_non_registrato_solleva(self):
+        with self.assertRaises(registry.RegistryError):
+            registry.set_language("en", slug="mai-registrato")
+
 
 class Dispatch(unittest.TestCase):
     def setUp(self):
         self.home = Path(tempfile.mkdtemp())
-        os.environ["ATLAS_HOME"] = str(self.home)
+        os.environ["ATLAS_CONFIG"] = str(self.home / "atlas.json")
 
     def tearDown(self):
-        os.environ.pop("ATLAS_HOME", None)
+        os.environ.pop("ATLAS_CONFIG", None)
         shutil.rmtree(self.home, ignore_errors=True)
+        atlascli_strings.set_language("it")  # dispatch.main() muta uno stato di modulo globale
 
     def test_riservato_prevale_su_tutto(self):
         self.assertIn("install", dispatch.RESERVED)
         self.assertIn("update", dispatch.RESERVED)
         self.assertIn("uninstall", dispatch.RESERVED)
         self.assertIn("list", dispatch.RESERVED)
+        self.assertIn("lang", dispatch.RESERVED)
+
+    def test_lang_globale_query_e_set(self):
+        self.assertEqual(0, dispatch.main(["lang", "en"]))
+        self.assertEqual("en", registry.language_for())
+        self.assertEqual(0, dispatch.main(["lang"]))
 
     def test_radice_locale_risale_le_cartelle(self):
         base = Path(tempfile.mkdtemp())

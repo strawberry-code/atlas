@@ -12,6 +12,7 @@ from datetime import datetime
 from .config import Graph, Workspace
 from .model import by_id, levels, node_of
 from .store import OPEN, DROPPED, SCHEMA_VERSION, StateError, transaction, write_new
+from .strings import t
 
 
 def now() -> str:
@@ -40,20 +41,21 @@ def validate(data: dict, vocab: dict) -> None:
     seen: set[str] = set()
     for node in data["nodes"]:
         if node["id"] in seen:
-            raise StateError(f"id duplicato: {node['id']}")
+            raise StateError(t("mutate.id_duplicato", id=node["id"]))
         seen.add(node["id"])
     for node in data["nodes"]:
         if node["branch"] not in data["branches"]:
-            raise StateError(f"{node['id']} sta su un ramo inesistente: {node['branch']}")
+            raise StateError(t("mutate.ramo_inesistente", id=node["id"], branch=node["branch"]))
         for key, allowed in (("type", vocab["types"]), ("mode", vocab["modes"]),
                              ("status", vocab["statuses"])):
             if node[key] not in allowed:
-                raise StateError(f"{node['id']} ha {key}='{node[key]}', fuori da {allowed}")
+                raise StateError(t("mutate.vocab_non_valido", id=node["id"],
+                                   chiave=key, valore=node[key], ammessi=allowed))
         for dep in node["blockedBy"]:
             if dep not in seen:
-                raise StateError(f"{node['id']} è bloccato da {dep}, che non esiste")
+                raise StateError(t("mutate.dipendenza_inesistente", id=node["id"], dep=dep))
             if dep == node["id"]:
-                raise StateError(f"{node['id']} dipende da se stesso")
+                raise StateError(t("mutate.auto_dipendenza", id=node["id"]))
     levels(data)  # solleva sui cicli
 
 
@@ -71,7 +73,7 @@ def editing(ref: Graph, vocab: dict | None = None):
 
 def add_branch(g: Editor, key: str, label: str, color: str = "#64748b") -> None:
     if key in g.data["branches"]:
-        raise StateError(f"il ramo {key} esiste già")
+        raise StateError(t("mutate.ramo_esiste", chiave=key))
     g.data["branches"][key] = {"label": label, "color": color}
 
 
@@ -79,7 +81,7 @@ def add_node(g: Editor, id: str, title: str, branch: str, question: str,
              type: str = "task", mode: str = "AFK",
              blockedBy: list[str] | tuple[str, ...] = (), artifacts: list[str] = ()) -> dict:
     if id in g.ids():
-        raise StateError(f"{id} esiste già")
+        raise StateError(t("mutate.nodo_esiste", id=id))
     node = {"id": id, "title": title, "branch": branch, "type": type, "mode": mode,
             "status": OPEN, "assignee": None, "blockedBy": list(blockedBy),
             "question": question, "answer": None, "claim": None,
@@ -92,7 +94,7 @@ def edit_node(g: Editor, node_id: str, **fields) -> dict:
     """Cambia i campi descrittivi. Stato e claim passano da claims, non da qui."""
     protetti = {"id", "status", "assignee", "claim"}
     if illeciti := protetti & set(fields):
-        raise StateError(f"questi campi non si toccano da mutate: {', '.join(sorted(illeciti))}")
+        raise StateError(t("mutate.campi_protetti", elenco=", ".join(sorted(illeciti))))
     node = g.node(node_id)
     node.update(fields)
     return node
@@ -101,7 +103,7 @@ def edit_node(g: Editor, node_id: str, **fields) -> dict:
 def remove_node(g: Editor, node_id: str) -> None:
     """Cancella davvero. Se il nodo e' stato lavorato, drop() e' quasi sempre meglio."""
     if dipendenti := [n["id"] for n in g.data["nodes"] if node_id in n["blockedBy"]]:
-        raise StateError(f"{node_id} blocca ancora {', '.join(dipendenti)}: sganciali prima")
+        raise StateError(t("mutate.blocca_ancora", id=node_id, dipendenti=", ".join(dipendenti)))
     g.node(node_id)
     g.data["nodes"] = [n for n in g.data["nodes"] if n["id"] != node_id]
 
@@ -116,7 +118,7 @@ def link(g: Editor, node_id: str, blocked_by: str) -> None:
 def unlink(g: Editor, node_id: str, blocked_by: str) -> None:
     node = g.node(node_id)
     if blocked_by not in node["blockedBy"]:
-        raise StateError(f"{node_id} non è bloccato da {blocked_by}")
+        raise StateError(t("mutate.non_bloccato", id=node_id, blocked_by=blocked_by))
     node["blockedBy"].remove(blocked_by)
 
 
@@ -163,12 +165,12 @@ def create_graph(ws: Workspace, slug: str, title: str, destination: str,
                  notes: list[str] | None = None) -> Graph:
     ref = Graph(ws, slug)
     if ref.exists():
-        raise StateError(f"il grafo '{slug}' esiste già in {ref.dir}")
+        raise StateError(t("mutate.grafo_esiste", slug=slug, dir=ref.dir))
     data = {
         "schemaVersion": SCHEMA_VERSION,
         "meta": {"slug": slug, "title": title, "destination": destination,
                  "updated": now()[:10], "notes": notes or []},
-        "branches": branches or {"A": {"label": "Percorso principale", "color": "#4f46e5"}},
+        "branches": branches or {"A": {"label": t("mutate.ramo_default_label"), "color": "#4f46e5"}},
         "nodes": [], "fog": [], "outOfScope": [],
     }
     validate(data, ws.config["vocab"])

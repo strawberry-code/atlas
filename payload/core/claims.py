@@ -14,6 +14,7 @@ from . import docs
 from .config import Graph
 from .model import by_id, is_done, node_of
 from .store import CLAIMED, CLOSED, OPEN, StateError, transaction
+from .strings import t
 
 
 def session() -> tuple[int | None, str | None]:
@@ -68,18 +69,14 @@ def claim(ref: Graph, node_id: str, assignee: str | None = None, force: bool = F
         node = node_of(data, node_id)
         index = by_id(data)
         if node["status"] != OPEN:
-            raise StateError(f"{node_id} non è aperto: sta a '{node['status']}'")
+            raise StateError(t("claim.non_aperto", id=node_id, stato=node["status"]))
         if bloccanti := [d for d in node["blockedBy"] if not is_done(index[d])]:
             if not force:
-                raise StateError(f"{node_id} è bloccato da {', '.join(bloccanti)}")
+                raise StateError(t("claim.bloccato", id=node_id, bloccanti=", ".join(bloccanti)))
         tenuti = [n["id"] for n in mine(data)]
         if len(tenuti) >= agent["max_claims_per_session"] and not force:
-            raise StateError(
-                f"questa sessione tiene già {', '.join(tenuti)}: "
-                f"il tetto è {agent['max_claims_per_session']} per sessione.\n"
-                f"  Rilascia con 'atlas release {tenuti[0]}', apri un'altra sessione,\n"
-                f"  oppure forza con --force se sai cosa stai facendo."
-            )
+            raise StateError(t("claim.tetto", tenuti=", ".join(tenuti),
+                               tetto=agent["max_claims_per_session"], primo=tenuti[0]))
         node.update(status=CLAIMED, assignee=assignee or agent["default_assignee"],
                     claim={"pid": pid, "session": sid,
                            "at": datetime.now().astimezone().isoformat(timespec="seconds")})
@@ -90,7 +87,7 @@ def release(ref: Graph, node_id: str) -> dict:
     with transaction(ref.json_path) as data:
         node = node_of(data, node_id)
         if node["status"] != CLAIMED:
-            raise StateError(f"{node_id} non è rivendicato: sta a '{node['status']}'")
+            raise StateError(t("release.non_rivendicato", id=node_id, stato=node["status"]))
         node.update(status=OPEN, assignee=None, claim=None)
         return dict(node)
 
@@ -102,16 +99,12 @@ def close(ref: Graph, node_id: str, summary: str, force: bool = False) -> dict:
     with transaction(ref.json_path) as data:
         node = node_of(data, node_id)
         if is_done(node):
-            raise StateError(f"{node_id} è già chiuso")
+            raise StateError(t("close.gia_chiuso", id=node_id))
         owner = holder(node).get("pid")
         if node["status"] == CLAIMED and owner != pid and alive(owner, agent["process_name"]) and not force:
-            raise StateError(f"{node_id} è rivendicato da un'altra sessione viva ({owner})")
+            raise StateError(t("close.altra_sessione", id=node_id, owner=owner))
         if not docs.answer_written(ref, node_id) and not force:
-            raise StateError(
-                f"la sezione Risposta di {ref.ticket_path(node_id).name} è vuota.\n"
-                f"  Scrivila prima di chiudere, oppure usa --force se il nodo\n"
-                f"  si chiude senza risposta perché è diventato irrilevante."
-            )
+            raise StateError(t("close.risposta_vuota", file=ref.ticket_path(node_id).name))
         node.update(status=CLOSED, assignee=None, claim=None, answer=summary,
                     closedAt=datetime.now().astimezone().isoformat(timespec="seconds"))
         return dict(node)

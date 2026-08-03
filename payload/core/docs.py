@@ -9,8 +9,7 @@ import re
 
 from .config import Graph
 from .store import StateError
-
-NIENTE = "_niente, per ora._"
+from .strings import t
 
 # Il marker separa la prosa scritta a mano, che sta sopra, da quel che discende dal
 # grafo, che sta sotto e viene riscritto per intero a ogni render. Senza un confine
@@ -18,10 +17,12 @@ NIENTE = "_niente, per ora._"
 MARK = "<!-- atlas:auto -->"
 
 # Le sezioni di map.md che il grafo possiede, e la chiave da cui ciascuna discende.
+# Le chiavi sono verso strings.py: l'intestazione vera dipende dalla lingua, e deve
+# combaciare esattamente con quella scritta nel template map.{lingua}.md.
 LISTS = {
-    "## Note": ("meta", "notes"),
-    "## Non ancora specificato": (None, "fog"),
-    "## Fuori scopo": (None, "outOfScope"),
+    "heading.note": ("meta", "notes"),
+    "heading.non_specificato": (None, "fog"),
+    "heading.fuori_scopo": (None, "outOfScope"),
 }
 
 
@@ -30,7 +31,7 @@ def answer_written(ref: Graph, node_id: str) -> bool:
     path = ref.ticket_path(node_id)
     if not path.exists():
         return False
-    tail = path.read_text(encoding="utf-8").rpartition("## Risposta")[2]
+    tail = path.read_text(encoding="utf-8").rpartition(t("heading.risposta"))[2]
     return bool(re.sub(r"<!--.*?-->", "", tail, flags=re.S).strip())
 
 
@@ -45,7 +46,7 @@ def write_stubs(ref: Graph, data: dict) -> int:
         path.write_text(stub.format(
             id=node["id"], title=node["title"], type=node["type"], mode=node["mode"],
             branch=rami[node["branch"]]["label"], question=node["question"],
-            blocked=", ".join(node["blockedBy"]) or "nessuno, prendibile subito",
+            blocked=", ".join(node["blockedBy"]) or t("docs.nessuno_prendibile"),
         ), encoding="utf-8")
         creati += 1
     return creati
@@ -64,16 +65,10 @@ def _replace_section(text: str, heading: str, corpo: str) -> str:
     """Riscrive quel che segue il marker dentro una sezione, e lascia intatto il resto."""
     head, sep, tail = text.partition(heading)
     if not sep:
-        raise StateError(
-            f"map.md non ha la sezione '{heading}': rinominarla ferma la rigenerazione.\n"
-            f"  Rimettila, oppure cancella map.md e lascia che 'atlas render' la ricrei."
-        )
+        raise StateError(t("docs.sezione_rinominata", heading=heading))
     body, nl, rest = tail.partition("\n## ")
     if MARK not in body:
-        raise StateError(
-            f"la sezione '{heading}' di map.md ha perso il marker {MARK}.\n"
-            f"  Senza quel confine non si sa dove finisce la prosa scritta a mano."
-        )
+        raise StateError(t("docs.marker_sezione_persa", heading=heading, mark=MARK))
     intro = body.partition(MARK)[0].rstrip()
     return f"{head}{sep}{intro}\n\n{MARK}\n{corpo}\n{nl}{rest}"
 
@@ -89,15 +84,15 @@ def decisions(data: dict) -> str:
     return "\n".join(
         f"- **{n['id']}** {n['title']}: {n['answer']} · [ticket](tickets/{n['id']}.md)"
         for n in chiusi
-    ) or NIENTE
+    ) or t("docs.niente")
 
 
 def rewrite_lists(ref: Graph, data: dict) -> None:
     """Rigenera in map.md le sezioni che il grafo possiede. Editarle a mano non serve."""
     text = ref.map_path.read_text(encoding="utf-8")
-    text = _replace_section(text, "## Destinazione", data["meta"]["destination"])
-    text = _replace_section(text, "## Decisioni prese", decisions(data))
-    for heading, (parent, key) in LISTS.items():
+    text = _replace_section(text, t("heading.destinazione"), data["meta"]["destination"])
+    text = _replace_section(text, t("heading.decisioni"), decisions(data))
+    for chiave, (parent, key) in LISTS.items():
         items = data[parent][key] if parent else data[key]
-        text = _replace_section(text, heading, "\n".join(f"- {i}" for i in items) or NIENTE)
+        text = _replace_section(text, t(chiave), "\n".join(f"- {i}" for i in items) or t("docs.niente"))
     ref.map_path.write_text(text, encoding="utf-8")
