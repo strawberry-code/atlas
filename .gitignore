@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+.DS_Store
+# Sandbox di prova generate dai test end-to-end
+/sandbox/

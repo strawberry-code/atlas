@@ -1,0 +1,238 @@
+"""Test del motore: forma del grafo, lucchetti, artefatti derivati.
+
+Ogni test lavora su una copia fresca di payload/ in una cartella temporanea, cosi'
+prova esattamente il codice che finisce dentro un progetto ospite.
+"""
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+SORGENTE = Path(__file__).resolve().parent.parent / "payload"
+
+
+class Base(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.root = self.tmp / ".atlas"
+        shutil.copytree(SORGENTE, self.root)
+        (self.root / "config.json").write_text(json.dumps({"project": "prova"}), encoding="utf-8")
+        for cartella in ("graphs", "scripts"):
+            (self.root / cartella).mkdir()
+        sys.path.insert(0, str(self.root))
+        os.environ["ATLAS_ROOT"] = str(self.root)
+        for modulo in [m for m in sys.modules if m == "core" or m.startswith("core.")]:
+            del sys.modules[modulo]
+        from core import config, docs, mutate, render, store, model, claims
+        self.config, self.docs, self.mutate = config, docs, mutate
+        self.render, self.store, self.model, self.claims = render, store, model, claims
+        self.ws = config.workspace(self.tmp)
+        self.ref = mutate.create_graph(self.ws, "prova", "Grafo di prova", "Verificare il motore.")
+
+    def tearDown(self):
+        sys.path.remove(str(self.root))
+        os.environ.pop("ATLAS_ROOT", None)
+        shutil.rmtree(self.tmp)
+
+    def popola(self, **kwargs):
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.add_branch(g, "F", "Fondamenta", "#4f46e5")
+            self.mutate.add_node(g, id="F01", branch="F", title="Primo", question="?")
+            self.mutate.add_node(g, id="F02", branch="F", title="Secondo", question="?", blockedBy=["F01"])
+            self.mutate.add_node(g, id="F03", branch="F", title="Terzo", question="?", blockedBy=["F02"])
+        return self.store.load(self.ref.json_path)
+
+    def rispondi(self, node_id: str):
+        self.docs.write_stubs(self.ref, self.store.load(self.ref.json_path))
+        path = self.ref.ticket_path(node_id)
+        path.write_text(path.read_text(encoding="utf-8") + "\nLa risposta.\n", encoding="utf-8")
+
+
+class Forma(Base):
+    def test_frontiera_solo_i_nodi_sbloccati(self):
+        data = self.popola()
+        self.assertEqual(["F01"], [n["id"] for n in self.model.frontier(data)])
+
+    def test_livelli_topologici(self):
+        data = self.popola()
+        self.assertEqual({"F01": 0, "F02": 1, "F03": 2}, self.model.levels(data))
+
+    def test_ciclo_rifiutato_e_grafo_intatto(self):
+        self.popola()
+        with self.assertRaises(self.store.StateError):
+            with self.mutate.editing(self.ref) as g:
+                self.mutate.link(g, "F01", blocked_by="F03")
+        self.assertEqual([], self.store.load(self.ref.json_path)["nodes"][0]["blockedBy"])
+
+    def test_arco_verso_nodo_inesistente(self):
+        self.popola()
+        with self.assertRaises(self.store.StateError):
+            with self.mutate.editing(self.ref) as g:
+                self.mutate.add_node(g, id="Z9", branch="F", title="X", question="?", blockedBy=["MAI"])
+
+    def test_vocabolario_chiuso(self):
+        with self.assertRaises(self.store.StateError):
+            with self.mutate.editing(self.ref) as g:
+                self.mutate.add_branch(g, "F", "Fondamenta")
+                self.mutate.add_node(g, id="F01", branch="F", title="X", question="?", type="epico")
+
+    def test_id_duplicato(self):
+        self.popola()
+        with self.assertRaises(self.store.StateError):
+            with self.mutate.editing(self.ref) as g:
+                self.mutate.add_node(g, id="F01", branch="F", title="Bis", question="?")
+
+    def test_eccezione_nello_script_non_scrive(self):
+        self.popola()
+        with self.assertRaises(RuntimeError):
+            with self.mutate.editing(self.ref) as g:
+                self.mutate.add_node(g, id="F04", branch="F", title="Perduto", question="?")
+                raise RuntimeError("a metà")
+        self.assertEqual(3, len(self.store.load(self.ref.json_path)["nodes"]))
+
+    def test_fuori_scopo_sblocca_chi_aspettava(self):
+        self.popola()
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.drop(g, "F01", reason="non serve più")
+        data = self.store.load(self.ref.json_path)
+        self.assertEqual(["F02"], [n["id"] for n in self.model.frontier(data)])
+        self.assertEqual(1, len(data["outOfScope"]))
+
+    def test_campi_protetti_non_si_toccano_da_mutate(self):
+        self.popola()
+        with self.assertRaises(self.store.StateError):
+            with self.mutate.editing(self.ref) as g:
+                self.mutate.edit_node(g, "F01", status="closed")
+
+
+class Lucchetti(Base):
+    def test_ciclo_di_vita(self):
+        self.popola()
+        self.claims.claim(self.ref, "F01")
+        data = self.store.load(self.ref.json_path)
+        self.assertEqual("claimed", self.model.node_of(data, "F01")["status"])
+        self.claims.release(self.ref, "F01")
+        self.assertEqual("open", self.model.node_of(self.store.load(self.ref.json_path), "F01")["status"])
+
+    def test_non_si_rivendica_un_nodo_bloccato(self):
+        self.popola()
+        with self.assertRaises(self.store.StateError):
+            self.claims.claim(self.ref, "F02")
+
+    def test_tetto_di_un_nodo_per_sessione(self):
+        self.popola()
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.unlink(g, "F02", blocked_by="F01")
+        self.claims.claim(self.ref, "F01")
+        with self.assertRaises(self.store.StateError):
+            self.claims.claim(self.ref, "F02")
+
+    def test_close_pretende_la_risposta_scritta(self):
+        self.popola()
+        self.claims.claim(self.ref, "F01")
+        with self.assertRaises(self.store.StateError):
+            self.claims.close(self.ref, "F01", "sintesi")
+        self.rispondi("F01")
+        node = self.claims.close(self.ref, "F01", "sintesi")
+        self.assertEqual("closed", node["status"])
+        self.assertIn("closedAt", node)
+
+    def test_lucchetto_orfano(self):
+        self.popola()
+        self.claims.claim(self.ref, "F01")
+        with self.store.transaction(self.ref.json_path) as data:
+            self.model.node_of(data, "F01")["claim"]["pid"] = 999999
+        node = self.model.node_of(self.store.load(self.ref.json_path), "F01")
+        self.assertEqual("dead", self.claims.claim_state(node, self.ws.config["agent"]))
+
+
+class Artefatti(Base):
+    def render_tutto(self):
+        data = self.store.load(self.ref.json_path)
+        self.docs.ensure_map(self.ref, data)
+        self.docs.write_stubs(self.ref, data)
+        self.docs.rewrite_lists(self.ref, data)
+        self.render.write(self.ref, data)
+        return data
+
+    def test_mappa_stabile_dopo_render_ripetuti(self):
+        self.popola()
+        self.render_tutto()
+        primo = self.ref.map_path.read_text(encoding="utf-8")
+        self.render_tutto()
+        self.render_tutto()
+        self.assertEqual(primo, self.ref.map_path.read_text(encoding="utf-8"))
+
+    def test_decisioni_ricostruite_dal_grafo(self):
+        self.popola()
+        self.rispondi("F01")
+        self.claims.claim(self.ref, "F01")
+        self.claims.close(self.ref, "F01", "così si è deciso")
+        self.ref.map_path.unlink(missing_ok=True)
+        self.render_tutto()
+        self.assertIn("così si è deciso", self.ref.map_path.read_text(encoding="utf-8"))
+
+    def test_sezione_rinominata_fallisce_rumorosamente(self):
+        data = self.popola()
+        self.docs.ensure_map(self.ref, data)
+        testo = self.ref.map_path.read_text(encoding="utf-8").replace("## Fuori scopo", "## Escluso")
+        self.ref.map_path.write_text(testo, encoding="utf-8")
+        with self.assertRaises(self.store.StateError):
+            self.docs.rewrite_lists(self.ref, data)
+
+    def test_ticket_non_sovrascritti(self):
+        data = self.popola()
+        self.docs.write_stubs(self.ref, data)
+        self.ref.ticket_path("F01").write_text("scritto a mano", encoding="utf-8")
+        self.assertEqual(0, self.docs.write_stubs(self.ref, data))
+        self.assertEqual("scritto a mano", self.ref.ticket_path("F01").read_text(encoding="utf-8"))
+
+    def test_dashboard_autoconsistente(self):
+        self.popola()
+        self.render_tutto()
+        html = self.ref.dashboard_path.read_text(encoding="utf-8")
+        self.assertNotIn("<script", html)
+        self.assertNotIn("<link", html)
+        self.assertIn('charset="utf-8"', html)
+        self.assertEqual(3, html.count('class="card"'))
+        for url in ("cdn", "googleapis", "unpkg"):
+            self.assertNotIn(url, html)
+
+    def test_dashboard_regge_un_grafo_vuoto(self):
+        self.render_tutto()
+        self.assertIn("<svg", self.ref.dashboard_path.read_text(encoding="utf-8"))
+
+
+class PiuGrafi(Base):
+    def test_grafi_isolati(self):
+        self.popola()
+        altro = self.mutate.create_graph(self.ws, "secondo", "Secondo", "Altra meta.")
+        self.assertEqual(["prova", "secondo"], self.ws.slugs())
+        self.assertEqual(0, len(self.store.load(altro.json_path)["nodes"]))
+        self.assertNotEqual(self.ref.dashboard_path, altro.dashboard_path)
+
+    def test_selezione_del_grafo_attivo(self):
+        self.mutate.create_graph(self.ws, "secondo", "Secondo", "Altra meta.")
+        with self.assertRaises(self.config.ConfigError):
+            self.ws.graph()
+        self.ws.pin("secondo")
+        self.assertEqual("secondo", self.ws.graph().slug)
+        os.environ["ATLAS_GRAPH"] = "prova"
+        try:
+            self.assertEqual("prova", self.ws.graph().slug)
+        finally:
+            os.environ.pop("ATLAS_GRAPH")
+        self.assertEqual("prova", self.ws.graph("prova").slug)
+
+    def test_slug_inesistente(self):
+        with self.assertRaises(self.config.ConfigError):
+            self.ws.graph("mai-esistito")
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,0 +1,23 @@
+"""{descrizione}
+
+Si esegue con:  atlas exec .atlas/scripts/{filename}
+
+Lo script gira dentro una sola transazione: se qualcosa non torna, il grafo resta
+com'era. Alla chiusura la forma viene validata (id unici, archi risolti, niente cicli).
+"""
+from core import mutate
+
+
+def run(g):
+    # g.data è il grafo aperto, g.node("X01") ne prende uno, g.ids() li elenca tutti.
+    #
+    # mutate.add_branch(g, "X", "Distribuzione", "#0f766e")
+    # mutate.add_node(g, id="X01", branch="X", type="task", mode="AFK",
+    #                 title="Pipeline di build firmata",
+    #                 question="Che cosa deve produrre la pipeline, e con quale chiave firma?",
+    #                 blockedBy=["F03"])
+    # mutate.link(g, "X02", blocked_by="X01")
+    # mutate.edit_node(g, "F03", title="Titolo corretto")
+    # mutate.drop(g, "L05", reason="la Lite non entra in questo giro")
+    # mutate.fog_add(g, "come si distribuiscono gli aggiornamenti fuori dallo store")
+    raise NotImplementedError("scrivi qui le mutazioni, poi togli questa riga")
