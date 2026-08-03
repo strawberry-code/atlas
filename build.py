@@ -1,23 +1,33 @@
 #!/usr/bin/env python3
-"""Impacchetta payload/ dentro dist/atlas-install.py.
+"""Impacchetta i due deliverable di Atlas: dist/atlas (CLI globale) e il suo sha256.
 
-Il payload viaggia come tar.gz codificato base64 dentro il sorgente dell'installer,
-cosi' resta un file solo da copiare e non serve rete per installarlo.
+Il payload (payload/, il motore per-progetto) viaggia come tar.gz+base64 imbustato
+dentro atlascli/_payload.py: quel file e' generato qui, mai scritto a mano, mai
+committato (vedi .gitignore). atlascli/ intero viene poi impacchettato con lo
+zipapp della stdlib in un solo eseguibile: nessuna dipendenza esterna, nessun passo
+di build oltre a 'python3 build.py'.
 """
 from __future__ import annotations
 
 import base64
+import hashlib
 import io
+import shutil
 import tarfile
-import textwrap
+import tempfile
+import zipapp
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-PAYLOAD = ROOT / "payload"
-USCITA = ROOT / "dist" / "atlas-install.py"
+PAYLOAD_DIR = ROOT / "payload"
+ATLASCLI_DIR = ROOT / "atlascli"
+PAYLOAD_MODULE = ATLASCLI_DIR / "_payload.py"
+DIST = ROOT / "dist"
+CLI_OUT = DIST / "atlas"
+CLI_SHA = DIST / "atlas.sha256"
 
 
-def normalizza(info: tarfile.TarInfo) -> tarfile.TarInfo:
+def _normalizza(info: tarfile.TarInfo) -> tarfile.TarInfo:
     """Archivio riproducibile: niente owner, niente mtime, permessi prevedibili."""
     info.uid = info.gid = 0
     info.uname = info.gname = ""
@@ -26,26 +36,49 @@ def normalizza(info: tarfile.TarInfo) -> tarfile.TarInfo:
     return info
 
 
-def impacchetta() -> bytes:
+def pack_payload() -> tuple[str, str]:
+    """Ritorna (versione, blob base64) del motore in payload/."""
+    versione = (PAYLOAD_DIR / "VERSION").read_text(encoding="utf-8").strip()
     buffer = io.BytesIO()
     with tarfile.open(fileobj=buffer, mode="w:gz", compresslevel=9) as tf:
-        for path in sorted(PAYLOAD.rglob("*")):
+        for path in sorted(PAYLOAD_DIR.rglob("*")):
             if "__pycache__" in path.parts or path.name == ".DS_Store":
                 continue
-            tf.add(path, arcname=str(path.relative_to(PAYLOAD)), filter=normalizza)
-    return buffer.getvalue()
+            tf.add(path, arcname=str(path.relative_to(PAYLOAD_DIR)), filter=_normalizza)
+    return versione, base64.b64encode(buffer.getvalue()).decode("ascii")
+
+
+def build_cli() -> None:
+    """zipapp appiattisce la cartella sorgente alla radice dello zip: se ci puntassimo
+    direttamente ATLASCLI_DIR, 'atlascli' smetterebbe di esistere come package dentro
+    l'archivio e le sue import relative ('from . import registry') si romperebbero.
+    Si zippa invece una cartella di staging che contiene 'atlascli/' come sottocartella,
+    cosi' il package resta un package anche impacchettato.
+    """
+    versione, blob = pack_payload()
+    PAYLOAD_MODULE.write_text(
+        f'"""Generato da build.py: NON modificare a mano, NON committare."""\n'
+        f'VERSION = "{versione}"\n'
+        f'PAYLOAD_B64 = "{blob}"\n',
+        encoding="utf-8",
+    )
+    try:
+        DIST.mkdir(exist_ok=True)
+        ignora = shutil.ignore_patterns("__pycache__", ".DS_Store")
+        with tempfile.TemporaryDirectory() as staging:
+            shutil.copytree(ATLASCLI_DIR, Path(staging) / "atlascli", ignore=ignora)
+            zipapp.create_archive(staging, CLI_OUT, interpreter="/usr/bin/env python3",
+                                   main="atlascli.main:run")
+        CLI_OUT.chmod(0o755)
+        CLI_SHA.write_text(f"{hashlib.sha256(CLI_OUT.read_bytes()).hexdigest()}  atlas\n", encoding="utf-8")
+    finally:
+        PAYLOAD_MODULE.unlink(missing_ok=True)
+    print(f"  {CLI_OUT.relative_to(ROOT)} · {CLI_OUT.stat().st_size / 1024:.1f} KB · versione {versione}")
+    print(f"  {CLI_SHA.relative_to(ROOT)}")
 
 
 def main() -> int:
-    versione = (PAYLOAD / "VERSION").read_text(encoding="utf-8").strip()
-    blob = base64.b64encode(impacchetta()).decode("ascii")
-    sorgente = (ROOT / "installer_template.py").read_text(encoding="utf-8")
-    sorgente = sorgente.replace("__VERSION__", versione)
-    sorgente = sorgente.replace("__PAYLOAD__", "\n" + "\n".join(textwrap.wrap(blob, 96)) + "\n")
-    USCITA.parent.mkdir(exist_ok=True)
-    USCITA.write_text(sorgente, encoding="utf-8")
-    USCITA.chmod(0o755)
-    print(f"  {USCITA.relative_to(ROOT)} · {USCITA.stat().st_size / 1024:.1f} KB · versione {versione}")
+    build_cli()
     return 0
 
 

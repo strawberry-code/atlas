@@ -3,3 +3,5 @@ __pycache__/
 .DS_Store
 # Sandbox di prova generate dai test end-to-end
 /sandbox/
+# Generato da build.py, mai committato: vedi atlascli/version.py
+/atlascli/_payload.py

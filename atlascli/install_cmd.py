@@ -1,20 +1,11 @@
-#!/usr/bin/env python3
-"""Atlas __VERSION__ — harness di task a grafo. Installer autoconsistente.
+"""Installa/disinstalla l'harness Atlas in un progetto ospite.
 
-Si copia dentro un progetto e si lancia:
-
-    python3 atlas-install.py --yes --graph epic-primo
-
-Scompatta l'harness in .atlas/, collega le skill sotto .claude/skills/, registra
-l'hook di fine sessione senza toccare quelli gia' presenti e appende il contratto
-operativo a CLAUDE.md dentro un blocco delimitato. Rilanciarlo aggiorna il motore
-e lascia intatti configurazione, grafi e script di mutazione.
-
-Non richiede rete, non installa dipendenze, non crea virtualenv.
+La classe Installer viene da installer_template.py: stessa logica, un'unica
+implementazione. Il payload (tar.gz+base64 di payload/) arriva da _payload.py,
+generato da build.py e mai committato.
 """
 from __future__ import annotations
 
-import argparse
 import base64
 import io
 import json
@@ -25,7 +16,9 @@ import sys
 import tarfile
 from pathlib import Path
 
-VERSION = "__VERSION__"
+from . import registry
+from .registry import RegistryError
+
 DIRNAME = ".atlas"
 BEGIN, END = "<!-- atlas:begin -->", "<!-- atlas:end -->"
 SOSTITUIBILI = ("core", "bin", "hooks", "skills", "templates", "VERSION")
@@ -40,8 +33,6 @@ CONFIG = {
               "modes": ["HITL", "AFK"],
               "statuses": ["open", "claimed", "closed", "out-of-scope"]},
 }
-
-PAYLOAD = """__PAYLOAD__"""
 
 
 class Installer:
@@ -65,7 +56,8 @@ class Installer:
     # --- passi ------------------------------------------------------------
 
     def scompatta(self) -> None:
-        blob = base64.b64decode(PAYLOAD)
+        from . import _payload
+        blob = base64.b64decode(_payload.PAYLOAD_B64)
         with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tf:
             if self.args.dry_run:
                 self.dice(f"scompatterebbe {len(tf.getnames())} file in {DIRNAME}/")
@@ -81,7 +73,8 @@ class Installer:
         for cartella in ("graphs", "scripts"):
             (self.root / cartella).mkdir(exist_ok=True)
         shutil.copyfile(self.root / "templates" / "contract.md", self.root / "CONTRACT.md")
-        self.dice(f"motore in {DIRNAME}/ (versione {VERSION})")
+        versione = (self.root / "VERSION").read_text(encoding="utf-8").strip()
+        self.dice(f"motore in {DIRNAME}/ (versione {versione})")
 
     def configura(self) -> None:
         path = self.root / "config.json"
@@ -165,6 +158,17 @@ class Installer:
         from core.cli import main  # noqa: E402
         main(["new", self.args.graph, "-t", self.args.graph.replace("-", " ").capitalize()])
 
+    def registra_globalmente(self) -> None:
+        if self.args.dry_run or getattr(self.args, "no_registry", False):
+            return
+        try:
+            slug = registry.register(self.target, slug=getattr(self.args, "slug", None),
+                                      yes=self.args.yes)
+        except RegistryError as errore:
+            self.dice(f"registro globale: {errore}")
+            return
+        self.dice(f"registrato come '{slug}' in ~/.atlas/registry.json")
+
     def disinstalla(self) -> int:
         for voce in SOSTITUIBILI + ("CONTRACT.md",):
             path = self.root / voce
@@ -184,13 +188,14 @@ class Installer:
             testo = re.sub(re.escape(BEGIN) + r".*?" + re.escape(END) + r"\n?", "",
                            claude_md.read_text(encoding="utf-8"), flags=re.S)
             claude_md.write_text(testo.rstrip() + "\n", encoding="utf-8")
+        slug = registry.find_by_path(self.target)
+        if slug:
+            registry.unregister(slug)
         print(f"\n  Motore rimosso. Restano i tuoi dati in {DIRNAME}/: "
               f"graphs/, scripts/, config.json.\n  Cancellali a mano se non ti servono più.\n")
         return 0
 
     def run(self) -> int:
-        if self.args.uninstall:
-            return self.disinstalla()
         self.scompatta()
         self.configura()
         self.collega_skill()
@@ -198,7 +203,10 @@ class Installer:
         self.contratto()
         self.gitignore()
         self.primo_grafo()
-        print(f"\n  Atlas {VERSION} in {self.target}\n")
+        self.registra_globalmente()
+        versione = (self.root / "VERSION").read_text(encoding="utf-8").strip() \
+            if (self.root / "VERSION").is_file() else "?"
+        print(f"\n  Atlas {versione} in {self.target}\n")
         for riga in self.fatti:
             print(f"    · {riga}")
         print(f"\n  Prova con:  {DIRNAME}/bin/atlas doctor")
@@ -208,17 +216,7 @@ class Installer:
         return 0
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=f"Installa Atlas {VERSION} nel progetto corrente.")
-    parser.add_argument("--dir", default=".", help="cartella del progetto (default: quella corrente)")
-    parser.add_argument("--yes", action="store_true", help="niente domande, usa i default")
-    parser.add_argument("--graph", help="crea subito un grafo con questo slug")
-    parser.add_argument("--no-hooks", action="store_true", help="non toccare .claude/settings.json")
-    parser.add_argument("--no-claude-md", action="store_true", help="non toccare CLAUDE.md")
-    parser.add_argument("--dry-run", action="store_true", help="dice cosa farebbe, senza farlo")
-    parser.add_argument("--uninstall", action="store_true", help="rimuove il motore, lascia i dati")
-    args = parser.parse_args(argv)
-
+def cmd_install(args) -> int:
     if sys.version_info < (3, 10):
         print("  Atlas richiede Python 3.10 o superiore.", file=sys.stderr)
         return 1
@@ -227,9 +225,8 @@ def main(argv: list[str] | None = None) -> int:
     except ImportError:
         print("  Atlas richiede un sistema POSIX: il lock del grafo usa fcntl.", file=sys.stderr)
         return 1
+    return Installer(Path(args.path).resolve(), args).run()
 
-    return Installer(Path(args.dir).resolve(), args).run()
 
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+def cmd_uninstall(args) -> int:
+    return Installer(Path(args.path).resolve(), args).disinstalla()
