@@ -31,7 +31,7 @@ VERSIONE_RE = re.compile(r"^\d+\.\d+\.\d+$")
 
 
 def _run(argv: list[str]) -> int:
-    print(f"  $ {' '.join(argv)}")
+    print(f"  $ {' '.join(argv)}", flush=True)
     return subprocess.run(argv, cwd=ROOT).returncode
 
 
