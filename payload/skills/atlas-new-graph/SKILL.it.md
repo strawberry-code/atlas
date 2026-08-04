@@ -14,7 +14,7 @@ Chiedi all'utente, con AskUserQuestion, una cosa sola:
 - **Ha già un testo?** Un documento, una lista di task, note di una riunione, un issue, una roadmap. In quel caso il lavoro è tradurre, e passi al ramo A.
 - **Oppure c'è solo un'idea?** Allora la mappa va tracciata, e passi al ramo B.
 
-Chiedi anche lo **slug** del grafo (kebab-case, es. `epic-auth`) e il **titolo**, se non li ha già detti. Se il progetto ha già dei grafi, mostraglieli con `.atlas/bin/atlas graphs`: forse il lavoro appartiene a uno di quelli.
+Chiedi anche lo **slug** del grafo (kebab-case, es. `epic-auth`) e il **titolo**, se non li ha già detti. Se il progetto ha già dei grafi, mostraglieli con `python3 .atlas/bin/atlas graphs`: forse il lavoro appartiene a uno di quelli.
 
 ## Ramo A — c'è un testo
 
@@ -49,8 +49,8 @@ Il **modo** è la domanda più importante che fai a ogni nodo: la risposta la pu
 ## Scrivere lo script
 
 ```sh
-.atlas/bin/atlas new <slug> -t "Titolo del grafo" -d "La destinazione, in una o due righe."
-.atlas/bin/atlas new-script primo-disegno
+python3 .atlas/bin/atlas new <slug> -t "Titolo del grafo" -d "La destinazione, in una o due righe."
+python3 .atlas/bin/atlas new-script primo-disegno
 ```
 
 Poi riempi lo script generato in `.atlas/scripts/`:
@@ -79,8 +79,8 @@ L'ordine di creazione non conta: la validazione avviene alla fine della transazi
 Poi:
 
 ```sh
-.atlas/bin/atlas exec .atlas/scripts/001-primo-disegno.py
-.atlas/bin/atlas render --open
+python3 .atlas/bin/atlas exec .atlas/scripts/001-primo-disegno.py
+python3 .atlas/bin/atlas render --open
 ```
 
 `exec` scrive i ticket mancanti, rigenera la mappa e la dashboard, e stampa la frontiera. Guardala insieme all'utente: un grafo con venti nodi tutti prendibili non ha dipendenze vere, uno con un nodo solo prendibile è una lista travestita da grafo.

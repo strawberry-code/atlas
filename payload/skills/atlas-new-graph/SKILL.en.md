@@ -14,7 +14,7 @@ Ask the user, with AskUserQuestion, one single thing:
 - **Do they already have a text?** A document, a task list, meeting notes, an issue, a roadmap. In that case the work is translation, and you move to Branch A.
 - **Or is there just an idea?** Then the map needs to be traced, and you move to Branch B.
 
-Also ask for the graph's **slug** (kebab-case, e.g. `epic-auth`) and its **title**, if not already given. If the project already has graphs, show them with `.atlas/bin/atlas graphs`: maybe the work belongs to one of those.
+Also ask for the graph's **slug** (kebab-case, e.g. `epic-auth`) and its **title**, if not already given. If the project already has graphs, show them with `python3 .atlas/bin/atlas graphs`: maybe the work belongs to one of those.
 
 ## Branch A — there's a text
 
@@ -49,8 +49,8 @@ The **mode** is the most important question you ask of every node: can the agent
 ## Writing the script
 
 ```sh
-.atlas/bin/atlas new <slug> -t "Graph title" -d "The destination, in one or two lines."
-.atlas/bin/atlas new-script first-draft
+python3 .atlas/bin/atlas new <slug> -t "Graph title" -d "The destination, in one or two lines."
+python3 .atlas/bin/atlas new-script first-draft
 ```
 
 Then fill in the generated script under `.atlas/scripts/`:
@@ -79,8 +79,8 @@ Creation order doesn't matter: validation happens at the end of the transaction,
 Then:
 
 ```sh
-.atlas/bin/atlas exec .atlas/scripts/001-first-draft.py
-.atlas/bin/atlas render --open
+python3 .atlas/bin/atlas exec .atlas/scripts/001-first-draft.py
+python3 .atlas/bin/atlas render --open
 ```
 
 `exec` writes the missing tickets, regenerates the map and the dashboard, and prints the frontier. Look at it together with the user: a graph with twenty nodes all up for grabs has no real dependencies, one with only a single node up for grabs is a list disguised as a graph.

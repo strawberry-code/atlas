@@ -3,10 +3,10 @@
 The work in this project is a graph of tasks in `.atlas/`. A node is a piece of work sized for one session, the `blockedBy` edges are the dependencies, and the **frontier** is the set of open nodes whose blockers are all closed. You don't pick what to do from a list: you look at the frontier.
 
 ```sh
-.atlas/bin/atlas status              # frontier, locks, progress
-.atlas/bin/atlas claim <ID>          # claim it, before touching anything
-.atlas/bin/atlas close <ID> -s "..."  # closes it, after writing the Answer in the ticket
-.atlas/bin/atlas fog "a line"        # notes down what came up and has no node yet
+python3 .atlas/bin/atlas status              # frontier, locks, progress
+python3 .atlas/bin/atlas claim <ID>          # claim it, before touching anything
+python3 .atlas/bin/atlas close <ID> -s "..."  # closes it, after writing the Answer in the ticket
+python3 .atlas/bin/atlas fog "a line"        # notes down what came up and has no node yet
 ```
 
 ### One node per session
@@ -33,8 +33,8 @@ An agent that answers a HITL node on its own has broken the most important rule 
 `graph.json` is never edited by hand, and the CLI has no commands that create nodes or edges. Every structural change is a Python script in `.atlas/scripts/` that goes through `core/mutate.py`:
 
 ```sh
-.atlas/bin/atlas new-script adds-deploy-branch
-.atlas/bin/atlas exec .atlas/scripts/003-adds-deploy-branch.py
+python3 .atlas/bin/atlas new-script adds-deploy-branch
+python3 .atlas/bin/atlas exec .atlas/scripts/003-adds-deploy-branch.py
 ```
 
 The script runs inside a single transaction and the graph is validated before being written, so a cycle or an edge to a nonexistent node makes it fail without touching the file. Scripts stay version-controlled: they're the history of changes to the map.

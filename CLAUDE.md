@@ -4,10 +4,10 @@ Harness di task a grafo, distribuito come CLI globale installabile via curl. Qui
 
 ## Struttura
 
-- `payload/` è l'unica cosa che finisce dentro un progetto ospite (l'harness in `.atlas/`). Tutto ciò che sta qui deve funzionare con la sola stdlib di Python 3.10, su POSIX, senza rete.
+- `payload/` è l'unica cosa che finisce dentro un progetto ospite (l'harness in `.atlas/`). Tutto ciò che sta qui deve funzionare con la sola stdlib di Python 3.10, su POSIX e su Windows nativo, senza rete. Dove POSIX e Windows divergono (lock del grafo, controllo di un processo vivo, symlink delle skill), il codice sceglie il ramo giusto con `sys.platform`, mai un solo ramo che assume POSIX.
 - `atlascli/` è il CLI globale (`atlas`): install/update/uninstall/list/lang, il registro dei progetti e le impostazioni di lingua (`~/.config/atlas.json`), il self-update. Anche qui solo stdlib — niente pip — ma la rete verso GitHub è consentita: è un prodotto diverso da `payload/`, con un vincolo diverso. `atlascli/dispatch.py` decide, in quest'ordine, se un comando è riservato (install/update/uninstall/list/lang), lo slug di un progetto registrato, o va passato com'è al motore locale del progetto corrente (`os.execv` su `payload/bin/atlas`, invariato).
 - `build.py` impacchetta `payload/` come tar.gz+base64 dentro `atlascli/_payload.py` (generato, gitignored, mai committato), poi impacchetta `atlascli/` intero con `zipapp` della stdlib in `dist/atlas` — un solo eseguibile. `dist/atlas` è un deliverable **binario** (blob zip): tracciato in git ma non diffabile riga per riga: il review passa dai sorgenti in `atlascli/*.py` e `payload/*`, non dal diff di `dist/`.
-- `install.sh` è lo script POSIX per `curl | sh`: scarica `dist/atlas` dall'ultima release GitHub e lo mette su `~/.local/bin`.
+- `install.sh` è lo script POSIX per `curl | sh`, `install.ps1` il suo gemello PowerShell per `irm | iex` su Windows nativo: entrambi scaricano `dist/atlas` dall'ultima release GitHub e lo mettono su `~/.local/bin` (`install.ps1` genera in più un `atlas.cmd` locale, mai committato, perché un file senza estensione non si risolve da PATHEXT su Windows).
 - `release.py` è il runbook di release, invocato a mano: bump versione, build, test, sha256. Non tagga né pusha da solo — quei comandi restano manuali.
 - `tests/` usa `unittest` della stdlib. Nessun runner esterno. `tests/httpfixture.py` è un server HTTP fittizio locale (stdlib `http.server`), usato per testare self-update e `install.sh` senza rete vera.
 

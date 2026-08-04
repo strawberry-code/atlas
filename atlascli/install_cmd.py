@@ -21,6 +21,7 @@ from .registry import RegistryError
 from .strings import set_language, t
 
 DIRNAME = ".atlas"
+MARCATORE = ".atlas-managed"  # dentro una copia di skill (fallback Windows al posto del simlink)
 BEGIN, END = "<!-- atlas:begin -->", "<!-- atlas:end -->"
 SOSTITUIBILI = ("core", "bin", "hooks", "skills", "templates", "VERSION")
 IGNORE = [f"{DIRNAME}/graphs/*/dashboard.html", f"{DIRNAME}/current", "__pycache__/"]
@@ -103,6 +104,10 @@ class Installer:
         path.write_text(json.dumps(dati, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
     def collega_skill(self) -> None:
+        """Symlink verso .atlas/skills/<nome>: su Windows senza admin/developer mode
+        symlink_to fallisce, e si copia la cartella invece. MARCATORE distingue la
+        nostra copia (si rigenera a ogni update) da una cartella messa li' da altri
+        (si segnala e si lascia stare, come per un simlink sostituito a mano)."""
         dest = self.target / ".claude" / "skills"
         if self.args.dry_run:
             self.dice(t("install.skill_dry_run"))
@@ -112,13 +117,18 @@ class Installer:
             if not skill.is_dir():
                 continue
             link = dest / skill.name
-            if link.is_symlink() or link.exists():
-                if link.is_symlink():
-                    link.unlink()
-                else:
-                    self.dice(t("install.skill_non_symlink", nome=link.name))
-                    continue
-            link.symlink_to(Path("..") / ".." / DIRNAME / "skills" / skill.name, target_is_directory=True)
+            if link.is_symlink():
+                link.unlink()
+            elif link.is_dir() and (link / MARCATORE).is_file():
+                shutil.rmtree(link)
+            elif link.exists():
+                self.dice(t("install.skill_non_symlink", nome=link.name))
+                continue
+            try:
+                link.symlink_to(Path("..") / ".." / DIRNAME / "skills" / skill.name, target_is_directory=True)
+            except OSError:
+                shutil.copytree(skill, link)
+                (link / MARCATORE).write_text("", encoding="utf-8")
         self.dice(t("install.skill_collegate"))
 
     def registra_hook(self) -> None:
@@ -195,6 +205,8 @@ class Installer:
         for link in skills.glob("atlas-*") if skills.is_dir() else []:
             if link.is_symlink():
                 link.unlink()
+            elif link.is_dir() and (link / MARCATORE).is_file():
+                shutil.rmtree(link)
         impostazioni = self.target / ".claude" / "settings.json"
         if impostazioni.is_file():
             dati = json.loads(impostazioni.read_text(encoding="utf-8"))
@@ -237,11 +249,6 @@ class Installer:
 def cmd_install(args) -> int:
     if sys.version_info < (3, 10):
         print(t("install.python_richiesto"), file=sys.stderr)
-        return 1
-    try:
-        import fcntl  # noqa: F401
-    except ImportError:
-        print(t("install.posix_richiesto"), file=sys.stderr)
         return 1
     target = Path(args.path).resolve()
     lingua = _lingua_per_install(target, getattr(args, "lang", None))

@@ -10,7 +10,7 @@ Il grafo dice cosa è prendibile adesso. Un nodo per sessione, dal claim alla ch
 ## 1. Orientati
 
 ```sh
-.atlas/bin/atlas status
+python3 .atlas/bin/atlas status
 ```
 
 Leggi anche la mappa del grafo attivo, `.atlas/graphs/<slug>/map.md`: la Destinazione dice dove si va, le Note dicono le preferenze permanenti, le Decisioni prese dicono cosa è già stato deciso e da quale nodo. Non serve aprire i ticket chiusi: la mappa è l'indice, si zooma solo su quello che serve davvero.
@@ -22,7 +22,7 @@ Se `status` segnala lucchetti orfani, sistemali prima di prendere altro.
 Il nodo lo nomina l'utente. Se non lo nomina, prendi il primo della frontiera.
 
 ```sh
-.atlas/bin/atlas claim <ID>
+python3 .atlas/bin/atlas claim <ID>
 ```
 
 **Rivendica prima di lavorare, non dopo.** Il claim serve a far sì che una sessione parallela salti questo nodo, e un claim messo alla fine non ha protetto niente.
@@ -32,7 +32,7 @@ Se il claim viene rifiutato perché la sessione ne tiene già uno, chiudi o rila
 ## 3. Guarda il modo del nodo, e fermati se dice HITL
 
 ```sh
-.atlas/bin/atlas show <ID>
+python3 .atlas/bin/atlas show <ID>
 ```
 
 - **AFK**: lavori da solo. La risposta la scrivi tu.
@@ -47,7 +47,7 @@ Il ticket è `.atlas/graphs/<slug>/tickets/<ID>.md`. Durante il lavoro annota in
 Se emerge qualcosa che meriterebbe un nodo suo, **non crearlo**. Appuntalo:
 
 ```sh
-.atlas/bin/atlas fog "quel che è emerso, in una riga"
+python3 .atlas/bin/atlas fog "quel che è emerso, in una riga"
 ```
 
 e proponilo all'utente a fine nodo. La forma del grafo si cambia solo con uno script di mutazione, mai di slancio in mezzo a un altro lavoro.
@@ -55,7 +55,7 @@ e proponilo all'utente a fine nodo. La forma del grafo si cambia solo con uno sc
 ## 5. Chiudi
 
 ```sh
-.atlas/bin/atlas close <ID> -s "la sintesi in una riga"
+python3 .atlas/bin/atlas close <ID> -s "la sintesi in una riga"
 ```
 
 La sintesi finisce da sola in `map.md` sotto Decisioni prese, e la dashboard si rigenera. Se `close` rifiuta perché la Risposta è vuota, scrivila: non è un ostacolo da aggirare con `--force`.

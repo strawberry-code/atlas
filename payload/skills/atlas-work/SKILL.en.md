@@ -10,7 +10,7 @@ The graph says what's up for grabs right now. One node per session, from claim t
 ## 1. Get your bearings
 
 ```sh
-.atlas/bin/atlas status
+python3 .atlas/bin/atlas status
 ```
 
 Also read the active graph's map, `.atlas/graphs/<slug>/map.md`: the Destination says where this is going, the Notes say the standing preferences, the Decisions made say what's already been decided and from which node. No need to open closed tickets: the map is the index, you zoom in only on what you actually need.
@@ -22,7 +22,7 @@ If `status` flags orphan locks, sort them out before claiming anything else.
 The user names the node. If they don't, take the first one on the frontier.
 
 ```sh
-.atlas/bin/atlas claim <ID>
+python3 .atlas/bin/atlas claim <ID>
 ```
 
 **Claim before working, not after.** The claim exists so a parallel session skips this node, and a claim placed at the end has protected nothing.
@@ -32,7 +32,7 @@ If the claim is refused because the session already holds one, close or release 
 ## 3. Check the node's mode, and stop if it says HITL
 
 ```sh
-.atlas/bin/atlas show <ID>
+python3 .atlas/bin/atlas show <ID>
 ```
 
 - **AFK**: you work it alone. You write the answer.
@@ -47,7 +47,7 @@ The ticket is `.atlas/graphs/<slug>/tickets/<ID>.md`. While working, note in **W
 If something comes up that would deserve a node of its own, **don't create it**. Note it down:
 
 ```sh
-.atlas/bin/atlas fog "what came up, in one line"
+python3 .atlas/bin/atlas fog "what came up, in one line"
 ```
 
 and propose it to the user once the node is done. The graph's shape changes only through a mutation script, never on impulse in the middle of other work.
@@ -55,7 +55,7 @@ and propose it to the user once the node is done. The graph's shape changes only
 ## 5. Close it
 
 ```sh
-.atlas/bin/atlas close <ID> -s "the one-line summary"
+python3 .atlas/bin/atlas close <ID> -s "the one-line summary"
 ```
 
 The summary lands on its own in `map.md` under Decisions made, and the dashboard regenerates. If `close` refuses because the Answer is empty, write it: it's not an obstacle to route around with `--force`.

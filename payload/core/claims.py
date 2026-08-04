@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 from datetime import datetime, timedelta
 
 from . import docs
@@ -28,6 +29,8 @@ def alive(pid: int | None, process_name: str = "claude") -> bool:
     """Vero se il processo esiste ed e' ancora l'agente: copre il riuso del PID."""
     if not pid:
         return False
+    if sys.platform == "win32":
+        return _alive_windows(pid, process_name)
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
@@ -37,6 +40,15 @@ def alive(pid: int | None, process_name: str = "claude") -> bool:
     out = subprocess.run(["ps", "-o", "comm=", "-p", str(pid)],
                          capture_output=True, text=True).stdout
     return process_name in out
+
+
+def _alive_windows(pid: int, process_name: str) -> bool:
+    """os.kill(pid, 0) su Windows non e' un probe: per segnali diversi da CTRL_C/CTRL_BREAK
+    la libc chiama TerminateProcess, quindi 'controllare' un pid lo ammazzerebbe davvero.
+    tasklist e' l'unica via sicura per sapere se un processo esiste ancora."""
+    out = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH", "/FO", "CSV"],
+                         capture_output=True, text=True).stdout
+    return process_name.lower() in out.lower()
 
 
 def holder(node: dict) -> dict:

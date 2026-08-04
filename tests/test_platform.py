@@ -11,11 +11,13 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from atlascli import dispatch, registry  # noqa: E402
+from atlascli import dispatch, install_cmd, registry  # noqa: E402
 from atlascli import strings as atlascli_strings  # noqa: E402
 
 
@@ -155,6 +157,53 @@ class Dispatch(unittest.TestCase):
                 os.chdir(cwd)
         finally:
             shutil.rmtree(vuota, ignore_errors=True)
+
+
+class CollegaSkill(unittest.TestCase):
+    """collega_skill() preferisce sempre il symlink: il fallback a copia (install_cmd.py)
+    serve solo quando symlink_to non e' permesso, come su Windows senza admin/developer mode."""
+
+    def setUp(self):
+        self.target = Path(tempfile.mkdtemp())
+        self.root = self.target / ".atlas"
+        (self.root / "skills" / "atlas-work").mkdir(parents=True)
+        (self.root / "skills" / "atlas-work" / "SKILL.md").write_text("contenuto", encoding="utf-8")
+
+    def tearDown(self):
+        shutil.rmtree(self.target, ignore_errors=True)
+
+    def _installer(self) -> install_cmd.Installer:
+        return install_cmd.Installer(self.target, SimpleNamespace(dry_run=False), "it")
+
+    def test_symlink_quando_possibile(self):
+        self._installer().collega_skill()
+        link = self.target / ".claude" / "skills" / "atlas-work"
+        self.assertTrue(link.is_symlink())
+
+    def test_fallback_a_copia_se_symlink_fallisce(self):
+        with mock.patch.object(Path, "symlink_to", side_effect=OSError("niente symlink qui")):
+            self._installer().collega_skill()
+        link = self.target / ".claude" / "skills" / "atlas-work"
+        self.assertFalse(link.is_symlink())
+        self.assertTrue((link / install_cmd.MARCATORE).is_file())
+        self.assertEqual("contenuto", (link / "SKILL.md").read_text(encoding="utf-8"))
+
+    def test_copia_si_rigenera_al_reinstall(self):
+        with mock.patch.object(Path, "symlink_to", side_effect=OSError("niente symlink qui")):
+            self._installer().collega_skill()
+        (self.root / "skills" / "atlas-work" / "SKILL.md").write_text("aggiornato", encoding="utf-8")
+        with mock.patch.object(Path, "symlink_to", side_effect=OSError("niente symlink qui")):
+            self._installer().collega_skill()
+        link = self.target / ".claude" / "skills" / "atlas-work"
+        self.assertEqual("aggiornato", (link / "SKILL.md").read_text(encoding="utf-8"))
+
+    def test_cartella_estranea_non_simlink_viene_lasciata_stare(self):
+        estranea = self.target / ".claude" / "skills" / "atlas-work"
+        estranea.mkdir(parents=True)
+        (estranea / "roba-mia.txt").write_text("non toccare", encoding="utf-8")
+        self._installer().collega_skill()
+        self.assertFalse(estranea.is_symlink())
+        self.assertTrue((estranea / "roba-mia.txt").is_file())
 
 
 if __name__ == "__main__":

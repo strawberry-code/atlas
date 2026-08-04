@@ -56,8 +56,6 @@ STRINGS: dict[str, dict[str, str]] = {
     # --- install_cmd.py ---
     "install.python_richiesto": {"it": "  Atlas richiede Python 3.10 o superiore.",
                                  "en": "  Atlas requires Python 3.10 or later."},
-    "install.posix_richiesto": {"it": "  Atlas richiede un sistema POSIX: il lock del grafo usa fcntl.",
-                               "en": "  Atlas requires a POSIX system: the graph lock uses fcntl."},
     "install.scriverebbe": {"it": "scriverebbe {path}", "en": "would write {path}"},
     "install.scompatterebbe": {"it": "scompatterebbe {n} file in {dirname}/",
                               "en": "would unpack {n} files into {dirname}/"},

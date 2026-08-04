@@ -12,6 +12,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 SORGENTE = Path(__file__).resolve().parent.parent / "payload"
 
@@ -150,6 +151,25 @@ class Lucchetti(Base):
             self.model.node_of(data, "F01")["claim"]["pid"] = 999999
         node = self.model.node_of(self.store.load(self.ref.json_path), "F01")
         self.assertEqual("dead", self.claims.claim_state(node, self.ws.config["agent"]))
+
+
+class LucchettiWindows(Base):
+    """claims.alive() sul ramo win32: os.kill(pid, 0) su Windows non e' un probe innocuo
+    (per segnali diversi da CTRL_C/CTRL_BREAK la libc chiama TerminateProcess), quindi
+    quel ramo deve passare da tasklist e non deve mai toccare os.kill."""
+
+    def test_processo_vivo_non_chiama_mai_os_kill(self):
+        with mock.patch("sys.platform", "win32"), \
+             mock.patch("os.kill", side_effect=AssertionError("os.kill ucciderebbe il processo su Windows")), \
+             mock.patch.object(self.claims, "subprocess") as sub:
+            sub.run.return_value.stdout = '"claude.exe","4242","Console","1","10.000 K"\r\n'
+            self.assertTrue(self.claims.alive(4242, "claude"))
+
+    def test_processo_assente(self):
+        with mock.patch("sys.platform", "win32"), \
+             mock.patch.object(self.claims, "subprocess") as sub:
+            sub.run.return_value.stdout = "INFO: No tasks are running which match the specified criteria.\r\n"
+            self.assertFalse(self.claims.alive(4242, "claude"))
 
 
 class Artefatti(Base):

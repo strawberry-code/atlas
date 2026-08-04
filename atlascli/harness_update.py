@@ -69,7 +69,8 @@ def _redraw_all(path: Path) -> tuple[list[str], list[str]]:
         if grafi_dir.is_dir() else []
     entrypoint = path / ".atlas" / "bin" / "atlas"
     falliti = [grafo for grafo in grafi
-               if subprocess.run([str(entrypoint), "-g", grafo, "render"], cwd=path).returncode != 0]
+               if subprocess.run([sys.executable, str(entrypoint), "-g", grafo, "render"],
+                                  cwd=path).returncode != 0]
     return grafi, falliti
 
 

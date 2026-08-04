@@ -6,14 +6,35 @@ invece di sovrascriversi a vicenda.
 """
 from __future__ import annotations
 
-import fcntl
 import json
 import re
+import sys
 from contextlib import contextmanager
 from pathlib import Path
 
 SCHEMA_VERSION = 1
 OPEN, CLAIMED, CLOSED, DROPPED = "open", "claimed", "closed", "out-of-scope"
+
+if sys.platform == "win32":
+    import msvcrt
+
+    def _lock(fh) -> None:
+        fh.seek(0)
+        msvcrt.locking(fh.fileno(), msvcrt.LK_LOCK, 1)
+
+    def _unlock(fh) -> None:
+        pos = fh.tell()
+        fh.seek(0)
+        msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+        fh.seek(pos)
+else:
+    import fcntl
+
+    def _lock(fh) -> None:
+        fcntl.flock(fh, fcntl.LOCK_EX)
+
+    def _unlock(fh) -> None:
+        fcntl.flock(fh, fcntl.LOCK_UN)
 
 # json.dumps con indent espande ogni array su piu' righe: qui gli array sono liste
 # corte di id ("blockedBy") e riespanderli renderebbe illeggibile il diff di un claim.
@@ -41,14 +62,18 @@ def write_new(path: Path, graph: dict) -> None:
 
 @contextmanager
 def transaction(path: Path):
-    """Sezione critica sul grafo: il flock cade da solo alla chiusura del descrittore.
+    """Sezione critica sul grafo: il lock esclusivo (fcntl su POSIX, msvcrt su Windows)
+    si rilascia sempre nel finally, corpo sollevi o no.
 
     Se il corpo solleva, il file non viene riscritto: il rollback e' non scrivere.
     """
     with path.open("r+", encoding="utf-8") as fh:
-        fcntl.flock(fh, fcntl.LOCK_EX)
-        graph = json.load(fh)
-        yield graph
-        fh.seek(0)
-        fh.write(dumps(graph))
-        fh.truncate()
+        _lock(fh)
+        try:
+            graph = json.load(fh)
+            yield graph
+            fh.seek(0)
+            fh.write(dumps(graph))
+            fh.truncate()
+        finally:
+            _unlock(fh)

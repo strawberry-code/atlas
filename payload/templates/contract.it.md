@@ -3,10 +3,10 @@
 Il lavoro di questo progetto è un grafo di task in `.atlas/`. Un nodo è un pezzo di lavoro dimensionato su una sessione, gli archi `blockedBy` sono le dipendenze, e la **frontiera** è l'insieme dei nodi aperti i cui blocker sono tutti chiusi. Non si sceglie cosa fare leggendo una lista: si guarda la frontiera.
 
 ```sh
-.atlas/bin/atlas status              # frontiera, lucchetti, avanzamento
-.atlas/bin/atlas claim <ID>          # rivendica, prima di toccare qualsiasi cosa
-.atlas/bin/atlas close <ID> -s "..."  # chiude, dopo aver scritto la Risposta nel ticket
-.atlas/bin/atlas fog "una riga"      # appunta ciò che è emerso e non ha ancora un nodo
+python3 .atlas/bin/atlas status              # frontiera, lucchetti, avanzamento
+python3 .atlas/bin/atlas claim <ID>          # rivendica, prima di toccare qualsiasi cosa
+python3 .atlas/bin/atlas close <ID> -s "..."  # chiude, dopo aver scritto la Risposta nel ticket
+python3 .atlas/bin/atlas fog "una riga"      # appunta ciò che è emerso e non ha ancora un nodo
 ```
 
 ### Un nodo per sessione
@@ -33,8 +33,8 @@ Un agente che risponde da solo a un nodo HITL ha rotto la regola più importante
 `graph.json` non si edita a mano, e la CLI non ha comandi che creano nodi o archi. Ogni modifica strutturale è uno script Python in `.atlas/scripts/` che passa da `core/mutate.py`:
 
 ```sh
-.atlas/bin/atlas new-script aggiunge-ramo-deploy
-.atlas/bin/atlas exec .atlas/scripts/003-aggiunge-ramo-deploy.py
+python3 .atlas/bin/atlas new-script aggiunge-ramo-deploy
+python3 .atlas/bin/atlas exec .atlas/scripts/003-aggiunge-ramo-deploy.py
 ```
 
 Lo script gira in una sola transazione e il grafo viene validato prima di essere scritto, quindi un ciclo o un arco verso un nodo inesistente lo fanno fallire senza toccare il file. Gli script restano versionati: sono la storia delle modifiche alla mappa.

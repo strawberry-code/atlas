@@ -17,6 +17,10 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from atlascli.registry import slugify  # noqa: E402
+
 CLI = ROOT / "dist" / "atlas"
 FIXTURE = ROOT / "tests" / "fixtures" / "grafo-di-prova.py"
 
@@ -69,7 +73,7 @@ def main() -> int:
         verifica((target / ".claude" / "skills" / "atlas-work").is_symlink(), "skill collegate con symlink")
 
         registro = json.loads(atlas_config.read_text(encoding="utf-8"))
-        slug = target.resolve().name
+        slug = slugify(target.resolve().name)  # register() slugifica il nome cartella, non lo usa nudo
         verifica(slug in registro["projects"], "progetto registrato nel registro globale")
         verifica(registro["projects"][slug]["path"] == str(target.resolve()),
                  "il registro punta al path giusto")
