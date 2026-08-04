@@ -31,7 +31,7 @@ def answer_written(ref: Graph, node_id: str) -> bool:
     path = ref.ticket_path(node_id)
     if not path.exists():
         return False
-    tail = path.read_text(encoding="utf-8").rpartition(t("heading.risposta"))[2]
+    tail = path.read_text(encoding="utf-8-sig").rpartition(t("heading.risposta"))[2]
     return bool(re.sub(r"<!--.*?-->", "", tail, flags=re.S).strip())
 
 
@@ -47,7 +47,7 @@ def write_stubs(ref: Graph, data: dict) -> int:
             id=node["id"], title=node["title"], type=node["type"], mode=node["mode"],
             branch=rami[node["branch"]]["label"], question=node["question"],
             blocked=", ".join(node["blockedBy"]) or t("docs.nessuno_prendibile"),
-        ), encoding="utf-8")
+        ), encoding="utf-8-sig")
         creati += 1
     return creati
 
@@ -58,7 +58,7 @@ def ensure_map(ref: Graph, data: dict) -> None:
     ref.map_path.write_text(ref.workspace.template("map.md").format(
         title=data["meta"]["title"], slug=data["meta"]["slug"],
         destination=data["meta"]["destination"],
-    ), encoding="utf-8")
+    ), encoding="utf-8-sig")
 
 
 def _replace_section(text: str, heading: str, corpo: str) -> str:
@@ -89,10 +89,10 @@ def decisions(data: dict) -> str:
 
 def rewrite_lists(ref: Graph, data: dict) -> None:
     """Rigenera in map.md le sezioni che il grafo possiede. Editarle a mano non serve."""
-    text = ref.map_path.read_text(encoding="utf-8")
+    text = ref.map_path.read_text(encoding="utf-8-sig")
     text = _replace_section(text, t("heading.destinazione"), data["meta"]["destination"])
     text = _replace_section(text, t("heading.decisioni"), decisions(data))
     for chiave, (parent, key) in LISTS.items():
         items = data[parent][key] if parent else data[key]
         text = _replace_section(text, t(chiave), "\n".join(f"- {i}" for i in items) or t("docs.niente"))
-    ref.map_path.write_text(text, encoding="utf-8")
+    ref.map_path.write_text(text, encoding="utf-8-sig")
