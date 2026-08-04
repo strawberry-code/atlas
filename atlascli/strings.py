@@ -35,6 +35,14 @@ STRINGS: dict[str, dict[str, str]] = {
     "opt.prune": {"it": "rimuove dal registro le voci morte", "en": "removes dead entries from the registry"},
     "help.lang": {"it": "lingua di default per i nuovi progetti", "en": "default language for new projects"},
     "opt.lang_valore": {"it": "nuovo default globale (it o en)", "en": "new global default (it or en)"},
+    "parser.epilog": {"it": "Per un progetto registrato (mai in automatico, uno alla volta):\n"
+                            "  atlas <slug> update   aggiorna il motore e ridisegna ogni dashboard\n"
+                            "  atlas <slug> redraw   ridisegna le dashboard da sole, senza toccare il motore\n"
+                            "  atlas <slug> lang [it|en]   cambia la lingua dei contenuti di quel progetto",
+                      "en": "For a registered project (never automatic, one at a time):\n"
+                            "  atlas <slug> update   updates the engine and redraws every dashboard\n"
+                            "  atlas <slug> redraw   redraws the dashboards on their own, without touching the engine\n"
+                            "  atlas <slug> lang [it|en]   changes that project's content language"},
 
     # --- dispatch.py: errori/scheda ---
     "dispatch.sconosciuto": {"it": "\n  '{token}' non è un comando di atlas, né un progetto registrato "
@@ -97,14 +105,19 @@ STRINGS: dict[str, dict[str, str]] = {
                                  "Reinstalla con 'atlas install {path} --slug {slug}'.\n",
                           "en": "\n  '{slug}' points to {path} ({stato}). "
                                 "Reinstall with 'atlas install {path} --slug {slug}'.\n"},
-    "harness.help_update": {"it": "aggiorna il motore di questo progetto", "en": "updates this project's engine"},
+    "harness.help_update": {"it": "aggiorna il motore di questo progetto e ridisegna ogni dashboard",
+                           "en": "updates this project's engine and redraws every dashboard"},
     "harness.help_path": {"it": "ripunta lo slug su questo path prima di aggiornare",
                          "en": "repoints the slug to this path before updating"},
+    "harness.help_redraw": {"it": "ridisegna la dashboard di ogni grafo, senza toccare il motore",
+                           "en": "redraws every graph's dashboard, without touching the engine"},
     "harness.help_lang_valore": {"it": "nuova lingua per questo progetto (it o en)",
                                 "en": "new language for this project (it or en)"},
     "harness.lang_riepilogo": {"it": "  rigenerati {n}/{totale} grafi in {lingua}",
                               "en": "  regenerated {n}/{totale} graphs in {lingua}"},
-    "harness.lang_falliti": {"it": " · falliti: {elenco}", "en": " · failed: {elenco}"},
+    "harness.redraw_riepilogo": {"it": "  ridisegnati {n}/{totale} grafi",
+                                "en": "  redrawn {n}/{totale} graphs"},
+    "harness.falliti": {"it": " · falliti: {elenco}", "en": " · failed: {elenco}"},
 
     # --- self_update.py ---
     "update.errore_rete": {"it": "\n  impossibile controllare la nuova versione: {errore}\n",
@@ -129,9 +142,11 @@ STRINGS: dict[str, dict[str, str]] = {
     "list.vuoto": {"it": "\n  nessun progetto registrato. Installa con 'atlas install <path>'.\n",
                   "en": "\n  no registered projects. Install with 'atlas install <path>'.\n"},
     "list.scheda": {"it": "\n  {slug}\n  path      {path}\n  stato     {stato}\n  versione  {versione}\n\n"
-                          "  Aggiorna con: atlas {slug} update\n",
+                          "  Aggiorna con: atlas {slug} update\n"
+                          "  Ridisegna con: atlas {slug} redraw\n",
                     "en": "\n  {slug}\n  path      {path}\n  status    {stato}\n  version   {versione}\n\n"
-                          "  Update with: atlas {slug} update\n"},
+                          "  Update with: atlas {slug} update\n"
+                          "  Redraw with: atlas {slug} redraw\n"},
 
     # --- registry.py ---
     "registry.slug_occupato": {"it": "'{slug}' è già registrato per {path}: usa --slug per un nome diverso",

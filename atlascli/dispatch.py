@@ -39,7 +39,9 @@ COMANDI = {"install": install_cmd.cmd_install, "uninstall": install_cmd.cmd_unin
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="atlas", description=t("parser.description"))
+    parser = argparse.ArgumentParser(prog="atlas", description=t("parser.description"),
+                                     epilog=t("parser.epilog"),
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     p = sub.add_parser("install", help=t("help.install"))
@@ -107,6 +109,9 @@ def main(argv: list[str] | None = None) -> int:
         if resto and resto[0] == "update":
             from .harness_update import cmd_slug_update
             return cmd_slug_update(primo, resto)
+        if resto and resto[0] == "redraw":
+            from .harness_update import cmd_slug_redraw
+            return cmd_slug_redraw(primo, resto)
         if resto and resto[0] == "lang":
             from .harness_update import cmd_slug_lang
             return cmd_slug_lang(primo, resto)

@@ -24,6 +24,16 @@ def _git_pulito() -> bool:
     return esito.stdout.strip() == ""
 
 
+def _ripristina() -> None:
+    """Se build o test falliscono a meta', VERSION/dist restano sporchi: si parte da
+    git pulito (vedi _git_pulito sopra), quindi un git checkout li riporta esattamente
+    com'erano. Senza questo, un fallimento lascia una release a meta' nel working tree.
+    """
+    subprocess.run(["git", "checkout", "--", str(VERSION_FILE), str(CLI_OUT), str(CLI_OUT.with_suffix(".sha256"))],
+                    cwd=ROOT)
+    print("  ripristinati payload/VERSION, dist/atlas, dist/atlas.sha256", file=sys.stderr)
+
+
 def main() -> int:
     if len(sys.argv) != 2 or not VERSIONE_RE.match(sys.argv[1]):
         print("  uso: python3 release.py X.Y.Z", file=sys.stderr)
@@ -39,12 +49,14 @@ def main() -> int:
     print(f"  payload/VERSION -> {versione}")
 
     if subprocess.run([sys.executable, "build.py"], cwd=ROOT).returncode != 0:
+        _ripristina()
         return 1
 
     unit = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tests"], cwd=ROOT)
     e2e = subprocess.run([sys.executable, "tests/e2e.py"], cwd=ROOT)
     if unit.returncode != 0 or e2e.returncode != 0:
         print("\n  test falliti: la release non procede.\n", file=sys.stderr)
+        _ripristina()
         return 1
 
     sha = hashlib.sha256(CLI_OUT.read_bytes()).hexdigest()

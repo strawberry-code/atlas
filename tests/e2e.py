@@ -129,6 +129,13 @@ def main() -> int:
                  "slug update: grafi intatti")
         verifica((target / "CLAUDE.md").read_text(encoding="utf-8").count("atlas:begin") == 1,
                  "slug update: contratto non duplicato")
+        verifica("ridisegnati 2/2" in esito.stdout, "slug update: redraw automatico riportato nel riepilogo")
+
+        dashboard = radice / "graphs" / "epic-test" / "dashboard.html"
+        dashboard.unlink()
+        esito = globale(target, slug, "redraw", env=env)
+        verifica(esito.returncode == 0 and dashboard.is_file(), "'atlas <slug> redraw' rigenera la dashboard")
+        verifica("ridisegnati 2/2" in esito.stdout, "redraw: riepilogo corretto")
 
         mappa_it_prima = (radice / "graphs" / "epic-test" / "map.md").read_text(encoding="utf-8")
         esito = globale(target, slug, "lang", "en", env=env)
