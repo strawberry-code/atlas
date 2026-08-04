@@ -1,98 +1,126 @@
 # Atlas
 
-Harness di task a grafo. I task sono nodi, le dipendenze sono archi, la **frontiera** è quel che si può prendere adesso. Ogni nodo dichiara se la sua risposta si scrive con l'umano (**HITL**) o la scrive l'agente da solo (**AFK**).
+*[Versione italiana](README.it.md)*
 
-## Installare il CLI
+A graph-based task harness. Tasks are nodes, dependencies are edges, and the **frontier** is whatever can be picked up right now. Every node declares who writes its answer: the human (**HITL**) or the agent on its own (**AFK**).
+
+## What it is, and when it's worth using
+
+Atlas takes a project's work, breaks it into nodes connected by dependencies, and lets it live as a graph instead of a list. Each node is a ticket sized for one session: a feature to build, a question to settle, an exploration that has to happen before a decision is even possible. The frontier is the set of nodes you can pick up right now, the ones whose blockers are already closed: you don't choose by reading a list top to bottom, you look at what's actually available.
+
+Every node also declares who writes its answer. An **AFK** node (away from keyboard) is worked by the agent alone, and its output always lands in a file: the ticket itself or the artifact it produces. An **HITL** node (human in the loop) gets resolved by talking it through: the question is put to the user one at a time, and the answer is written together.
+
+It's worth installing when a piece of work spans more than one session and has real dependencies between its parts. An epic with a dozen connected tasks is the typical case, one graph per epic. If the work fits in a single session, or it's really a list without real dependencies, the graph adds ceremony instead of structure.
+
+## How you work, in practice
+
+Install the CLI, install it in a project (creates `.atlas/`, registers the project, adds the two skills), then the loop stays the same every time:
+
+1. **Create or import a graph**, from a text you already have or by tracing it from scratch with the wayfinder if the idea is still fog. The `atlas-new-graph` skill handles this.
+2. **Look at the frontier** with `atlas status`: what's available, what's blocked, what's already closed.
+3. **Claim a node** with `atlas claim <ID>`, before touching it. The claim is a per-session lock.
+4. **Work it**: if the node is AFK, the agent does it alone; if it's HITL, the `atlas-work` skill asks its questions one at a time and waits.
+5. **Close it** with `atlas close <ID> -s "summary"`, after writing the Answer section in the ticket. The map and dashboard regenerate on their own.
+
+One way to orchestrate several nodes at once, if the project has many available: a "main" session that watches the frontier and coordinates, AFK nodes delegated to sub-agents that work in parallel and write their results into their own tickets, HITL nodes reserved for a dedicated session. This isn't a feature of the engine, it's just one way of using it: Atlas stays the source of truth on what's done, whoever's coordinating on top is free to organize however they like.
+
+## Installing the CLI
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/strawberry-code/atlas/main/install.sh | sh
 ```
 
-Finisce in `~/.local/bin/atlas` (override con `ATLAS_INSTALL_DIR`). Serve Python 3.10+ su POSIX: niente venv, nessuna dipendenza oltre la stdlib.
+On native Windows (no WSL needed):
 
-## Installare in un progetto
-
-```bash
-atlas install .                      # oppure atlas install /path/al/progetto
-atlas install . --graph mio-epic     # crea subito il primo grafo
-atlas install . --lang en            # contenuti e skill in inglese invece che italiano
+```powershell
+irm https://raw.githubusercontent.com/strawberry-code/atlas/main/install.ps1 | iex
 ```
 
-Finisce tutto in `.atlas/`, più due symlink in `.claude/skills/`, l'hook di fine sessione in `.claude/settings.json` e il contratto in `CLAUDE.md`. Il progetto viene anche registrato in `~/.config/atlas.json` con uno slug (default: nome della cartella; `--slug` per un nome diverso).
+Lands in `~/.local/bin/atlas` (`%USERPROFILE%\.local\bin\atlas` on Windows, override with `ATLAS_INSTALL_DIR`). Needs Python 3.10+: no venv, no dependency beyond the stdlib.
+
+## Installing in a project
 
 ```bash
-atlas list                           # progetti registrati e il loro stato
-atlas mio-progetto update            # aggiorna SOLO l'harness di quel progetto
-atlas update                         # aggiorna SOLO il CLI globale, mai i progetti
-atlas lang                           # lingua di default per i nuovi progetti (it/en)
-atlas mio-progetto lang en           # cambia lingua a un progetto già installato e rigenera skill/contratto
+atlas install .                      # or atlas install /path/to/project
+atlas install . --graph my-epic      # create the first graph right away
+atlas install . --lang en            # content and skills in English instead of Italian
 ```
 
-Cambiare lingua a un progetto esistente rigenera `SKILL.md`, `CONTRACT.md` e prova a rirenderizzare ogni grafo: un `map.md` già scritto nella vecchia lingua non viene toccato (le sue intestazioni non combaciano più), quel grafo resta com'era finché non lo si aggiorna a mano — i ticket nuovi seguono comunque la lingua corrente.
-
-## Lavorare
-
-Da dentro il progetto, `atlas <comando>` fa da passthrough al motore locale — stesso effetto di `.atlas/bin/atlas <comando>`, forma consigliata perché non richiede il path:
+Everything lands in `.atlas/`, plus two symlinks in `.claude/skills/`, the end-of-session hook in `.claude/settings.json`, and the contract in `CLAUDE.md`. The project also gets registered in `~/.config/atlas.json` under a slug (default: the folder name; `--slug` for a different one).
 
 ```bash
-atlas status                         # frontiera, lucchetti, avanzamento
-atlas claim F01                      # rivendica, prima di toccare qualsiasi cosa
-atlas show F01                       # domanda, dipendenze, path del ticket
-# lavori, poi scrivi la sezione Risposta in .atlas/graphs/<slug>/tickets/F01.md
-atlas close F01 -s "sintesi in una riga"
+atlas list                           # registered projects and their state
+atlas my-project update              # updates ONLY that project's harness
+atlas update                         # updates ONLY the global CLI, never any project
+atlas lang                           # default language for new projects (it/en)
+atlas my-project lang en             # switches an installed project's language and regenerates skill/contract
+```
+
+Switching an existing project's language regenerates `SKILL.md`, `CONTRACT.md`, and tries to re-render every graph: a `map.md` already written in the old language is left untouched (its headings no longer match), so that graph stays as it was until you update it by hand — new tickets still follow the current language.
+
+## Working
+
+From inside the project, `atlas <command>` passes through to the local engine — same effect as `.atlas/bin/atlas <command>`, the recommended form since it doesn't need the path:
+
+```bash
+atlas status                         # frontier, locks, progress
+atlas claim F01                      # claim, before touching anything
+atlas show F01                       # question, dependencies, ticket path
+# work it, then write the Answer section in .atlas/graphs/<slug>/tickets/F01.md
+atlas close F01 -s "one-line summary"
 atlas render --open                  # dashboard
 ```
 
-Un nodo per sessione. `close` rifiuta se la Risposta è vuota.
+One node per session. `close` refuses if the Answer is empty.
 
-## Cambiare il grafo
+## Changing the graph
 
-Mai a mano, sempre con uno script:
+Never by hand, always with a script:
 
 ```bash
-atlas new-script aggiunge-ramo-deploy
-# scrivi le mutazioni in .atlas/scripts/002-aggiunge-ramo-deploy.py
-atlas exec .atlas/scripts/002-aggiunge-ramo-deploy.py
+atlas new-script adds-deploy-branch
+# write the mutations in .atlas/scripts/002-adds-deploy-branch.py
+atlas exec .atlas/scripts/002-adds-deploy-branch.py
 ```
 
 ```python
 from core import mutate
 
 def run(g):
-    mutate.add_branch(g, "X", "Consegna", "#0f766e")
+    mutate.add_branch(g, "X", "Delivery", "#0f766e")
     mutate.add_node(g, id="X01", branch="X", type="task", mode="AFK",
-                    title="Pipeline di build",
-                    question="Che cosa produce, e come si verifica che sia buono?",
+                    title="Build pipeline",
+                    question="What does it produce, and how do you verify it's good?",
                     blockedBy=["F03"])
 ```
 
-Tutto gira in una transazione sola e viene validato prima di scrivere: cicli, archi verso il nulla e id duplicati fanno fallire lo script senza toccare il file.
+It all runs in a single transaction and gets validated before writing: cycles, edges pointing nowhere, and duplicate ids fail the script without touching the file.
 
-Altre funzioni: `edit_node`, `link`, `unlink`, `drop` (fuori scopo), `remove_node`, `reopen`, `fog_add`, `note_add`, `set_meta`.
+Other functions: `edit_node`, `link`, `unlink`, `drop` (out of scope), `remove_node`, `reopen`, `fog_add`, `note_add`, `set_meta`.
 
-## Più grafi
+## Multiple graphs
 
-Uno per epic, isolati.
+One per epic, isolated.
 
 ```bash
-atlas new altro-epic -t "Titolo" -d "Dove si arriva."
+atlas new other-epic -t "Title" -d "Where it lands."
 atlas graphs
-atlas use altro-epic       # oppure -g <slug>, oppure ATLAS_GRAPH=<slug>
+atlas use other-epic       # or -g <slug>, or ATLAS_GRAPH=<slug>
 ```
 
-## Le due skill
+## The two skills
 
-`atlas-new-graph` costruisce un grafo nuovo, da un testo che hai già o tracciandolo col wayfinder. `atlas-work` lavora un nodo dalla frontiera alla chiusura. Si invocano da sole quando serve.
+`atlas-new-graph` builds a new graph, from a text you already have or by tracing it with the wayfinder. `atlas-work` works a node from the frontier to its close. They invoke themselves when needed.
 
-## Licenza
+## License
 
-AGPL-3.0. Vedi `LICENSE`.
+AGPL-3.0. See `LICENSE`.
 
-## Sviluppare Atlas
+## Developing Atlas
 
 ```bash
-python3 -m unittest discover -s tests   # motore + CLI globale (registry, self-update, install.sh)
-python3 build.py && python3 tests/e2e.py  # dist/atlas, provato davvero
+python3 -m unittest discover -s tests   # engine + global CLI (registry, self-update, install.sh)
+python3 build.py && python3 tests/e2e.py  # dist/atlas, tried for real
 ```
 
-`payload/` è il motore che finisce nel progetto ospite, e deve restare stdlib pura, POSIX, senza rete. `atlascli/` è il CLI globale (install/update/uninstall/list, registro, self-update): stdlib pura anche lì, ma la rete verso GitHub è consentita perché è un prodotto diverso. Dopo ogni modifica va rigenerato `dist/atlas` con `build.py`. Per tagliare una release: `python3 release.py X.Y.Z` (bump versione, build, test, sha256 — i comandi git/GitHub restano manuali).
+`payload/` is the engine that ends up in the host project, and it has to stay pure stdlib, cross-platform (POSIX and Windows), no network. `atlascli/` is the global CLI (install/update/uninstall/list, registry, self-update): pure stdlib there too, but network access to GitHub is allowed since it's a different product. Every change needs `dist/atlas` regenerated with `build.py`. To cut a release: `python3 release.py X.Y.Z` (version bump, build, test, sha256 — the git/GitHub commands stay manual).
