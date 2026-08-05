@@ -62,6 +62,11 @@ li b{{color:{INK};font-weight:500}}
 .pct{{font-size:23px;font-weight:600;letter-spacing:-.02em}}
 .pct span{{font-size:12.5px;font-weight:400;color:{FAINT};margin-left:6px}}
 .dest{{margin:8px 0 0;color:{MUTED};font-size:12.5px;line-height:1.45}}
+.box-avanzamento{{min-height:266px}}
+.box-chiusi{{display:flex;flex-direction:column;max-height:266px}}
+.box-chiusi ul{{overflow-y:auto;min-height:0;scrollbar-width:thin;scrollbar-color:{EDGE} transparent}}
+.box-chiusi ul::-webkit-scrollbar{{width:6px}}
+.box-chiusi ul::-webkit-scrollbar-thumb{{background:{EDGE};border-radius:99px}}
 .dot{{width:9px;height:9px;border-radius:3px;flex:none;display:inline-block}}
 .legend{{display:flex;flex-wrap:wrap;gap:10px;padding:16px 34px 6px;
   color:{MUTED};font-size:12px;align-items:center}}
@@ -69,8 +74,8 @@ li b{{color:{INK};font-weight:500}}
   border:1px solid {BORDER};border-radius:99px;padding:5px 11px}}
 .legend span.hint{{background:none;border:none;padding:5px 0;color:{FAINT}}}
 .wrap{{overflow-x:auto;padding:12px 34px 34px}}
-.canvas{{background:#fff;border:1px solid {BORDER};border-radius:12px;padding:10px;
-  box-shadow:{SHADOW}}}
+.canvas{{display:inline-block;vertical-align:top;background:#fff;border:1px solid {BORDER};
+  border-radius:12px;padding:10px;box-shadow:{SHADOW}}}
 .nid{{font:600 11px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.02em}}
 .nbadge{{font:10px ui-monospace,SFMono-Regular,Menlo,monospace}}
 .ntt{{font:12.5px -apple-system,system-ui,sans-serif}}

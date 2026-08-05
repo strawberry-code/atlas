@@ -20,16 +20,16 @@ from .theme import STATE
 def _card_avanzamento(data: dict, fatti: int, totale: int) -> str:
     quota = round(100 * fatti / totale) if totale else 0
     return (
-        f'<section class="box"><h2>{t("render.avanzamento")}</h2>'
+        f'<section class="box box-avanzamento"><h2>{t("render.avanzamento")}</h2>'
         f'<p class="pct">{quota}%<span>{t("render.nodi_conteggio", fatti=fatti, totale=totale)}</span></p>'
         f'<div class="track"><div class="fill" style="width:{quota}%"></div></div>'
         f'<p class="dest">{escape(data["meta"]["destination"])}</p></section>'
     )
 
 
-def _card_lista(titolo: str, voci: list[str], vuoto: str) -> str:
+def _card_lista(titolo: str, voci: list[str], vuoto: str, classe: str = "box") -> str:
     corpo = "".join(voci) or f'<li>{vuoto}</li>'
-    return f'<section class="box"><h2>{titolo}</h2><ul>{corpo}</ul></section>'
+    return f'<section class="{classe}"><h2>{titolo}</h2><ul>{corpo}</ul></section>'
 
 
 def _costo_numerico(testo: str) -> float | None:
@@ -86,7 +86,7 @@ def panels(ref: Graph, data: dict, front: list[dict], presi: list[dict]) -> str:
             f'<span class="tag">{escape(n.get("cost") or t("render.costo_ignoto"))}</span></li>'
             for n in chiusi
         ]
-        cards.append(_card_lista(t("render.chiusi"), voci_chiusi, ""))
+        cards.append(_card_lista(t("render.chiusi"), voci_chiusi, "", classe="box box-chiusi"))
     return "".join(cards)
 
 
