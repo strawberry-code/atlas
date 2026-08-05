@@ -12,7 +12,7 @@ import sys
 from datetime import datetime, timedelta
 
 from . import docs
-from .config import Graph
+from .config import ENV_IDENTITY, Graph
 from .model import by_id, is_done, node_of
 from .store import CLAIMED, CLOSED, OPEN, StateError, transaction
 from .strings import t
@@ -23,6 +23,19 @@ def session() -> tuple[int | None, str | None]:
     pid = os.environ.get("CLAUDE_PID")
     return (int(pid) if pid and pid.isdigit() else None,
             os.environ.get("CLAUDE_CODE_SESSION_ID"))
+
+
+def identity() -> str:
+    """Chi tiene davvero il lucchetto: sovrascrivibile via ATLAS_IDENTITY, altrimenti il PID.
+
+    I subagent di una stessa sessione Claude condividono lo stesso CLAUDE_PID: senza
+    un'identita' esplicita, il tetto di claim per sessione e i conflitti di chiusura
+    li tratterebbero come un solo attore anche quando lavorano nodi diversi in parallelo.
+    """
+    if sovrascritta := os.environ.get(ENV_IDENTITY):
+        return sovrascritta
+    pid, _ = session()
+    return str(pid) if pid else "?"
 
 
 def alive(pid: int | None, process_name: str = "claude") -> bool:
@@ -60,25 +73,36 @@ def held_since(node: dict) -> timedelta | None:
     return datetime.now().astimezone() - datetime.fromisoformat(stamp) if stamp else None
 
 
+def heartbeat_since(node: dict) -> timedelta | None:
+    """Come held_since, ma dal battito piu' recente invece che dalla presa iniziale:
+    e' il segnale giusto per capire se un lucchetto e' fermo, non da quanto e' aperto."""
+    stamp = holder(node).get("heartbeat") or holder(node).get("at")
+    return datetime.now().astimezone() - datetime.fromisoformat(stamp) if stamp else None
+
+
 def claim_state(node: dict, agent: dict) -> str:
     """live, dead o idle: come si presenta un nodo rivendicato."""
     if not alive(holder(node).get("pid"), agent["process_name"]):
         return "dead"
-    held = held_since(node)
-    return "idle" if held and held > timedelta(hours=agent["idle_hours"]) else "live"
+    quiete = heartbeat_since(node)
+    return "idle" if quiete and quiete > timedelta(hours=agent["idle_hours"]) else "live"
 
 
 def mine(data: dict) -> list[dict]:
-    pid, _ = session()
+    me = identity()
     return [n for n in data["nodes"]
-            if n["status"] == CLAIMED and holder(n).get("pid") == pid]
+            if n["status"] == CLAIMED and holder(n).get("identity") == me]
 
 
 def claim(ref: Graph, node_id: str, assignee: str | None = None, force: bool = False) -> dict:
     agent = ref.workspace.config["agent"]
     pid, sid = session()
+    me = identity()
     with transaction(ref.json_path) as data:
         node = node_of(data, node_id)
+        if node["status"] == CLAIMED and holder(node).get("identity") == me:
+            node["claim"]["heartbeat"] = datetime.now().astimezone().isoformat(timespec="seconds")
+            return dict(node)
         index = by_id(data)
         if node["status"] != OPEN:
             raise StateError(t("claim.non_aperto", id=node_id, stato=node["status"]))
@@ -89,9 +113,9 @@ def claim(ref: Graph, node_id: str, assignee: str | None = None, force: bool = F
         if len(tenuti) >= agent["max_claims_per_session"] and not force:
             raise StateError(t("claim.tetto", tenuti=", ".join(tenuti),
                                tetto=agent["max_claims_per_session"], primo=tenuti[0]))
+        ora = datetime.now().astimezone().isoformat(timespec="seconds")
         node.update(status=CLAIMED, assignee=assignee or agent["default_assignee"],
-                    claim={"pid": pid, "session": sid,
-                           "at": datetime.now().astimezone().isoformat(timespec="seconds")})
+                    claim={"pid": pid, "session": sid, "identity": me, "at": ora, "heartbeat": ora})
         return dict(node)
 
 
@@ -112,8 +136,9 @@ def close(ref: Graph, node_id: str, summary: str, force: bool = False) -> dict:
         node = node_of(data, node_id)
         if is_done(node):
             raise StateError(t("close.gia_chiuso", id=node_id))
-        owner = holder(node).get("pid")
-        if node["status"] == CLAIMED and owner != pid and alive(owner, agent["process_name"]) and not force:
+        owner = holder(node).get("identity")
+        owner_pid = holder(node).get("pid")
+        if node["status"] == CLAIMED and owner != identity() and alive(owner_pid, agent["process_name"]) and not force:
             raise StateError(t("close.altra_sessione", id=node_id, owner=owner))
         if not docs.answer_written(ref, node_id) and not force:
             raise StateError(t("close.risposta_vuota", file=ref.ticket_path(node_id).name))

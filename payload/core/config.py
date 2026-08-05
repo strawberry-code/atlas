@@ -15,6 +15,7 @@ from .strings import t
 DIRNAME = ".atlas"
 ENV_GRAPH = "ATLAS_GRAPH"
 ENV_ROOT = "ATLAS_ROOT"
+ENV_IDENTITY = "ATLAS_IDENTITY"
 
 DEFAULTS = {
     "project": "progetto",

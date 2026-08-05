@@ -35,7 +35,8 @@ def sessione_corrente() -> tuple[str | None, int | None]:
 def main() -> int:
     ws = Workspace(ROOT)
     set_language(ws.config.get("language", "it"))
-    sid, pid = sessione_corrente()
+    sid, _ = sessione_corrente()
+    io = claims.identity()
     rimasti: list[str] = []
     for slug in ws.slugs():
         ref = Graph(ws, slug)
@@ -43,7 +44,7 @@ def main() -> int:
         dash.write(ref, data)
         rimasti += [f"{slug}/{n['id']}" for n in data["nodes"]
                     if n["status"] == "claimed"
-                    and (claims.holder(n).get("session") == sid or claims.holder(n).get("pid") == pid)]
+                    and (claims.holder(n).get("session") == sid or claims.holder(n).get("identity") == io)]
     if rimasti:
         print(t("hook.rivendicato", elenco=", ".join(rimasti)))
     return 0

@@ -152,6 +152,40 @@ class Lucchetti(Base):
         node = self.model.node_of(self.store.load(self.ref.json_path), "F01")
         self.assertEqual("dead", self.claims.claim_state(node, self.ws.config["agent"]))
 
+    def test_identita_sovrascrivibile_permette_claim_paralleli(self):
+        self.popola()
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.unlink(g, "F02", blocked_by="F01")
+        os.environ["ATLAS_IDENTITY"] = "esecutore-1"
+        try:
+            self.claims.claim(self.ref, "F01")
+        finally:
+            os.environ.pop("ATLAS_IDENTITY", None)
+        os.environ["ATLAS_IDENTITY"] = "esecutore-2"
+        try:
+            self.claims.claim(self.ref, "F02")
+        finally:
+            os.environ.pop("ATLAS_IDENTITY", None)
+        data = self.store.load(self.ref.json_path)
+        self.assertEqual("claimed", self.model.node_of(data, "F01")["status"])
+        self.assertEqual("claimed", self.model.node_of(data, "F02")["status"])
+
+    def test_riclamare_il_proprio_nodo_rinfresca_il_lucchetto(self):
+        self.popola()
+        self.claims.claim(self.ref, "F01")
+        node = self.claims.claim(self.ref, "F01")
+        self.assertEqual("claimed", node["status"])
+
+    def test_riclamare_da_unaltra_identita_solleva(self):
+        self.popola()
+        self.claims.claim(self.ref, "F01")
+        os.environ["ATLAS_IDENTITY"] = "qualcun-altro"
+        try:
+            with self.assertRaises(self.store.StateError):
+                self.claims.claim(self.ref, "F01")
+        finally:
+            os.environ.pop("ATLAS_IDENTITY", None)
+
 
 class LucchettiWindows(Base):
     """claims.alive() sul ramo win32: os.kill(pid, 0) su Windows non e' un probe innocuo
