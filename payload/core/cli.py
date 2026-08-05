@@ -138,6 +138,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("claim", help=t("help.claim"))
     p.add_argument("node"); p.add_argument("-a", "--assignee"); p.add_argument("--force", action="store_true")
+    p = sub.add_parser("take", help=t("help.take"))
+    p.add_argument("node"); p.add_argument("-a", "--assignee"); p.add_argument("--force", action="store_true")
     p = sub.add_parser("release", help=t("help.release")); p.add_argument("node")
     p.add_argument("-r", "--ragione", default=None)
     p = sub.add_parser("close", help=t("help.close"))
@@ -180,6 +182,13 @@ def dispatch(ws: Workspace, args) -> int:
         refresh(ref, data)
         commit(ws, ref, node, args.tipo or ws.config["git"]["commit_type"])
         report.show_status(ref, data)
+        return 0
+
+    if args.cmd == "take":
+        node = claims.claim(ref, args.node, args.assignee, args.force)
+        data = load(ref.json_path)
+        refresh(ref, data)
+        report.show_brief(ref, data, node["id"])
         return 0
 
     if args.cmd == "claim":

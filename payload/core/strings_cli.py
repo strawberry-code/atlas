@@ -18,6 +18,8 @@ STRINGS: dict[str, dict[str, str]] = {
     "help.brief": {"it": "il pacchetto di contesto per lavorare un nodo",
                    "en": "the context package to work a node"},
     "help.claim": {"it": "rivendica un nodo per questa sessione", "en": "claims a node for this session"},
+    "help.take": {"it": "rivendica un nodo e ne stampa subito il contesto",
+                  "en": "claims a node and prints its context right away"},
     "help.release": {"it": "restituisce un nodo alla frontiera", "en": "returns a node to the frontier"},
     "help.close": {"it": "chiude un nodo con la sua sintesi", "en": "closes a node with its summary"},
     "help.fog": {"it": "appunta ciò che è emerso e non ha ancora un nodo",

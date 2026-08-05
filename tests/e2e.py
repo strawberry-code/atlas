@@ -116,6 +116,10 @@ def main() -> int:
         prossimo = locale(target, "next").stdout
         verifica("F03" in prossimo, "'atlas next' mostra la frontiera")
 
+        presa = locale(target, "take", "F03")
+        verifica(presa.returncode == 0, "'atlas take' rivendica il nodo")
+        verifica("così si è deciso" in presa.stdout, "'atlas take' stampa il contesto insieme al claim")
+
         verifica(locale(target, "fog", "manca il suono dei passi", "--for", "F03").returncode == 0,
                  "fog con --for accettato")
         nebbia = locale(target, "fog", "--list").stdout
