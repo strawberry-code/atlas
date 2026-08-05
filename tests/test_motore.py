@@ -309,6 +309,15 @@ class Artefatti(Base):
         self.render_tutto()
         self.assertIn("<svg", self.ref.dashboard_path.read_text(encoding="utf-8"))
 
+    def test_dashboard_mostra_il_costo_dichiarato(self):
+        self.popola()
+        self.rispondi("F01")
+        self.claims.claim(self.ref, "F01")
+        self.claims.close(self.ref, "F01", "fatto", cost="~40 chiamate")
+        self.render_tutto()
+        html = self.ref.dashboard_path.read_text(encoding="utf-8")
+        self.assertIn("~40 chiamate", html)
+
 
 class Doctor(Base):
     def test_nessun_avviso_su_un_grafo_sano(self):

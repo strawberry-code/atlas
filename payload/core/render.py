@@ -7,6 +7,7 @@ quel canvas, cioe' header, pannelli laterali, legenda, footer.
 """
 from __future__ import annotations
 
+import re
 from html import escape
 
 from . import claims, render_svg, theme
@@ -29,6 +30,24 @@ def _card_avanzamento(data: dict, fatti: int, totale: int) -> str:
 def _card_lista(titolo: str, voci: list[str], vuoto: str) -> str:
     corpo = "".join(voci) or f'<li>{vuoto}</li>'
     return f'<section class="box"><h2>{titolo}</h2><ul>{corpo}</ul></section>'
+
+
+def _costo_numerico(testo: str) -> float | None:
+    trovato = re.search(r"[\d.]+", testo)
+    return float(trovato.group()) if trovato else None
+
+
+def _card_costi(chiusi: list[dict]) -> str:
+    con_costo = [n for n in chiusi if n.get("cost")]
+    numerici = [_costo_numerico(n["cost"]) for n in con_costo]
+    totale = sum(v for v in numerici if v is not None)
+    fuori_conteggio = sum(1 for v in numerici if v is None)
+    return (
+        f'<section class="box"><h2>{t("render.costi")}</h2>'
+        f'<p class="pct">{totale:g}<span>{t("render.costi_copertura", con=len(con_costo), totale=len(chiusi))}'
+        f'</span></p>'
+        f'<p class="dest">{t("render.costi_fuori_conteggio", n=fuori_conteggio)}</p></section>'
+    )
 
 
 def panels(ref: Graph, data: dict, front: list[dict], presi: list[dict]) -> str:
@@ -59,6 +78,15 @@ def panels(ref: Graph, data: dict, front: list[dict], presi: list[dict]) -> str:
             f'{claims.claim_state(n, agente)}</span></li>' for n in presi
         ]
         cards.append(_card_lista(t("render.in_lavorazione"), voci, ""))
+    chiusi = [n for n in data["nodes"] if n["status"] == "closed"]
+    if chiusi:
+        cards.append(_card_costi(chiusi))
+        voci_chiusi = [
+            f'<li><b>{n["id"]}</b> {escape(n["title"])}'
+            f'<span class="tag">{escape(n.get("cost") or t("render.costo_ignoto"))}</span></li>'
+            for n in chiusi
+        ]
+        cards.append(_card_lista(t("render.chiusi"), voci_chiusi, ""))
     return "".join(cards)
 
 
