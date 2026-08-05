@@ -136,6 +136,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("claim", help=t("help.claim"))
     p.add_argument("node"); p.add_argument("-a", "--assignee"); p.add_argument("--force", action="store_true")
     p = sub.add_parser("release", help=t("help.release")); p.add_argument("node")
+    p.add_argument("-r", "--ragione", default=None)
     p = sub.add_parser("close", help=t("help.close"))
     p.add_argument("node"); p.add_argument("-s", "--sintesi", required=True)
     p.add_argument("-t", "--tipo", default=None); p.add_argument("--force", action="store_true")
@@ -179,7 +180,7 @@ def dispatch(ws: Workspace, args) -> int:
         node = claims.claim(ref, args.node, args.assignee, args.force)
         print(t("claim.fatto", id=node["id"], path=ref.ticket_path(node["id"])))
     elif args.cmd == "release":
-        print(t("release.fatto", id=claims.release(ref, args.node)["id"]))
+        print(t("release.fatto", id=claims.release(ref, args.node, args.ragione)["id"]))
     elif args.cmd == "fog":
         with transaction(ref.json_path) as data:
             data["fog"].append(args.riga)

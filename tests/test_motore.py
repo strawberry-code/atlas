@@ -193,6 +193,14 @@ class Lucchetti(Base):
         finally:
             os.environ.pop("ATLAS_IDENTITY", None)
 
+    def test_rilascio_con_ragione_registra_levento(self):
+        self.popola()
+        self.claims.claim(self.ref, "F01")
+        self.claims.release(self.ref, "F01", "non pronto")
+        data = self.store.load(self.ref.json_path)
+        self.assertEqual(1, len(data["releases"]))
+        self.assertEqual("non pronto", data["releases"][0]["reason"])
+
 
 class LucchettiWindows(Base):
     """claims.alive() sul ramo win32: os.kill(pid, 0) su Windows non e' un probe innocuo
@@ -238,6 +246,13 @@ class Artefatti(Base):
         self.ref.map_path.unlink(missing_ok=True)
         self.render_tutto()
         self.assertIn("così si è deciso", self.ref.map_path.read_text(encoding="utf-8"))
+
+    def test_rilascio_con_ragione_appare_nelle_decisioni(self):
+        self.popola()
+        self.claims.claim(self.ref, "F01")
+        self.claims.release(self.ref, "F01", "verifica reale bocciata")
+        self.render_tutto()
+        self.assertIn("verifica reale bocciata", self.ref.map_path.read_text(encoding="utf-8"))
 
     def test_sezione_rinominata_fallisce_rumorosamente(self):
         data = self.popola()

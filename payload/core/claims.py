@@ -119,11 +119,16 @@ def claim(ref: Graph, node_id: str, assignee: str | None = None, force: bool = F
         return dict(node)
 
 
-def release(ref: Graph, node_id: str) -> dict:
+def release(ref: Graph, node_id: str, reason: str | None = None) -> dict:
     with transaction(ref.json_path) as data:
         node = node_of(data, node_id)
         if node["status"] != CLAIMED:
             raise StateError(t("release.non_rivendicato", id=node_id, stato=node["status"]))
+        if reason:
+            data.setdefault("releases", []).append({
+                "id": node_id, "title": node["title"], "reason": reason,
+                "at": datetime.now().astimezone().isoformat(timespec="seconds"),
+            })
         node.update(status=OPEN, assignee=None, claim=None)
         return dict(node)
 
