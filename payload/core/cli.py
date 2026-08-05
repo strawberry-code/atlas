@@ -43,7 +43,10 @@ def commit(ws: Workspace, ref, node: dict, tipo: str) -> None:
                 if cfg["stage"] == "node-paths" else ["-A"])
     subprocess.run(["git", "add", *percorsi], cwd=radice, check=False)
     messaggio = f"{tipo}({node['id']}): {node['title'].lower()}"
-    subprocess.run(["git", "commit", "-m", messaggio], cwd=radice, check=False)
+    if cfg["stage"] == "node-paths":
+        subprocess.run(["git", "commit", "-m", messaggio, "--", *percorsi], cwd=radice, check=False)
+    else:
+        subprocess.run(["git", "commit", "-m", messaggio], cwd=radice, check=False)
     print(t("commit.fatto", messaggio=messaggio))
 
 
