@@ -152,7 +152,9 @@ def show_brief(ref: Graph, data: dict, node_id: str) -> None:
     """Il pacchetto di contesto per lavorare un nodo: domanda, risposte dei bloccanti,
     nebbia che lo nomina, rilasci passati su questo stesso nodo."""
     node = node_of(data, node_id)
+    ramo = data["branches"][node["branch"]]["label"]
     print(f"\n  {node['id']} · {node['title']}")
+    print(f"  {ramo} · {node['type']}/{node['mode']} · {node['status']}")
     print(f"\n  {node['question']}\n")
 
     if node["blockedBy"]:
