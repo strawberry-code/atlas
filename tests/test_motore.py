@@ -112,6 +112,23 @@ class Forma(Base):
             with self.mutate.editing(self.ref) as g:
                 self.mutate.edit_node(g, "F01", status="closed")
 
+    def test_downstream_conta_tutti_i_dipendenti(self):
+        data = self.popola()
+        self.assertEqual({"F02", "F03"}, self.model.downstream(data, "F01"))
+
+    def test_cammino_residuo_fino_al_terminale(self):
+        data = self.popola()
+        self.assertEqual(2, self.model.residual_path(data, "F01"))
+        self.assertEqual(0, self.model.residual_path(data, "F03"))
+
+    def test_ranked_frontier_ordina_per_impatto(self):
+        self.popola()
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.unlink(g, "F02", blocked_by="F01")
+        data = self.store.load(self.ref.json_path)
+        ordinata = self.model.ranked_frontier(data)
+        self.assertEqual(["F02", "F01"], [n["id"] for n, _, _ in ordinata])
+
 
 class Lucchetti(Base):
     def test_ciclo_di_vita(self):

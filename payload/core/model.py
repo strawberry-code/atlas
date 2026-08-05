@@ -65,3 +65,28 @@ def blocks(graph: dict, node_id: str) -> list[str]:
 
 def progress(graph: dict) -> tuple[int, int]:
     return sum(1 for n in graph["nodes"] if is_done(n)), len(graph["nodes"])
+
+
+def downstream(graph: dict, node_id: str) -> set[str]:
+    """Tutti i nodi che aspettano, direttamente o no, la chiusura di questo."""
+    visti: set[str] = set()
+    coda = [node_id]
+    while coda:
+        corrente = coda.pop()
+        for succ in blocks(graph, corrente):
+            if succ not in visti:
+                visti.add(succ)
+                coda.append(succ)
+    return visti
+
+
+def residual_path(graph: dict, node_id: str) -> int:
+    """Il piu' lungo cammino di dipendenza da qui fino a un nodo terminale."""
+    succ = blocks(graph, node_id)
+    return 1 + max((residual_path(graph, s) for s in succ), default=-1)
+
+
+def ranked_frontier(graph: dict) -> list[tuple[dict, int, int]]:
+    """La frontiera ordinata per impatto: quanti nodi sblocca, poi cammino residuo."""
+    righe = [(n, len(downstream(graph, n["id"])), residual_path(graph, n["id"])) for n in frontier(graph)]
+    return sorted(righe, key=lambda r: (-r[1], -r[2]))

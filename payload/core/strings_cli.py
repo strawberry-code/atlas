@@ -11,6 +11,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "opt.graph": {"it": "slug del grafo, se non è quello attivo",
                   "en": "graph slug, if not the active one"},
     "help.status": {"it": "frontiera, lucchetti, avanzamento", "en": "frontier, locks, progress"},
+    "help.next": {"it": "la frontiera ordinata per impatto", "en": "the frontier ranked by impact"},
     "help.graphs": {"it": "i grafi di questo progetto", "en": "the graphs in this project"},
     "help.use": {"it": "rende attivo un grafo", "en": "makes a graph active"},
     "help.show": {"it": "scheda di un nodo", "en": "a node's card"},

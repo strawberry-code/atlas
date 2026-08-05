@@ -130,6 +130,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("status", help=t("help.status"))
+    sub.add_parser("next", help=t("help.next"))
     sub.add_parser("graphs", help=t("help.graphs"))
     p = sub.add_parser("use", help=t("help.use")); p.add_argument("slug")
     p = sub.add_parser("show", help=t("help.show")); p.add_argument("node")
@@ -206,6 +207,9 @@ def dispatch(ws: Workspace, args) -> int:
     data = load(ref.json_path)
     if args.cmd == "status":
         report.show_status(ref, data)  # sola lettura: non tocca gli artefatti
+        return 0
+    if args.cmd == "next":
+        report.show_next(ref, data)  # sola lettura: non tocca gli artefatti
         return 0
     refresh(ref, data, getattr(args, "aprila", False))
     if args.cmd not in ("claim", "fog"):

@@ -51,6 +51,9 @@ STRINGS: dict[str, dict[str, str]] = {
                                       "en": "    {id} {titolo}: still {stato}, no answer to read yet"},
     "report.brief_nebbia": {"it": "\n  Nebbia che lo nomina:", "en": "\n  Fog that names it:"},
     "report.brief_rilasci": {"it": "\n  Rilasci precedenti su questo nodo:", "en": "\n  Earlier releases of this node:"},
+    "report.next_titolo": {"it": "\n  Frontiera, ordinata per impatto:", "en": "\n  Frontier, ranked by impact:"},
+    "report.next_riga": {"it": "    {id}  {titolo}  · sblocca {sblocca} · cammino residuo {cammino}",
+                         "en": "    {id}  {titolo}  · unlocks {sblocca} · {cammino} steps to the end"},
 
     # --- theme.py (etichette di stato nella dashboard) ---
     "state.frontier": {"it": "prendibile adesso", "en": "up for grabs now"},

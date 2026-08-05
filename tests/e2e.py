@@ -113,6 +113,9 @@ def main() -> int:
         brief = locale(target, "brief", "F03").stdout
         verifica("così si è deciso" in brief, "atlas brief mostra la risposta del bloccante F01")
 
+        prossimo = locale(target, "next").stdout
+        verifica("F03" in prossimo, "'atlas next' mostra la frontiera")
+
         verifica(locale(target, "fog", "manca il suono dei passi", "--for", "F03").returncode == 0,
                  "fog con --for accettato")
         nebbia = locale(target, "fog", "--list").stdout

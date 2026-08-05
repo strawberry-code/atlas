@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 from . import claims
 from .config import Graph, Workspace
-from .model import blocked, blocks, by_id, claimed, frontier, node_of, progress
+from .model import blocked, blocks, by_id, claimed, frontier, node_of, progress, ranked_frontier
 from .store import load
 from .strings import t
 
@@ -175,4 +175,16 @@ def show_brief(ref: Graph, data: dict, node_id: str) -> None:
         print(t("report.brief_rilasci"))
         for r in rilasci:
             print(f"    {r['at']}: {r['reason']}")
+    print()
+
+
+def show_next(ref: Graph, data: dict) -> None:
+    """La frontiera ordinata per impatto: quanti nodi sblocca, poi cammino residuo."""
+    righe = ranked_frontier(data)
+    if not righe:
+        print(t("report.frontiera_vuota"))
+        return
+    print(t("report.next_titolo"))
+    for nodo, sblocca, cammino in righe:
+        print(t("report.next_riga", id=nodo["id"], titolo=nodo["title"], sblocca=sblocca, cammino=cammino))
     print()
