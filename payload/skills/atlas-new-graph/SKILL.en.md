@@ -76,6 +76,16 @@ def run(g):
 
 Creation order doesn't matter: validation happens at the end of the transaction, so you can name a node in `blockedBy` that you create further down. What matters is that every edge resolves by the end and that there are no cycles.
 
+A fog entry (`atlas fog --list` rereads all of them) that matures into a node gets promoted in the same kind of script, adding the node and dropping the entry with `fog_drop`, which matches on a substring:
+
+```python
+def run(g):
+    mutate.add_node(g, id="F04", branch="F", type="task", mode="AFK",
+                    title="How updates get distributed",
+                    question="...", blockedBy=["F01"])
+    mutate.fog_drop(g, "updates get distributed")
+```
+
 Then:
 
 ```sh

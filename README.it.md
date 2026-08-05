@@ -17,8 +17,8 @@ Ha senso installarlo quando un pezzo di lavoro dura più sessioni e ha dipendenz
 Si installa il CLI, si installa in un progetto (crea `.atlas/`, registra il progetto, aggiunge le due skill), poi il ciclo è sempre lo stesso:
 
 1. **Si crea o importa un grafo**, da un testo che già esiste oppure tracciandolo da zero col wayfinder se l'idea è ancora nebbia. Se ne occupa la skill `atlas-new-graph`.
-2. **Si guarda la frontiera** con `atlas status`: cosa è prendibile, cosa è bloccato, cosa è già chiuso.
-3. **Si rivendica un nodo** con `atlas claim <ID>`, prima di toccarlo. Il claim è un lucchetto per sessione.
+2. **Si guarda la frontiera** con `atlas status`, o `atlas next` per ordinarla per impatto quando i nodi prendibili sono più d'uno.
+3. **Si prende un nodo** con `atlas take <ID>`, prima di toccarlo: rivendica e stampa il suo contesto (domanda, Risposte dei bloccanti, nebbia che lo nomina) nello stesso passo.
 4. **Si lavora**: se il nodo è AFK lo fa l'agente da solo, se è HITL la skill `atlas-work` porta le domande una alla volta e aspetta.
 5. **Si chiude** con `atlas close <ID> -s "sintesi"`, dopo aver scritto la Risposta nel ticket. Mappa e dashboard si rigenerano da sole.
 
@@ -64,11 +64,12 @@ Da dentro il progetto, `atlas <comando>` fa da passthrough al motore locale — 
 
 ```bash
 atlas status                         # frontiera, lucchetti, avanzamento
-atlas claim F01                      # rivendica, prima di toccare qualsiasi cosa
-atlas show F01                       # domanda, dipendenze, path del ticket
+atlas next                           # frontiera ordinata per impatto, come suggerimento
+atlas take F01                       # rivendica e stampa il contesto in un solo passo
 # lavori, poi scrivi la sezione Risposta in .atlas/graphs/<slug>/tickets/F01.md
 atlas close F01 -s "sintesi in una riga"
 atlas render --open                  # dashboard
+atlas doctor                         # controllo di salute: nodi dimenticati, lucchetti fermi, dashboard stantia
 ```
 
 Un nodo per sessione. `close` rifiuta se la Risposta è vuota.
@@ -96,7 +97,7 @@ def run(g):
 
 Tutto gira in una transazione sola e viene validato prima di scrivere: cicli, archi verso il nulla e id duplicati fanno fallire lo script senza toccare il file.
 
-Altre funzioni: `edit_node`, `link`, `unlink`, `drop` (fuori scopo), `remove_node`, `reopen`, `fog_add`, `note_add`, `set_meta`.
+Altre funzioni: `edit_node`, `link`, `unlink`, `drop` (fuori scopo), `remove_node`, `reopen`, `fog_add`, `fog_drop`, `note_add`, `set_meta`.
 
 ## Più grafi
 

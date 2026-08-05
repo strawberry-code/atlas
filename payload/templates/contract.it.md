@@ -4,16 +4,19 @@ Il lavoro di questo progetto è un grafo di task in `.atlas/`. Un nodo è un pez
 
 ```sh
 python3 .atlas/bin/atlas status              # frontiera, lucchetti, avanzamento
-python3 .atlas/bin/atlas claim <ID>          # rivendica, prima di toccare qualsiasi cosa
+python3 .atlas/bin/atlas next                 # la frontiera ordinata per impatto: un suggerimento
+python3 .atlas/bin/atlas take <ID>            # rivendica e stampa il contesto insieme, prima di toccare qualsiasi cosa
 python3 .atlas/bin/atlas close <ID> -s "..."  # chiude, dopo aver scritto la Risposta nel ticket
-python3 .atlas/bin/atlas fog "una riga"      # appunta ciò che è emerso e non ha ancora un nodo
+python3 .atlas/bin/atlas fog "una riga" --for <ID>   # appunta ciò che è emerso, indirizzato a un nodo se lo riguarda
 ```
+
+`atlas brief <ID>` stampa lo stesso pacchetto di contesto di `take` (domanda, Risposte dei bloccanti, nebbia che lo nomina) senza rivendicare: utile per rileggerlo senza toccare il lucchetto.
 
 ### Un nodo per sessione
 
-Il claim è un lucchetto, non un promemoria: porta il PID della sessione, e `claim` rifiuta se questa sessione ne tiene già uno. Per lavorare su più nodi in parallelo si aprono più sessioni, una per nodo. Il rifiuto si scavalca con `--force`, che esiste per i casi imprevisti e non per la fretta.
+Il claim è un lucchetto, non un promemoria: porta l'identità di chi rivendica (il PID di processo, o `ATLAS_IDENTITY` se impostata) e un battito che si rinnova ri-rivendicando lo stesso nodo. `claim`/`take` rifiutano se questa identità ne tiene già uno. Per lavorare su più nodi in parallelo con subagent che condividono lo stesso processo padre, ognuno imposta un `ATLAS_IDENTITY` diverso: altrimenti il tetto per sessione li conta come un solo attore. Il rifiuto si scavalca con `--force`, che esiste per i casi imprevisti e non per la fretta.
 
-Un lucchetto è orfano quando il processo che l'ha preso non esiste più. `status` lo segnala, e va rilasciato o riconfermato prima di rivendicare altro.
+Un lucchetto è orfano quando il processo che l'ha preso non esiste più, o fermo quando il battito non si aggiorna da troppo tempo. `atlas doctor` segnala entrambi i casi, insieme ai nodi che nessuno richiede e alle dashboard non aggiornate: eseguilo prima di dichiarare un grafo finito.
 
 ### HITL e AFK
 
@@ -51,6 +54,10 @@ Quel che scopri lavorando un nodo e che meriterebbe un nodo suo va **proposto**,
 | `task` | il lavoro è fatto e verificato, con la prova descritta nel ticket |
 
 `close` verifica una cosa sola, che la sezione **Risposta** del ticket sia compilata. Il resto lo dichiara chi chiude. Che la risposta sia anche vera non lo può verificare nessuna macchina, e l'unica difesa è che la scriva chi ha fatto il lavoro mentre ce l'ha fresco.
+
+Sotto Risposta ci sono tre sotto-sezioni leggere e facoltative: **scelte non canoniche** (cosa hai deciso a tavolino, non dettato dal documento di design), **debito dichiarato** (cosa lasci volutamente incompleto, e perché) e **autorizzazioni ricevute** (se hai agito oltre l'ambito del nodo su indicazione esplicita dell'utente, cosa e quando). Un cancello di verifica le legge senza dover ricostruire la stessa archeologia da una prosa libera, e la terza rende verificabile un "come da tua richiesta" invece che solo asserito.
+
+`close` accetta anche `-c/--costo` (un ordine di grandezza di quanto è costato, testo libero, niente di preciso) e `--artefatti` (i file prodotti, popolano il campo che il grafo già prevede). Se un cancello rilascia un nodo invece di chiuderlo, `-r/--ragione` su `release` registra il perché come evento in mappa, non solo come un ritorno silenzioso alla frontiera.
 
 ### Più grafi
 

@@ -17,8 +17,8 @@ It's worth installing when a piece of work spans more than one session and has r
 Install the CLI, install it in a project (creates `.atlas/`, registers the project, adds the two skills), then the loop stays the same every time:
 
 1. **Create or import a graph**, from a text you already have or by tracing it from scratch with the wayfinder if the idea is still fog. The `atlas-new-graph` skill handles this.
-2. **Look at the frontier** with `atlas status`: what's available, what's blocked, what's already closed.
-3. **Claim a node** with `atlas claim <ID>`, before touching it. The claim is a per-session lock.
+2. **Look at the frontier** with `atlas status`, or `atlas next` to rank it by impact when several nodes are up for grabs.
+3. **Take a node** with `atlas take <ID>`, before touching it: claims it and prints its context (question, blockers' answers, fog that names it) in the same step.
 4. **Work it**: if the node is AFK, the agent does it alone; if it's HITL, the `atlas-work` skill asks its questions one at a time and waits.
 5. **Close it** with `atlas close <ID> -s "summary"`, after writing the Answer section in the ticket. The map and dashboard regenerate on their own.
 
@@ -64,11 +64,12 @@ From inside the project, `atlas <command>` passes through to the local engine â€
 
 ```bash
 atlas status                         # frontier, locks, progress
-atlas claim F01                      # claim, before touching anything
-atlas show F01                       # question, dependencies, ticket path
+atlas next                           # frontier ranked by impact, as a suggestion
+atlas take F01                       # claims it and prints its context in one step
 # work it, then write the Answer section in .atlas/graphs/<slug>/tickets/F01.md
 atlas close F01 -s "one-line summary"
 atlas render --open                  # dashboard
+atlas doctor                         # health check: dangling nodes, stale locks, stale dashboard
 ```
 
 One node per session. `close` refuses if the Answer is empty.
@@ -96,7 +97,7 @@ def run(g):
 
 It all runs in a single transaction and gets validated before writing: cycles, edges pointing nowhere, and duplicate ids fail the script without touching the file.
 
-Other functions: `edit_node`, `link`, `unlink`, `drop` (out of scope), `remove_node`, `reopen`, `fog_add`, `note_add`, `set_meta`.
+Other functions: `edit_node`, `link`, `unlink`, `drop` (out of scope), `remove_node`, `reopen`, `fog_add`, `fog_drop`, `note_add`, `set_meta`.
 
 ## Multiple graphs
 

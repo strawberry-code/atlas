@@ -4,16 +4,19 @@ The work in this project is a graph of tasks in `.atlas/`. A node is a piece of 
 
 ```sh
 python3 .atlas/bin/atlas status              # frontier, locks, progress
-python3 .atlas/bin/atlas claim <ID>          # claim it, before touching anything
+python3 .atlas/bin/atlas next                 # the frontier ranked by impact: a suggestion
+python3 .atlas/bin/atlas take <ID>            # claims it and prints its context in one step, before touching anything
 python3 .atlas/bin/atlas close <ID> -s "..."  # closes it, after writing the Answer in the ticket
-python3 .atlas/bin/atlas fog "a line"        # notes down what came up and has no node yet
+python3 .atlas/bin/atlas fog "a line" --for <ID>   # notes down what came up, addressed to a node if it concerns one
 ```
+
+`atlas brief <ID>` prints the same context package as `take` (question, blockers' answers, fog that names it) without claiming: useful to reread it without touching the lock.
 
 ### One node per session
 
-A claim is a lock, not a reminder: it carries the session's PID, and `claim` refuses if this session already holds one. To work on several nodes in parallel, open several sessions, one per node. The refusal is overridden with `--force`, which exists for the unexpected, not for being in a hurry.
+A claim is a lock, not a reminder: it carries the claiming identity (the process PID, or `ATLAS_IDENTITY` if set) and a heartbeat that renews by re-claiming the same node. `claim`/`take` refuse if this identity already holds one. To work on several nodes in parallel with subagents that share the same parent process, each one sets a different `ATLAS_IDENTITY`: otherwise the per-session cap counts them as a single actor. The refusal is overridden with `--force`, which exists for the unexpected, not for being in a hurry.
 
-A lock is orphaned when the process that took it no longer exists. `status` flags it, and it must be released or reconfirmed before claiming anything else.
+A lock is orphaned when the process that took it no longer exists, or stalled when its heartbeat hasn't updated in too long. `atlas doctor` flags both cases, along with nodes nothing requires and dashboards that are out of date: run it before declaring a graph done.
 
 ### HITL and AFK
 
@@ -51,6 +54,10 @@ Something you discover while working a node that would deserve a node of its own
 | `task` | the work is done and verified, with the proof described in the ticket |
 
 `close` checks exactly one thing: that the ticket's **Answer** section is filled in. Everything else is declared by whoever closes it. No machine can verify that the answer is also true, and the only defense is that whoever did the work writes it while it's still fresh.
+
+Under Answer there are three light, optional sub-sections: **non-canonical choices** (what you decided on your own, not dictated by the design doc), **declared debt** (what you're deliberately leaving incomplete, and why), and **authorizations received** (if you acted beyond the node's scope on the user's explicit direction, what and when). A verification gate reads them without having to reconstruct the same archaeology from free prose, and the third one makes a "per your request" verifiable instead of merely asserted.
+
+`close` also accepts `-c/--costo` (a rough order of magnitude for what it cost, free text, nothing precise) and `--artefatti` (the files produced, filling in the field the graph already has). If a gate releases a node instead of closing it, `-r/--ragione` on `release` records why as an event in the map, not just a silent return to the frontier.
 
 ### Multiple graphs
 

@@ -76,6 +76,16 @@ def run(g):
 
 L'ordine di creazione non conta: la validazione avviene alla fine della transazione, quindi puoi nominare in `blockedBy` un nodo che crei più sotto. Quello che conta è che alla fine ogni arco risolva e che non ci siano cicli.
 
+Una voce di nebbia (`atlas fog --list` per rileggerle tutte) che matura in un nodo si promuove nello stesso tipo di script, aggiungendo il nodo e togliendo la voce con `fog_drop`, che cerca una sottostringa:
+
+```python
+def run(g):
+    mutate.add_node(g, id="F04", branch="F", type="task", mode="AFK",
+                    title="Come si distribuiscono gli aggiornamenti",
+                    question="...", blockedBy=["F01"])
+    mutate.fog_drop(g, "distribuiscono gli aggiornamenti")
+```
+
 Poi:
 
 ```sh
