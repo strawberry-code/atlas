@@ -5,7 +5,7 @@ from datetime import timedelta
 
 from . import claims
 from .config import Graph, Workspace
-from .model import blocked, blocks, claimed, frontier, node_of, progress
+from .model import blocked, blocks, by_id, claimed, frontier, node_of, progress
 from .store import load
 from .strings import t
 
@@ -86,3 +86,43 @@ def show_node(ref: Graph, data: dict, node_id: str) -> None:
     print(f"\n  {node['question']}\n")
     if node["answer"]:
         print(t("report.nodo_risposta", risposta=node["answer"]))
+
+
+def doctor_avvisi(data: dict, ref: Graph, agente: dict) -> list[str]:
+    """Avvisi sulla salute di un grafo: non bloccano niente, segnalano soltanto."""
+    avvisi = []
+
+    foglie = [n["id"] for n in data["nodes"] if not blocks(data, n["id"])]
+    if len(foglie) > 1:
+        avvisi.append(t("doctor.nodi_pendenti", elenco=", ".join(foglie)))
+
+    for nodo in claimed(data):
+        stato = claims.claim_state(nodo, agente)
+        if stato != "live":
+            avvisi.append(t("doctor.lucchetto_fermo", id=nodo["id"], stato=t(ETICHETTA[stato])))
+
+    if ref.dashboard_path.is_file() and ref.json_path.stat().st_mtime > ref.dashboard_path.stat().st_mtime:
+        avvisi.append(t("doctor.dashboard_stantia"))
+
+    index = by_id(data)
+    for nodo in claimed(data):
+        chi = claims.holder(nodo).get("identity")
+        autoverificati = [d for d in nodo["blockedBy"] if index[d].get("closedBy") == chi]
+        if chi and autoverificati:
+            avvisi.append(t("doctor.autoverifica", id=nodo["id"], chi=chi, elenco=", ".join(autoverificati)))
+
+    return avvisi
+
+
+def show_doctor(ws: Workspace) -> None:
+    """Avvisi sulla salute di ogni grafo del progetto: non bloccano niente, segnalano soltanto."""
+    agente = ws.config["agent"]
+    for slug in ws.slugs():
+        ref = Graph(ws, slug)
+        data = load(ref.json_path)
+        avvisi = doctor_avvisi(data, ref, agente)
+        if avvisi:
+            print(t("doctor.grafo_titolo", slug=slug))
+            for avviso in avvisi:
+                print(f"    {avviso}")
+    print()

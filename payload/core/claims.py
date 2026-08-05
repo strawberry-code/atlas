@@ -149,6 +149,7 @@ def close(ref: Graph, node_id: str, summary: str, force: bool = False,
         if not docs.answer_written(ref, node_id) and not force:
             raise StateError(t("close.risposta_vuota", file=ref.ticket_path(node_id).name))
         node.update(status=CLOSED, assignee=None, claim=None, answer=summary, cost=cost,
+                    closedBy=identity(),
                     closedAt=datetime.now().astimezone().isoformat(timespec="seconds"))
         if artifacts is not None:
             node["artifacts"] = list(artifacts)

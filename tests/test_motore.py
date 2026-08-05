@@ -11,6 +11,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta
 from pathlib import Path
 from unittest import mock
 
@@ -29,10 +30,10 @@ class Base(unittest.TestCase):
         os.environ["ATLAS_ROOT"] = str(self.root)
         for modulo in [m for m in sys.modules if m == "core" or m.startswith("core.")]:
             del sys.modules[modulo]
-        from core import config, docs, mutate, render, store, model, claims, strings
+        from core import config, docs, mutate, render, store, model, claims, strings, report
         self.config, self.docs, self.mutate = config, docs, mutate
         self.render, self.store, self.model, self.claims = render, store, model, claims
-        self.strings = strings
+        self.strings, self.report = strings, report
         self.ws = config.workspace(self.tmp)
         self.ref = mutate.create_graph(self.ws, "prova", "Grafo di prova", "Verificare il motore.")
 
@@ -290,6 +291,42 @@ class Artefatti(Base):
     def test_dashboard_regge_un_grafo_vuoto(self):
         self.render_tutto()
         self.assertIn("<svg", self.ref.dashboard_path.read_text(encoding="utf-8"))
+
+
+class Doctor(Base):
+    def test_nessun_avviso_su_un_grafo_sano(self):
+        self.popola()
+        data = self.store.load(self.ref.json_path)
+        avvisi = self.report.doctor_avvisi(data, self.ref, self.ws.config["agent"])
+        self.assertEqual([], avvisi)
+
+    def test_nodo_pendente_segnalato_se_non_e_lunico_cancello(self):
+        self.popola()
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.add_node(g, id="F04", branch="F", title="Isolato", question="?")
+        data = self.store.load(self.ref.json_path)
+        avvisi = self.report.doctor_avvisi(data, self.ref, self.ws.config["agent"])
+        self.assertTrue(any("F04" in a for a in avvisi))
+
+    def test_lucchetto_fermo_segnalato(self):
+        self.popola()
+        self.claims.claim(self.ref, "F01")
+        with self.store.transaction(self.ref.json_path) as data:
+            vecchio = (datetime.now().astimezone() - timedelta(hours=5)).isoformat(timespec="seconds")
+            self.model.node_of(data, "F01")["claim"]["heartbeat"] = vecchio
+        data = self.store.load(self.ref.json_path)
+        avvisi = self.report.doctor_avvisi(data, self.ref, self.ws.config["agent"])
+        self.assertTrue(any("F01" in a for a in avvisi))
+
+    def test_autoverifica_segnalata(self):
+        self.popola()
+        self.rispondi("F01")
+        self.claims.claim(self.ref, "F01")
+        self.claims.close(self.ref, "F01", "fatto")
+        self.claims.claim(self.ref, "F02")
+        data = self.store.load(self.ref.json_path)
+        avvisi = self.report.doctor_avvisi(data, self.ref, self.ws.config["agent"])
+        self.assertTrue(any("F02" in a and "F01" in a for a in avvisi))
 
 
 class PiuGrafi(Base):
