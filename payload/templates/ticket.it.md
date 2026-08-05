@@ -14,16 +14,13 @@
 
 ## Risposta
 
-<!-- da compilare alla chiusura; la sintesi finisce da sola in map.md -->
+<!-- da compilare alla chiusura; la sintesi finisce da sola in map.md.
 
 ### Scelte non canoniche
-
-<!-- cosa hai deciso a tavolino, non dettato dal documento di design. lascia vuoto se non ce ne sono -->
+Cosa hai deciso a tavolino, non dettato dal documento di design. Lascia vuoto se non ce ne sono.
 
 ### Debito dichiarato
-
-<!-- cosa lasci volutamente incompleto, e perché. lascia vuoto se non ce n'è -->
+Cosa lasci volutamente incompleto, e perché. Lascia vuoto se non ce n'è.
 
 ### Autorizzazioni ricevute
-
-<!-- se hai agito oltre l'ambito originale del nodo su indicazione esplicita dell'umano, registra qui cosa e quando. lascia vuoto se non è successo -->
+Se hai agito oltre l'ambito originale del nodo su indicazione esplicita dell'umano, registra qui cosa e quando. -->
