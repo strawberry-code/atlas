@@ -141,6 +141,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("node"); p.add_argument("-s", "--sintesi", required=True)
     p.add_argument("-t", "--tipo", default=None); p.add_argument("--force", action="store_true")
     p.add_argument("-c", "--costo", default=None)
+    p.add_argument("--artefatti", nargs="*", default=None)
     p = sub.add_parser("fog", help=t("help.fog"))
     p.add_argument("riga")
     p = sub.add_parser("render", help=t("help.render"))
@@ -168,7 +169,7 @@ def dispatch(ws: Workspace, args) -> int:
 
     ref = ws.graph(args.graph)
     if args.cmd == "close":
-        node = claims.close(ref, args.node, args.sintesi, args.force, cost=args.costo)
+        node = claims.close(ref, args.node, args.sintesi, args.force, cost=args.costo, artifacts=args.artefatti)
         print(t("close.fatto", id=node["id"]))
         data = load(ref.json_path)
         refresh(ref, data)

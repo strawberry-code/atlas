@@ -151,6 +151,13 @@ class Lucchetti(Base):
         node = self.claims.close(self.ref, "F01", "sintesi", cost="~40 chiamate")
         self.assertEqual("~40 chiamate", node["cost"])
 
+    def test_close_registra_gli_artifacts_se_dichiarati(self):
+        self.popola()
+        self.claims.claim(self.ref, "F01")
+        self.rispondi("F01")
+        node = self.claims.close(self.ref, "F01", "sintesi", artifacts=["a.py", "b.py"])
+        self.assertEqual(["a.py", "b.py"], node["artifacts"])
+
     def test_lucchetto_orfano(self):
         self.popola()
         self.claims.claim(self.ref, "F01")

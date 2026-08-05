@@ -133,7 +133,8 @@ def release(ref: Graph, node_id: str, reason: str | None = None) -> dict:
         return dict(node)
 
 
-def close(ref: Graph, node_id: str, summary: str, force: bool = False, cost: str | None = None) -> dict:
+def close(ref: Graph, node_id: str, summary: str, force: bool = False,
+          cost: str | None = None, artifacts: list[str] | None = None) -> dict:
     """Chiude un nodo. Il possesso da parte di una sessione morta non e' un ostacolo."""
     agent = ref.workspace.config["agent"]
     pid, _ = session()
@@ -149,4 +150,6 @@ def close(ref: Graph, node_id: str, summary: str, force: bool = False, cost: str
             raise StateError(t("close.risposta_vuota", file=ref.ticket_path(node_id).name))
         node.update(status=CLOSED, assignee=None, claim=None, answer=summary, cost=cost,
                     closedAt=datetime.now().astimezone().isoformat(timespec="seconds"))
+        if artifacts is not None:
+            node["artifacts"] = list(artifacts)
         return dict(node)

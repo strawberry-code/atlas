@@ -15,3 +15,11 @@
 ## Risposta
 
 <!-- da compilare alla chiusura; la sintesi finisce da sola in map.md -->
+
+### Scelte non canoniche
+
+<!-- cosa hai deciso a tavolino, non dettato dal documento di design. lascia vuoto se non ce ne sono -->
+
+### Debito dichiarato
+
+<!-- cosa lasci volutamente incompleto, e perché. lascia vuoto se non ce n'è -->
