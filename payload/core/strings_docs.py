@@ -44,6 +44,8 @@ STRINGS: dict[str, dict[str, str]] = {
     "report.nodo_ticket": {"it": "  ticket:      {path}", "en": "  ticket:       {path}"},
     "report.nodo_nessuno": {"it": "nessuno", "en": "none"},
     "report.nodo_risposta": {"it": "  Risposta: {risposta}\n", "en": "  Answer: {risposta}\n"},
+    "report.nebbia_vuota": {"it": "  nessuna voce in nebbia", "en": "  no fog entries"},
+    "report.nebbia_titolo": {"it": "\n  Nebbia:", "en": "\n  Fog:"},
 
     # --- theme.py (etichette di stato nella dashboard) ---
     "state.frontier": {"it": "prendibile adesso", "en": "up for grabs now"},

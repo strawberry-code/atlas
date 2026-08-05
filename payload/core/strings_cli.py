@@ -90,6 +90,9 @@ STRINGS: dict[str, dict[str, str]] = {
     "claim.fatto": {"it": "  {id} rivendicato · ticket in {path}", "en": "  {id} claimed · ticket at {path}"},
     "release.fatto": {"it": "  {id} tornato alla frontiera", "en": "  {id} back on the frontier"},
     "fog.fatto": {"it": "  appuntato nella nebbia", "en": "  noted in the fog"},
+    "fog.per": {"it": "per {id}: {riga}", "en": "for {id}: {riga}"},
+    "fog.riga_mancante": {"it": "una voce di nebbia richiede del testo: 'atlas fog \"...\"'",
+                          "en": "a fog entry needs some text: 'atlas fog \"...\"'"},
 
     # --- hooks/session_end.py ---
     "hook.rivendicato": {"it": "Atlas: {elenco} resta rivendicato. "

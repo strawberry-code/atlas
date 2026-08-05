@@ -110,6 +110,12 @@ def main() -> int:
         verifica("così si è deciso" in mappa, "decisione registrata in map.md")
         verifica("F03" in locale(target, "status").stdout, "la frontiera è avanzata")
 
+        verifica(locale(target, "fog", "manca il suono dei passi", "--for", "F03").returncode == 0,
+                 "fog con --for accettato")
+        nebbia = locale(target, "fog", "--list").stdout
+        verifica("manca il suono dei passi" in nebbia and "F03" in nebbia,
+                 "fog --list mostra la voce col destinatario")
+
         locale(target, "new", "epic-secondo", "-t", "Secondo stream")
         verifica((radice / "graphs" / "epic-secondo" / "graph.json").is_file(), "secondo grafo creato")
         verifica("epic-test" in locale(target, "-g", "epic-test", "status").stdout, "override con --graph")

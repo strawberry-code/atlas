@@ -136,3 +136,13 @@ def show_doctor(ws: Workspace) -> None:
             for avviso in avvisi:
                 print(f"    {avviso}")
     print()
+
+
+def show_fog(ref: Graph, data: dict) -> None:
+    voci = data["fog"]
+    if not voci:
+        print(t("report.nebbia_vuota"))
+        return
+    print(t("report.nebbia_titolo"))
+    for i, voce in enumerate(voci):
+        print(f"    [{i}] {voce}")

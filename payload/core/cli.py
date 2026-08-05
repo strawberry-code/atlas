@@ -144,7 +144,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("-c", "--costo", default=None)
     p.add_argument("--artefatti", nargs="*", default=None)
     p = sub.add_parser("fog", help=t("help.fog"))
-    p.add_argument("riga")
+    p.add_argument("riga", nargs="?", default=None)
+    p.add_argument("--for", dest="destinatario", default=None)
+    p.add_argument("--list", dest="elenca", action="store_true")
     p = sub.add_parser("render", help=t("help.render"))
     p.add_argument("--open", dest="aprila", action="store_true")
 
@@ -184,8 +186,14 @@ def dispatch(ws: Workspace, args) -> int:
     elif args.cmd == "release":
         print(t("release.fatto", id=claims.release(ref, args.node, args.ragione)["id"]))
     elif args.cmd == "fog":
+        if args.elenca:
+            report.show_fog(ref, load(ref.json_path))
+            return 0
+        if not args.riga:
+            raise StateError(t("fog.riga_mancante"))
+        riga = t("fog.per", id=args.destinatario, riga=args.riga) if args.destinatario else args.riga
         with transaction(ref.json_path) as data:
-            data["fog"].append(args.riga)
+            data["fog"].append(riga)
         print(t("fog.fatto"))
     elif args.cmd == "show":
         report.show_node(ref, load(ref.json_path), args.node)
