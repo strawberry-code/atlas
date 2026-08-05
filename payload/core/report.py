@@ -1,7 +1,7 @@
 """Quel che la CLI stampa: frontiera, lucchetti, elenco dei grafi, scheda di un nodo."""
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from . import claims
 from .config import Graph, Workspace
@@ -110,6 +110,16 @@ def doctor_avvisi(data: dict, ref: Graph, agente: dict) -> list[str]:
         autoverificati = [d for d in nodo["blockedBy"] if index[d].get("closedBy") == chi]
         if chi and autoverificati:
             avvisi.append(t("doctor.autoverifica", id=nodo["id"], chi=chi, elenco=", ".join(autoverificati)))
+
+    for nodo in data["nodes"]:
+        chiuso = nodo.get("closedAt")
+        if nodo["status"] != "closed" or not chiuso or not nodo.get("artifacts"):
+            continue
+        soglia = datetime.fromisoformat(chiuso)
+        tocchi = [a for a in nodo["artifacts"] if (ref.workspace.project_root / a).is_file()
+                  and datetime.fromtimestamp((ref.workspace.project_root / a).stat().st_mtime).astimezone() > soglia]
+        if tocchi:
+            avvisi.append(t("doctor.ambito_toccato", id=nodo["id"], elenco=", ".join(tocchi)))
 
     return avvisi
 

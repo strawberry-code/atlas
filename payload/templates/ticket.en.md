@@ -23,3 +23,7 @@
 ### Declared debt
 
 <!-- what you're deliberately leaving incomplete, and why. leave empty if none -->
+
+### Authorizations received
+
+<!-- if you acted beyond the node's original scope on the human's explicit direction, record what and when here. leave empty if it didn't happen -->

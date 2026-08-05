@@ -23,3 +23,7 @@
 ### Debito dichiarato
 
 <!-- cosa lasci volutamente incompleto, e perché. lascia vuoto se non ce n'è -->
+
+### Autorizzazioni ricevute
+
+<!-- se hai agito oltre l'ambito originale del nodo su indicazione esplicita dell'umano, registra qui cosa e quando. lascia vuoto se non è successo -->

@@ -77,6 +77,10 @@ STRINGS: dict[str, dict[str, str]] = {
                                  "en": "the dashboard is older than the last change to the graph: run 'atlas render'"},
     "doctor.autoverifica": {"it": "{id}, rivendicato da {chi}, verifica nodi che {chi} stessa ha chiuso: {elenco}",
                             "en": "{id}, claimed by {chi}, verifies nodes that {chi} closed themself: {elenco}"},
+    "doctor.ambito_toccato": {"it": "{id} è chiuso ma questi artifacts sono stati modificati dopo: {elenco}. "
+                                     "Verifica che non sia una scrittura fuori scopo.",
+                              "en": "{id} is closed but these artifacts were modified afterwards: {elenco}. "
+                                    "Check it isn't an out-of-scope write."},
     "si": {"it": "sì", "en": "yes"},
     "no": {"it": "no", "en": "no"},
 

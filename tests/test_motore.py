@@ -328,6 +328,21 @@ class Doctor(Base):
         avvisi = self.report.doctor_avvisi(data, self.ref, self.ws.config["agent"])
         self.assertTrue(any("F02" in a and "F01" in a for a in avvisi))
 
+    def test_scrittura_fuori_scopo_dopo_chiusura_segnalata(self):
+        self.popola()
+        self.rispondi("F01")
+        self.claims.claim(self.ref, "F01")
+        artefatto = self.ws.project_root / "prodotto.txt"
+        artefatto.write_text("v1", encoding="utf-8")
+        self.claims.close(self.ref, "F01", "fatto", artifacts=["prodotto.txt"])
+        with self.store.transaction(self.ref.json_path) as data:
+            passato = (datetime.now().astimezone() - timedelta(hours=1)).isoformat(timespec="seconds")
+            self.model.node_of(data, "F01")["closedAt"] = passato
+        artefatto.write_text("v2 dopo la chiusura", encoding="utf-8")
+        data = self.store.load(self.ref.json_path)
+        avvisi = self.report.doctor_avvisi(data, self.ref, self.ws.config["agent"])
+        self.assertTrue(any("F01" in a and "prodotto.txt" in a for a in avvisi))
+
 
 class PiuGrafi(Base):
     def test_grafi_isolati(self):
