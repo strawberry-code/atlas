@@ -110,6 +110,9 @@ def main() -> int:
         verifica("così si è deciso" in mappa, "decisione registrata in map.md")
         verifica("F03" in locale(target, "status").stdout, "la frontiera è avanzata")
 
+        brief = locale(target, "brief", "F03").stdout
+        verifica("così si è deciso" in brief, "atlas brief mostra la risposta del bloccante F01")
+
         verifica(locale(target, "fog", "manca il suono dei passi", "--for", "F03").returncode == 0,
                  "fog con --for accettato")
         nebbia = locale(target, "fog", "--list").stdout

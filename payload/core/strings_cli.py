@@ -14,6 +14,8 @@ STRINGS: dict[str, dict[str, str]] = {
     "help.graphs": {"it": "i grafi di questo progetto", "en": "the graphs in this project"},
     "help.use": {"it": "rende attivo un grafo", "en": "makes a graph active"},
     "help.show": {"it": "scheda di un nodo", "en": "a node's card"},
+    "help.brief": {"it": "il pacchetto di contesto per lavorare un nodo",
+                   "en": "the context package to work a node"},
     "help.claim": {"it": "rivendica un nodo per questa sessione", "en": "claims a node for this session"},
     "help.release": {"it": "restituisce un nodo alla frontiera", "en": "returns a node to the frontier"},
     "help.close": {"it": "chiude un nodo con la sua sintesi", "en": "closes a node with its summary"},

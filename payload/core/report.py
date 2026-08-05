@@ -146,3 +146,33 @@ def show_fog(ref: Graph, data: dict) -> None:
     print(t("report.nebbia_titolo"))
     for i, voce in enumerate(voci):
         print(f"    [{i}] {voce}")
+
+
+def show_brief(ref: Graph, data: dict, node_id: str) -> None:
+    """Il pacchetto di contesto per lavorare un nodo: domanda, risposte dei bloccanti,
+    nebbia che lo nomina, rilasci passati su questo stesso nodo."""
+    node = node_of(data, node_id)
+    print(f"\n  {node['id']} · {node['title']}")
+    print(f"\n  {node['question']}\n")
+
+    if node["blockedBy"]:
+        print(t("report.brief_bloccanti"))
+        for dep_id in node["blockedBy"]:
+            dep = node_of(data, dep_id)
+            if dep["status"] == "closed":
+                print(f"    {dep['id']} {dep['title']}: {dep['answer']}")
+            else:
+                print(t("report.brief_bloccante_aperto", id=dep["id"], titolo=dep["title"], stato=dep["status"]))
+
+    nebbia = [voce for voce in data["fog"] if node_id in voce]
+    if nebbia:
+        print(t("report.brief_nebbia"))
+        for voce in nebbia:
+            print(f"    {voce}")
+
+    rilasci = [r for r in data.get("releases", []) if r["id"] == node_id]
+    if rilasci:
+        print(t("report.brief_rilasci"))
+        for r in rilasci:
+            print(f"    {r['at']}: {r['reason']}")
+    print()

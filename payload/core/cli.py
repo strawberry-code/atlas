@@ -133,6 +133,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("graphs", help=t("help.graphs"))
     p = sub.add_parser("use", help=t("help.use")); p.add_argument("slug")
     p = sub.add_parser("show", help=t("help.show")); p.add_argument("node")
+    p = sub.add_parser("brief", help=t("help.brief")); p.add_argument("node")
 
     p = sub.add_parser("claim", help=t("help.claim"))
     p.add_argument("node"); p.add_argument("-a", "--assignee"); p.add_argument("--force", action="store_true")
@@ -197,6 +198,9 @@ def dispatch(ws: Workspace, args) -> int:
         print(t("fog.fatto"))
     elif args.cmd == "show":
         report.show_node(ref, load(ref.json_path), args.node)
+        return 0
+    elif args.cmd == "brief":
+        report.show_brief(ref, load(ref.json_path), args.node)
         return 0
 
     data = load(ref.json_path)

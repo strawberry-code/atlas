@@ -46,6 +46,11 @@ STRINGS: dict[str, dict[str, str]] = {
     "report.nodo_risposta": {"it": "  Risposta: {risposta}\n", "en": "  Answer: {risposta}\n"},
     "report.nebbia_vuota": {"it": "  nessuna voce in nebbia", "en": "  no fog entries"},
     "report.nebbia_titolo": {"it": "\n  Nebbia:", "en": "\n  Fog:"},
+    "report.brief_bloccanti": {"it": "\n  Risposte dei bloccanti:", "en": "\n  Blockers' answers:"},
+    "report.brief_bloccante_aperto": {"it": "    {id} {titolo}: ancora {stato}, non c'è risposta da leggere",
+                                      "en": "    {id} {titolo}: still {stato}, no answer to read yet"},
+    "report.brief_nebbia": {"it": "\n  Nebbia che lo nomina:", "en": "\n  Fog that names it:"},
+    "report.brief_rilasci": {"it": "\n  Rilasci precedenti su questo nodo:", "en": "\n  Earlier releases of this node:"},
 
     # --- theme.py (etichette di stato nella dashboard) ---
     "state.frontier": {"it": "prendibile adesso", "en": "up for grabs now"},
