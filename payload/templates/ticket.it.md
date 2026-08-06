@@ -1,3 +1,4 @@
+<!-- atlas:auto -->
 # {id} · {title}
 
 > Ramo: {branch} · Tipo: {type} · Modo: {mode}
@@ -7,6 +8,7 @@
 ## Domanda
 
 {question}
+<!-- /atlas:auto -->
 
 ## Lavorazione
 

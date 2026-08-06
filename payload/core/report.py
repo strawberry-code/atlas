@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-from . import claims
+from . import claims, docs
 from .config import Graph, Workspace
 from .model import blocked, blocks, by_id, claimed, fog_for, frontier, is_done, node_of, progress, ranked_frontier
 from .store import load
@@ -103,6 +103,9 @@ def doctor_avvisi(data: dict, ref: Graph, agente: dict) -> list[str]:
 
     if ref.dashboard_path.is_file() and ref.json_path.stat().st_mtime > ref.dashboard_path.stat().st_mtime:
         avvisi.append(t("doctor.dashboard_stantia"))
+
+    if scollegati := docs.unalignable(ref, data):
+        avvisi.append(t("doctor.ticket_scollegato", elenco=", ".join(scollegati), mark=docs.MARK_END))
 
     index = by_id(data)
     for nodo in claimed(data):

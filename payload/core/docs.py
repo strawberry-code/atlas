@@ -16,6 +16,12 @@ from .strings import t
 # esplicito la rigenerazione finiva per impilare una copia sull'altra.
 MARK = "<!-- atlas:auto -->"
 
+# Nel ticket il rapporto e' rovesciato: la parte derivata (titolo, ramo, tipo, modo,
+# bloccanti, domanda) sta in testa fra i due marker, e la prosa umana viene dopo. Serve
+# un marker di chiusura perche' la testa contiene gia' un '## ', che nella mappa basta
+# a chiudere una sezione.
+MARK_END = "<!-- /atlas:auto -->"
+
 # Le sezioni di map.md che il grafo possiede, e la chiave da cui ciascuna discende.
 # Le chiavi sono verso strings.py: l'intestazione vera dipende dalla lingua, e deve
 # combaciare esattamente con quella scritta nel template map.{lingua}.md.
@@ -38,18 +44,76 @@ def answer_written(ref: Graph, node_id: str) -> bool:
 def write_stubs(ref: Graph, data: dict) -> int:
     """Crea i ticket mancanti. Non sovrascrive mai: il lavoro scritto resta."""
     ref.tickets_dir.mkdir(parents=True, exist_ok=True)
-    stub, rami, creati = ref.workspace.template("ticket.md"), data["branches"], 0
+    modello, coda = _modello(ref)
+    rami, creati = data["branches"], 0
     for node in data["nodes"]:
         path = ref.ticket_path(node["id"])
         if path.exists():
             continue
-        path.write_text(stub.format(
-            id=node["id"], title=node["title"], type=node["type"], mode=node["mode"],
-            branch=rami[node["branch"]]["label"], question=node["question"],
-            blocked=", ".join(node["blockedBy"]) or t("docs.nessuno_prendibile"),
-        ), encoding="utf-8-sig")
+        path.write_text(_testa(modello, node, rami) + coda, encoding="utf-8-sig")
         creati += 1
     return creati
+
+
+def _modello(ref: Graph) -> tuple[str, str]:
+    """Il template spezzato sul marker: la testa da formattare, la coda da lasciar stare.
+    Il layout del ticket resta scritto una volta sola, nel template."""
+    testa, _, coda = ref.workspace.template("ticket.md").partition(MARK_END)
+    return testa + MARK_END, coda
+
+
+def _testa(modello: str, node: dict, rami: dict) -> str:
+    """La parte del ticket che discende dal grafo: titolo, ramo, tipo, modo, bloccanti, domanda."""
+    return modello.format(
+        id=node["id"], title=node["title"], type=node["type"], mode=node["mode"],
+        branch=rami[node["branch"]]["label"], question=node["question"],
+        blocked=", ".join(node["blockedBy"]) or t("docs.nessuno_prendibile"),
+    )
+
+
+def _coda(testo: str) -> str | None:
+    """Quel che nel ticket e' stato scritto a mano, o None se il confine non si riconosce.
+
+    Per i ticket nati prima che il marker esistesse il confine si deduce dall'intestazione
+    della Lavorazione: cosi' il primo render li riallinea invece di lasciarli indietro.
+    """
+    if MARK_END in testo:
+        return testo.partition(MARK_END)[2]
+    _, sep, resto = testo.partition(t("heading.lavorazione"))
+    return f"\n\n{sep}{resto}" if sep else None
+
+
+def rewrite_heads(ref: Graph, data: dict) -> int:
+    """Riallinea al grafo la testa dei ticket gia' esistenti, e ritorna quanti ne ha toccati.
+
+    E' il rimedio a un ticket che invecchia: edit_node cambia graph.json, e senza questo
+    il markdown continuava a raccontare il titolo, la domanda e i bloccanti di prima.
+    Riscrive solo se qualcosa e' davvero cambiato, perche' un mtime mosso a vuoto e'
+    rumore per il controllo di sconfinamento di doctor.
+    """
+    modello, _ = _modello(ref)
+    rami, riscritti = data["branches"], 0
+    for node in data["nodes"]:
+        path = ref.ticket_path(node["id"])
+        if not path.exists():
+            continue
+        testo = path.read_text(encoding="utf-8-sig")
+        coda = _coda(testo)
+        if coda is None:
+            continue                       # segnalato da unalignable(), mai sovrascritto alla cieca
+        nuovo = _testa(modello, node, rami) + coda
+        if nuovo != testo:
+            path.write_text(nuovo, encoding="utf-8-sig")
+            riscritti += 1
+    return riscritti
+
+
+def unalignable(ref: Graph, data: dict) -> list[str]:
+    """I ticket in cui non si riconosce il confine fra parte derivata e testo scritto:
+    nessuna rigenerazione li tocca, quindi restano indietro in silenzio."""
+    return [node["id"] for node in data["nodes"]
+            if ref.ticket_path(node["id"]).exists()
+            and _coda(ref.ticket_path(node["id"]).read_text(encoding="utf-8-sig")) is None]
 
 
 def ensure_map(ref: Graph, data: dict) -> None:

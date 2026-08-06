@@ -505,6 +505,61 @@ class PromozioneDallaNebbia(Base):
                     runpy.run_path(str(self.template(lingua)))["run"](None)
 
 
+class TicketRiallineati(Base):
+    """Il ticket è una vista, non una seconda verità: la sua testa discende dal grafo,
+    e quel che ci si scrive sotto resta di chi l'ha scritto."""
+
+    def lavorato(self, node_id: str = "F01") -> Path:
+        """Un ticket con dentro del lavoro scritto a mano, come lo si trova in un progetto vero."""
+        self.docs.write_stubs(self.ref, self.store.load(self.ref.json_path))
+        path = self.ref.ticket_path(node_id)
+        path.write_text(path.read_text(encoding="utf-8-sig") + "\nAppunti miei, da non perdere.\n",
+                        encoding="utf-8-sig")
+        return path
+
+    def test_edit_node_si_riflette_nel_ticket(self):
+        self.popola()
+        path = self.lavorato("F02")
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.edit_node(g, "F02", title="Titolo corretto", question="La domanda vera?")
+            self.mutate.unlink(g, "F02", blocked_by="F01")
+        self.assertEqual(1, self.docs.rewrite_heads(self.ref, self.store.load(self.ref.json_path)))
+        testo = path.read_text(encoding="utf-8-sig")
+        self.assertIn("Titolo corretto", testo)
+        self.assertIn("La domanda vera?", testo)
+        self.assertNotIn("Bloccato da: F01", testo)
+        self.assertIn("Appunti miei, da non perdere.", testo)   # la prosa umana non si tocca
+
+    def test_non_riscrive_se_non_e_cambiato_niente(self):
+        self.popola()
+        path = self.lavorato()
+        prima = path.stat().st_mtime_ns
+        self.assertEqual(0, self.docs.rewrite_heads(self.ref, self.store.load(self.ref.json_path)))
+        self.assertEqual(prima, path.stat().st_mtime_ns)   # un mtime mosso a vuoto confonde doctor
+
+    def test_migra_un_ticket_nato_prima_del_marker(self):
+        self.popola()
+        path = self.lavorato()
+        vecchio = path.read_text(encoding="utf-8-sig")
+        testa, _, coda = vecchio.partition(self.docs.MARK_END)
+        path.write_text(testa.replace(self.docs.MARK, "") + coda, encoding="utf-8-sig")  # com'era prima
+        self.assertEqual(1, self.docs.rewrite_heads(self.ref, self.store.load(self.ref.json_path)))
+        testo = path.read_text(encoding="utf-8-sig")
+        self.assertIn(self.docs.MARK_END, testo)
+        self.assertIn("Appunti miei, da non perdere.", testo)
+
+    def test_un_ticket_senza_confine_riconoscibile_si_segnala_e_non_si_tocca(self):
+        self.popola()
+        path = self.lavorato()
+        path.write_text("Ho riscritto tutto a modo mio.\n", encoding="utf-8-sig")
+        data = self.store.load(self.ref.json_path)
+        self.assertEqual(["F01"], self.docs.unalignable(self.ref, data))
+        self.assertEqual(0, self.docs.rewrite_heads(self.ref, data))
+        self.assertEqual("Ho riscritto tutto a modo mio.\n", path.read_text(encoding="utf-8-sig"))
+        avvisi = self.report.doctor_avvisi(data, self.ref, self.ws.config["agent"])
+        self.assertTrue([a for a in avvisi if "F01" in a and self.docs.MARK_END in a])
+
+
 class HowTo(Base):
     def stampa(self) -> str:
         buffer = io.StringIO()

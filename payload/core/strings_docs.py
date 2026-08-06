@@ -95,4 +95,5 @@ STRINGS: dict[str, dict[str, str]] = {
     "heading.non_specificato": {"it": "## Non ancora specificato", "en": "## Not yet specified"},
     "heading.fuori_scopo": {"it": "## Fuori scopo", "en": "## Out of scope"},
     "heading.risposta": {"it": "## Risposta", "en": "## Answer"},
+    "heading.lavorazione": {"it": "## Lavorazione", "en": "## Work"},
 }

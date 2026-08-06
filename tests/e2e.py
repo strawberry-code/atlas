@@ -127,6 +127,9 @@ def main() -> int:
         verifica("manca il suono dei passi" in nebbia and "F03" in nebbia,
                  "fog --list mostra la voce col destinatario")
 
+        ticket_f03 = (radice / "graphs" / "epic-test" / "tickets" / "F03.md").read_text(encoding="utf-8-sig")
+        verifica("<!-- /atlas:auto -->" in ticket_f03, "il ticket nasce col confine fra parte generata e prosa")
+
         briefing = locale(target, "how-to").stdout
         verifica("il grafo comanda il lavoro" in briefing, "how-to stampa il contratto installato")
         verifica("mutate.add_node(g," in briefing and "atlas-work:" in briefing,

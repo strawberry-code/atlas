@@ -42,7 +42,7 @@ For `grilling` nodes use the `grilling` and `domain-modeling` skills, for `proto
 
 ## 4. Work, and leave a trail in the ticket
 
-The ticket is `.atlas/graphs/<slug>/tickets/<ID>.md`. While working, note in **Work** the alternatives you discarded and links to the artifacts produced. At the end, fill in **Answer**: it's the only thing `close` checks, and it's for whoever arrives after you.
+The ticket is `.atlas/graphs/<slug>/tickets/<ID>.md`. Write from **Work** downwards: everything above the `<!-- /atlas:auto -->` comment descends from the graph and rewrites itself, so fixing it by hand is wasted effort. While working, note in **Work** the alternatives you discarded and links to the artifacts produced. At the end, fill in **Answer**: it's the only thing `close` checks, and it's for whoever arrives after you.
 
 If something comes up that would deserve a node of its own, **don't create it**. Note it down, addressed to a node if it concerns one:
 

@@ -39,6 +39,8 @@ STRINGS: dict[str, dict[str, str]] = {
 
     # --- refresh/commit ---
     "refresh.ticket_creati": {"it": "  {n} ticket creati in {dir}", "en": "  {n} tickets created in {dir}"},
+    "refresh.ticket_riallineati": {"it": "  {n} ticket riallineati al grafo",
+                                   "en": "  {n} tickets realigned to the graph"},
     "commit.fatto": {"it": "  commit: {messaggio}", "en": "  commit: {messaggio}"},
 
     # --- cmd_new ---
@@ -82,6 +84,12 @@ STRINGS: dict[str, dict[str, str]] = {
     "doctor.lucchetto_fermo": {"it": "{id} è rivendicato ma {stato}", "en": "{id} is claimed but {stato}"},
     "doctor.dashboard_stantia": {"it": "la dashboard è più vecchia dell'ultima modifica al grafo: esegui 'atlas render'",
                                  "en": "the dashboard is older than the last change to the graph: run 'atlas render'"},
+    "doctor.ticket_scollegato": {"it": "in questi ticket manca il confine {mark} fra la parte generata e "
+                                        "il testo scritto a mano: {elenco}. La loro testa non si riallinea "
+                                        "più al grafo, e va rimessa a mano o ricreata cancellando il file.",
+                                 "en": "these tickets have lost the {mark} boundary between the generated part "
+                                       "and the hand-written text: {elenco}. Their head no longer realigns to "
+                                       "the graph, and must be fixed by hand or recreated by deleting the file."},
     "doctor.autoverifica": {"it": "{id}, rivendicato da {chi}, verifica nodi che {chi} stessa ha chiuso: {elenco}",
                             "en": "{id}, claimed by {chi}, verifies nodes that {chi} closed themself: {elenco}"},
     "doctor.ambito_toccato": {"it": "{id} è chiuso ma questi artifacts sono stati modificati dopo: {elenco}. "

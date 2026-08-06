@@ -1,3 +1,4 @@
+<!-- atlas:auto -->
 # {id} · {title}
 
 > Branch: {branch} · Type: {type} · Mode: {mode}
@@ -7,6 +8,7 @@
 ## Question
 
 {question}
+<!-- /atlas:auto -->
 
 ## Work
 

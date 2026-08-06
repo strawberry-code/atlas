@@ -45,6 +45,8 @@ python3 .atlas/bin/atlas exec .atlas/scripts/003-aggiunge-ramo-deploy.py
 
 Lo script gira in una sola transazione e il grafo viene validato prima di essere scritto, quindi un ciclo o un arco verso un nodo inesistente lo fanno fallire senza toccare il file. Gli script restano versionati: sono la storia delle modifiche alla mappa.
 
+Il ticket di un nodo non è una seconda copia del grafo. La sua testa (titolo, ramo, tipo, modo, bloccanti, domanda) discende da `graph.json` e viene riscritta a ogni rigenerazione, mentre Lavorazione e Risposta restano di chi le scrive. Il confine fra le due parti è il commento `<!-- /atlas:auto -->`. Uno script che cambia titolo, domanda o dipendenze non lascia quindi dietro di sé un markdown stantio, e non c'è niente da correggere a mano; se quel commento sparisce, il ticket smette di riallinearsi e `atlas doctor` lo segnala.
+
 Quel che scopri lavorando un nodo e che meriterebbe un nodo suo va **proposto**, non creato: intanto si appunta con `atlas fog`. Per farne un nodo c'è un esempio pronto in `.atlas/scripts/000-promote-fog.py`: si compila con l'indice della voce e i campi del nodo, e si lancia con `atlas exec`.
 
 ### Quando un nodo è fatto

@@ -42,7 +42,7 @@ Per i nodi `grilling` usa le skill `grilling` e `domain-modeling`, per i `protot
 
 ## 4. Lavora, e lascia traccia nel ticket
 
-Il ticket è `.atlas/graphs/<slug>/tickets/<ID>.md`. Durante il lavoro annota in **Lavorazione** le alternative scartate e i link agli artefatti prodotti. Alla fine compila **Risposta**: è la sola cosa che `close` verifica, e serve a chi arriva dopo.
+Il ticket è `.atlas/graphs/<slug>/tickets/<ID>.md`. Scrivi da **Lavorazione** in giù: quel che sta sopra il commento `<!-- /atlas:auto -->` discende dal grafo e si riscrive da sé, quindi correggerlo a mano è tempo perso. Durante il lavoro annota in **Lavorazione** le alternative scartate e i link agli artefatti prodotti. Alla fine compila **Risposta**: è la sola cosa che `close` verifica, e serve a chi arriva dopo.
 
 Se emerge qualcosa che meriterebbe un nodo suo, **non crearlo**. Appuntalo, indirizzato a un nodo se lo riguarda:
 

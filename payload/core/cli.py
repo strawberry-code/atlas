@@ -25,6 +25,8 @@ def refresh(ref, data: dict, aprila: bool = False) -> None:
     docs.ensure_map(ref, data)
     if creati := docs.write_stubs(ref, data):
         print(t("refresh.ticket_creati", n=creati, dir=ref.tickets_dir))
+    if riallineati := docs.rewrite_heads(ref, data):
+        print(t("refresh.ticket_riallineati", n=riallineati))
     docs.rewrite_lists(ref, data)
     dash.write(ref, data)
     if aprila:
