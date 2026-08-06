@@ -1,6 +1,8 @@
 """Sola lettura sul grafo: indici, profondita' topologica, frontiera, avanzamento."""
 from __future__ import annotations
 
+import re
+
 from .store import CLAIMED, CLOSED, DROPPED, OPEN, StateError
 
 
@@ -90,3 +92,11 @@ def ranked_frontier(graph: dict) -> list[tuple[dict, int, int]]:
     """La frontiera ordinata per impatto: quanti nodi sblocca, poi cammino residuo."""
     righe = [(n, len(downstream(graph, n["id"])), residual_path(graph, n["id"])) for n in frontier(graph)]
     return sorted(righe, key=lambda r: (-r[1], -r[2]))
+
+
+def fog_for(graph: dict, node_id: str) -> list[str]:
+    """Le voci di nebbia che nominano questo nodo. Confine di parola, non sottostringa:
+    cercando B1 non devono uscire le voci che parlano di B10. Copre sia il prefisso
+    strutturato scritto da 'fog --for' sia la menzione nel testo libero."""
+    confine = re.compile(rf"(?<![0-9A-Za-z_-]){re.escape(node_id)}(?![0-9A-Za-z_-])")
+    return [voce for voce in graph.get("fog", []) if confine.search(voce)]

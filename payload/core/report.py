@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 from . import claims
 from .config import Graph, Workspace
-from .model import blocked, blocks, by_id, claimed, frontier, node_of, progress, ranked_frontier
+from .model import blocked, blocks, by_id, claimed, fog_for, frontier, is_done, node_of, progress, ranked_frontier
 from .store import load
 from .strings import t
 
@@ -92,7 +92,7 @@ def doctor_avvisi(data: dict, ref: Graph, agente: dict) -> list[str]:
     """Avvisi sulla salute di un grafo: non bloccano niente, segnalano soltanto."""
     avvisi = []
 
-    foglie = [n["id"] for n in data["nodes"] if not blocks(data, n["id"])]
+    foglie = [n["id"] for n in data["nodes"] if not is_done(n) and not blocks(data, n["id"])]
     if len(foglie) > 1:
         avvisi.append(t("doctor.nodi_pendenti", elenco=", ".join(foglie)))
 
@@ -166,7 +166,7 @@ def show_brief(ref: Graph, data: dict, node_id: str) -> None:
             else:
                 print(t("report.brief_bloccante_aperto", id=dep["id"], titolo=dep["title"], stato=dep["status"]))
 
-    nebbia = [voce for voce in data["fog"] if node_id in voce]
+    nebbia = fog_for(data, node_id)
     if nebbia:
         print(t("report.brief_nebbia"))
         for voce in nebbia:

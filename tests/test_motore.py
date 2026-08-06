@@ -320,6 +320,24 @@ class Artefatti(Base):
 
 
 class Doctor(Base):
+    def test_fog_for_confine_di_parola(self):
+        """fog_for deve usare confini di parola, non sottostringa: B1 ≠ B10."""
+        self.popola()
+        with self.store.transaction(self.ref.json_path) as data:
+            data["fog"] = [
+                "per B1: primo nodo",
+                "per B10: decimo nodo",
+                "B1 è menzionato qui nel testo",
+                "B10 è menzionato qui nel testo",
+            ]
+        data = self.store.load(self.ref.json_path)
+        risultati = self.model.fog_for(data, "B1")
+        self.assertEqual(2, len(risultati))
+        self.assertIn("per B1: primo nodo", risultati)
+        self.assertIn("B1 è menzionato qui nel testo", risultati)
+        self.assertNotIn("per B10: decimo nodo", risultati)
+        self.assertNotIn("B10 è menzionato qui nel testo", risultati)
+
     def test_nessun_avviso_su_un_grafo_sano(self):
         self.popola()
         data = self.store.load(self.ref.json_path)
@@ -368,6 +386,22 @@ class Doctor(Base):
         data = self.store.load(self.ref.json_path)
         avvisi = self.report.doctor_avvisi(data, self.ref, self.ws.config["agent"])
         self.assertTrue(any("F01" in a and "prodotto.txt" in a for a in avvisi))
+
+    def test_nodi_pendenti_avvisati_finche_restano_aperti(self):
+        """L'avviso serve a scovare un nodo dimenticato: a grafo finito non ha piu' niente
+        da dire, e ripetuto a ogni esecuzione insegna solo a ignorarlo."""
+        self.popola()
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.unlink(g, "F03", blocked_by="F02")   # due foglie aperte: F02 e F03
+        avvisi = self.report.doctor_avvisi(self.store.load(self.ref.json_path), self.ref, self.ws.config["agent"])
+        self.assertTrue([a for a in avvisi if "F02" in a and "F03" in a])
+
+        for nodo_id in ("F01", "F02", "F03"):
+            self.rispondi(nodo_id)
+            self.claims.claim(self.ref, nodo_id)
+            self.claims.close(self.ref, nodo_id, "fatto")
+        avvisi = self.report.doctor_avvisi(self.store.load(self.ref.json_path), self.ref, self.ws.config["agent"])
+        self.assertFalse([a for a in avvisi if "F02" in a and "F03" in a])
 
 
 class PiuGrafi(Base):
