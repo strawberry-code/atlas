@@ -58,7 +58,7 @@ and propose it to the user once the node is done. The graph's shape changes only
 python3 .atlas/bin/atlas close <ID> -s "the one-line summary"
 ```
 
-To leave a rough order of magnitude for what it cost (calls, tokens, time), add `-c/--costo "..."`; to name the files produced explicitly, `--artefatti path/one path/two`. In the ticket, the **Non-canonical choices**, **Declared debt**, and **Authorizations received** sub-sections under Answer are optional: use them when there's actually something to say, leave them empty otherwise.
+To leave a rough order of magnitude for what it cost (calls, tokens, time), add `-c/--costo "..."`. You don't have to list the files you produced: inside a git repository `close` works them out on its own, from what you touched since you claimed the node. `--artefatti path/one path/two` declares them yourself; `--artefatti` with no arguments leaves the field empty. In the ticket, the **Non-canonical choices**, **Declared debt**, and **Authorizations received** sub-sections under Answer are optional: use them when there's actually something to say, leave them empty otherwise.
 
 The summary lands on its own in `map.md` under Decisions made, and the dashboard regenerates. If `close` refuses because the Answer is empty, write it: it's not an obstacle to route around with `--force`.
 

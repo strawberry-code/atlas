@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -54,6 +55,13 @@ class Base(unittest.TestCase):
         self.docs.write_stubs(self.ref, self.store.load(self.ref.json_path))
         path = self.ref.ticket_path(node_id)
         path.write_text(path.read_text(encoding="utf-8") + "\nLa risposta.\n", encoding="utf-8")
+
+    def git_init(self):
+        """La sandbox diventa una repo con un commit: serve ai test sulla deduzione
+        degli artefatti, che guarda quel che e' cambiato rispetto a HEAD."""
+        for comando in (["init"], ["config", "user.email", "prova@locale"], ["config", "user.name", "Prova"],
+                        ["add", "."], ["commit", "-m", "primo"]):
+            subprocess.run(["git", *comando], cwd=self.tmp, check=True, capture_output=True)
 
 
 class Forma(Base):
@@ -317,6 +325,38 @@ class Artefatti(Base):
         self.render_tutto()
         html = self.ref.dashboard_path.read_text(encoding="utf-8")
         self.assertIn("~40 chiamate", html)
+
+    def prepara_lavoro(self):
+        """Un nodo rivendicato in una repo git, con un file di lavoro appena scritto."""
+        self.popola()
+        self.rispondi("F01")
+        self.git_init()
+        self.claims.claim(self.ref, "F01")
+        (self.tmp / "prodotto.txt").write_text("output", encoding="utf-8")
+
+    def test_artifacts_dedotti_da_git_senza_flag(self):
+        self.prepara_lavoro()
+        node = self.claims.close(self.ref, "F01", "fatto")
+        self.assertIn("prodotto.txt", node["artifacts"])
+        self.assertFalse([p for p in node["artifacts"] if p.startswith(".atlas/")])
+
+    def test_artifacts_espliciti_vincono_sulla_deduzione(self):
+        self.prepara_lavoro()
+        node = self.claims.close(self.ref, "F01", "fatto", artifacts=["esplicito.txt"])
+        self.assertEqual(["esplicito.txt"], node["artifacts"])
+
+    def test_artifacts_lista_vuota_svuota_il_campo(self):
+        self.prepara_lavoro()
+        node = self.claims.close(self.ref, "F01", "fatto", artifacts=[])
+        self.assertEqual([], node["artifacts"])
+
+    def test_artifacts_non_dedotti_fuori_da_una_repo_git(self):
+        self.popola()
+        self.rispondi("F01")
+        self.claims.claim(self.ref, "F01")
+        (self.tmp / "prodotto.txt").write_text("output", encoding="utf-8")
+        node = self.claims.close(self.ref, "F01", "fatto")
+        self.assertEqual([], node["artifacts"])
 
 
 class Doctor(Base):

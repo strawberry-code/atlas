@@ -11,7 +11,7 @@ import subprocess
 import sys
 from datetime import datetime, timedelta
 
-from . import docs
+from . import docs, gitscan
 from .config import ENV_IDENTITY, Graph
 from .model import by_id, is_done, node_of
 from .store import CLAIMED, CLOSED, OPEN, StateError, transaction
@@ -148,9 +148,12 @@ def close(ref: Graph, node_id: str, summary: str, force: bool = False,
             raise StateError(t("close.altra_sessione", id=node_id, owner=owner))
         if not docs.answer_written(ref, node_id) and not force:
             raise StateError(t("close.risposta_vuota", file=ref.ticket_path(node_id).name))
+        preso = holder(node).get("at")
         node.update(status=CLOSED, assignee=None, claim=None, answer=summary, cost=cost,
                     closedBy=identity(),
                     closedAt=datetime.now().astimezone().isoformat(timespec="seconds"))
+        if artifacts is None:
+            artifacts = gitscan.touched(ref.workspace.project_root, preso) or None
         if artifacts is not None:
             node["artifacts"] = list(artifacts)
         return dict(node)
