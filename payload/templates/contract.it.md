@@ -3,6 +3,7 @@
 Il lavoro di questo progetto è un grafo di task in `.atlas/`. Un nodo è un pezzo di lavoro dimensionato su una sessione, gli archi `blockedBy` sono le dipendenze, e la **frontiera** è l'insieme dei nodi aperti i cui blocker sono tutti chiusi. Non si sceglie cosa fare leggendo una lista: si guarda la frontiera.
 
 ```sh
+python3 .atlas/bin/atlas how-to              # questo contratto, i comandi, le mutazioni, le skill e i path
 python3 .atlas/bin/atlas status              # frontiera, lucchetti, avanzamento
 python3 .atlas/bin/atlas next                 # la frontiera ordinata per impatto: un suggerimento
 python3 .atlas/bin/atlas take <ID>            # rivendica e stampa il contesto insieme, prima di toccare qualsiasi cosa
@@ -11,6 +12,8 @@ python3 .atlas/bin/atlas fog "una riga" --for <ID>   # appunta ciò che è emers
 ```
 
 `atlas brief <ID>` stampa lo stesso pacchetto di contesto di `take` (domanda, Risposte dei bloccanti, nebbia che lo nomina) senza rivendicare: utile per rileggerlo senza toccare il lucchetto.
+
+Se arrivi qui senza sapere niente di Atlas, `atlas how-to` è il punto di ingresso: stampa questo contratto, l'elenco dei comandi, le mutazioni chiamabili da uno script, le skill installate e i path di questo progetto. È la stessa dottrina che stai leggendo, raggiungibile da un comando invece che da un file.
 
 ### Un nodo per sessione
 

@@ -127,6 +127,12 @@ def main() -> int:
         verifica("manca il suono dei passi" in nebbia and "F03" in nebbia,
                  "fog --list mostra la voce col destinatario")
 
+        briefing = locale(target, "how-to").stdout
+        verifica("il grafo comanda il lavoro" in briefing, "how-to stampa il contratto installato")
+        verifica("mutate.add_node(g," in briefing and "atlas-work:" in briefing,
+                 "how-to elenca le mutazioni e le skill")
+        verifica(all(f"─── {n}." in briefing for n in range(1, 7)), "how-to ha tutte e sei le sezioni")
+
         locale(target, "new", "epic-secondo", "-t", "Secondo stream")
         verifica((radice / "graphs" / "epic-secondo" / "graph.json").is_file(), "secondo grafo creato")
         verifica("epic-test" in locale(target, "-g", "epic-test", "status").stdout, "override con --graph")

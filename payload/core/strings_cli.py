@@ -1,7 +1,7 @@
 """Messaggi di cli.py: help di argparse, e quel che stampano i comandi.
 
 Parte del catalogo del motore: vedi strings.py per il meccanismo di lookup,
-strings_engine.py e strings_docs.py per il resto del catalogo.
+strings_engine.py, strings_docs.py e strings_howto.py per il resto del catalogo.
 """
 from __future__ import annotations
 
@@ -34,6 +34,8 @@ STRINGS: dict[str, dict[str, str]] = {
     "help.exec": {"it": "esegue uno script di mutazione", "en": "runs a mutation script"},
     "help.validate": {"it": "verifica la forma dei grafi", "en": "checks the graphs' shape"},
     "help.doctor": {"it": "stato dell'installazione", "en": "installation status"},
+    "help.how_to": {"it": "tutto quel che serve per lavorare qui, in un comando solo",
+                    "en": "everything needed to work here, in a single command"},
 
     # --- refresh/commit ---
     "refresh.ticket_creati": {"it": "  {n} ticket creati in {dir}", "en": "  {n} tickets created in {dir}"},

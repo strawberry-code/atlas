@@ -63,6 +63,7 @@ Switching an existing project's language regenerates `SKILL.md`, `CONTRACT.md`, 
 From inside the project, `atlas <command>` passes through to the local engine — same effect as `.atlas/bin/atlas <command>`, the recommended form since it doesn't need the path:
 
 ```bash
+atlas how-to                         # the whole briefing: contract, commands, mutations, skills, paths
 atlas status                         # frontier, locks, progress
 atlas next                           # frontier ranked by impact, as a suggestion
 atlas take F01                       # claims it and prints its context in one step
@@ -73,6 +74,8 @@ atlas doctor                         # health check: dangling nodes, stale locks
 ```
 
 One node per session. `close` refuses if the Answer is empty.
+
+`atlas how-to` is the single entry point for an agent that lands here cold: it prints the project's contract, the command list, the mutations a script can call, the installed skills, and where every file lives. The contract is the only hand-written part, and everything else is read from the installed code, so it can't drift from the version in use.
 
 ## Changing the graph
 

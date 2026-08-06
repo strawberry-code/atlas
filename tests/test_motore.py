@@ -5,6 +5,8 @@ prova esattamente il codice che finisce dentro un progetto ospite.
 """
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import os
 import runpy
@@ -32,10 +34,10 @@ class Base(unittest.TestCase):
         os.environ["ATLAS_ROOT"] = str(self.root)
         for modulo in [m for m in sys.modules if m == "core" or m.startswith("core.")]:
             del sys.modules[modulo]
-        from core import config, docs, mutate, render, store, model, claims, strings, report
+        from core import config, docs, howto, mutate, render, store, model, claims, strings, report
         self.config, self.docs, self.mutate = config, docs, mutate
         self.render, self.store, self.model, self.claims = render, store, model, claims
-        self.strings, self.report = strings, report
+        self.strings, self.report, self.howto = strings, report, howto
         self.ws = config.workspace(self.tmp)
         self.ref = mutate.create_graph(self.ws, "prova", "Grafo di prova", "Verificare il motore.")
 
@@ -501,6 +503,59 @@ class PromozioneDallaNebbia(Base):
             with self.subTest(lingua=lingua):
                 with self.assertRaises(NotImplementedError):
                     runpy.run_path(str(self.template(lingua)))["run"](None)
+
+
+class HowTo(Base):
+    def stampa(self) -> str:
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            self.howto.show(self.ws, "usage: atlas [-h] ...")
+        return buffer.getvalue()
+
+    def test_stampa_il_contratto_e_le_sei_sezioni(self):
+        self.popola()
+        uscita = self.stampa()
+        self.assertIn("il grafo comanda il lavoro", uscita)     # dal contratto
+        self.assertIn("usage: atlas", uscita)                    # l'help di argparse, passato da cli
+        self.assertIn("mutate.add_node(g,", uscita)
+        self.assertIn("atlas-work:", uscita)                     # le skill installate
+        self.assertIn(".atlas/graphs/prova/tickets", uscita)     # i path, relativi al progetto
+        for n in range(1, 7):
+            self.assertIn(f"─── {n}.", uscita)
+
+    def test_elenca_solo_le_mutazioni_da_script(self):
+        nomi = [r.strip() for r in self.howto.mutazioni() if r.strip().startswith("mutate.")]
+        self.assertTrue([n for n in nomi if n.startswith("mutate.add_node(")])
+        for escluso in ("create_graph", "validate", "editing", "now"):
+            self.assertFalse([n for n in nomi if n.startswith(f"mutate.{escluso}(")])
+
+    def test_ogni_mutazione_ha_la_sua_voce_tradotta(self):
+        """Il presidio della regola: una funzione nuova in mutate.py senza voce di
+        catalogo esce dall'how-to muta, e questo test lo dice prima del rilascio."""
+        for riga in self.howto.mutazioni():
+            if not riga.strip().startswith("mutate."):
+                continue
+            nome = riga.strip()[len("mutate."):].split("(")[0]
+            voce = self.strings.STRINGS.get(f"howto.mutate.{nome}")
+            self.assertIsNotNone(voce, f"manca howto.mutate.{nome} nel catalogo")
+            self.assertTrue(voce.get("it") and voce.get("en"), f"howto.mutate.{nome} non è tradotta")
+
+    def test_in_inglese_stampa_il_contratto_inglese(self):
+        (self.root / "config.json").write_text(json.dumps({"project": "prova", "language": "en"}), encoding="utf-8")
+        self.strings.set_language("en")
+        try:
+            uscita = self.stampa()
+            self.assertIn("the graph runs the work", uscita)
+            self.assertIn("The commands", uscita)
+        finally:
+            self.strings.set_language("it")
+
+    def test_regge_un_progetto_senza_grafi(self):
+        vuoto = self.config.Workspace(self.root)
+        (self.root / "graphs" / "prova").rename(self.root / "prova-messo-via")
+        uscita = self.stampa()
+        self.assertIn("nessun grafo ancora", uscita)
+        self.assertEqual([], vuoto.slugs())
 
 
 class Lingua(Base):

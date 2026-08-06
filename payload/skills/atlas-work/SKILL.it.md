@@ -5,7 +5,7 @@ description: Lavora un nodo del grafo Atlas di questo progetto, dalla scelta sul
 
 # Lavorare un nodo
 
-Il grafo dice cosa è prendibile adesso. Un nodo per sessione, dal claim alla chiusura.
+Il grafo dice cosa è prendibile adesso. Un nodo per sessione, dal claim alla chiusura. Se il contratto di questo progetto non ti è già in contesto, `atlas how-to` te lo stampa insieme ai comandi, alle mutazioni e ai path.
 
 ## 1. Orientati
 

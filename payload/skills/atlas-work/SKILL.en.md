@@ -5,7 +5,7 @@ description: Works a node of this project's Atlas graph, from picking off the fr
 
 # Working a node
 
-The graph says what's up for grabs right now. One node per session, from claim to close.
+The graph says what's up for grabs right now. One node per session, from claim to close. If this project's contract isn't already in your context, `atlas how-to` prints it along with the commands, the mutations and the paths.
 
 ## 1. Get your bearings
 

@@ -3,6 +3,7 @@
 The work in this project is a graph of tasks in `.atlas/`. A node is a piece of work sized for one session, the `blockedBy` edges are the dependencies, and the **frontier** is the set of open nodes whose blockers are all closed. You don't pick what to do from a list: you look at the frontier.
 
 ```sh
+python3 .atlas/bin/atlas how-to              # this contract, the commands, the mutations, the skills and the paths
 python3 .atlas/bin/atlas status              # frontier, locks, progress
 python3 .atlas/bin/atlas next                 # the frontier ranked by impact: a suggestion
 python3 .atlas/bin/atlas take <ID>            # claims it and prints its context in one step, before touching anything
@@ -11,6 +12,8 @@ python3 .atlas/bin/atlas fog "a line" --for <ID>   # notes down what came up, ad
 ```
 
 `atlas brief <ID>` prints the same context package as `take` (question, blockers' answers, fog that names it) without claiming: useful to reread it without touching the lock.
+
+If you get here knowing nothing about Atlas, `atlas how-to` is the way in: it prints this contract, the list of commands, the mutations a script can call, the installed skills and this project's paths. Same doctrine you're reading now, reachable from a command instead of a file.
 
 ### One node per session
 

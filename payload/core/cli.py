@@ -12,7 +12,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import claims, docs, mutate, render as dash, report, strings
+from . import claims, docs, howto, mutate, render as dash, report, strings
 from .config import ConfigError, Workspace, workspace
 from .model import node_of
 from .mutate import editing, validate
@@ -162,13 +162,16 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("exec", help=t("help.exec")); p.add_argument("script")
     sub.add_parser("validate", help=t("help.validate"))
     sub.add_parser("doctor", help=t("help.doctor"))
+    sub.add_parser("how-to", help=t("help.how_to"))
     return parser
 
 
 def dispatch(ws: Workspace, args) -> int:
-    if args.cmd in ("new", "new-script", "exec", "validate", "doctor", "graphs", "use"):
+    if args.cmd in ("new", "new-script", "exec", "validate", "doctor", "graphs", "use", "how-to"):
         if args.cmd == "graphs":
             report.show_graphs(ws); return 0
+        if args.cmd == "how-to":
+            howto.show(ws, build_parser().format_help()); return 0
         if args.cmd == "use":
             ws.graph(args.slug); ws.pin(args.slug); print(t("use.attivo", slug=args.slug)); return 0
         return {"new": cmd_new, "new-script": cmd_new_script, "exec": cmd_exec,
