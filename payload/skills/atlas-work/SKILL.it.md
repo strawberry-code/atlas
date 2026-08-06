@@ -50,7 +50,7 @@ Se emerge qualcosa che meriterebbe un nodo suo, **non crearlo**. Appuntalo, indi
 python3 .atlas/bin/atlas fog "quel che è emerso, in una riga" --for <ID>
 ```
 
-e proponilo all'utente a fine nodo. La forma del grafo si cambia solo con uno script di mutazione, mai di slancio in mezzo a un altro lavoro.
+e proponilo all'utente a fine nodo. La forma del grafo si cambia solo con uno script di mutazione, mai di slancio in mezzo a un altro lavoro. Per farne un nodo c'è un esempio pronto in `.atlas/scripts/000-promote-fog.py`: si compila con l'indice della voce e i campi del nodo, e si lancia con `atlas exec`.
 
 ## 5. Chiudi
 

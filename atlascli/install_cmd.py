@@ -75,6 +75,9 @@ class Installer:
         (self.root / "bin" / "atlas").chmod(0o755)
         for cartella in ("graphs", "scripts"):
             (self.root / cartella).mkdir(exist_ok=True)
+        esempio = self.root / "scripts" / "000-promote-fog.py"
+        if not esempio.is_file():          # scripts/ e' territorio dell'utente: mai sovrascriverlo
+            shutil.copyfile(self.root / "templates" / f"promote-fog.{self.lingua}.py.tmpl", esempio)
         for skill in (self.root / "skills").iterdir():
             if skill.is_dir():
                 shutil.copyfile(skill / f"SKILL.{self.lingua}.md", skill / "SKILL.md")

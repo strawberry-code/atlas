@@ -42,7 +42,7 @@ python3 .atlas/bin/atlas exec .atlas/scripts/003-adds-deploy-branch.py
 
 The script runs inside a single transaction and the graph is validated before being written, so a cycle or an edge to a nonexistent node makes it fail without touching the file. Scripts stay version-controlled: they're the history of changes to the map.
 
-Something you discover while working a node that would deserve a node of its own gets **proposed**, not created: in the meantime, note it with `atlas fog`.
+Something you discover while working a node that would deserve a node of its own gets **proposed**, not created: in the meantime, note it with `atlas fog`. To turn one into a node there's a ready example at `.atlas/scripts/000-promote-fog.py`: fill in the entry's index and the node's fields, then run it with `atlas exec`.
 
 ### When a node is done
 

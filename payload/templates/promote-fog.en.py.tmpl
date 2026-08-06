@@ -1,0 +1,31 @@
+"""Promotes a fog entry to a graph node.
+
+It's a template to be modified, and the second half of the 'atlas fog' gesture: fog
+collects what emerges while working and hasn't yet a node, this script is the
+obvious way to turn it into one.
+
+First check what's in fog:  atlas fog --list
+then fill in INDEX and NEW below, and run with:
+                           atlas exec .atlas/scripts/000-promote-fog.py
+"""
+from core import mutate
+
+INDEX = None               # the number in square brackets printed by 'atlas fog --list'
+NEW = {
+    "id": "X01",           # must be free: 'atlas show X01' should find nothing
+    "branch": "A",         # a branch that already exists in the graph
+    "title": "Title of the node born from fog",
+    "question": "The question this node answers.",
+    "type": "task",
+    "mode": "AFK",
+    "blockedBy": [],       # the ids that must close before this one is takeable
+}
+
+
+def run(g):
+    if INDEX is None:
+        raise NotImplementedError("pick INDEX and fill in NEW, then run again")
+    entry = g.data["fog"][INDEX]
+    mutate.add_node(g, **NEW)
+    mutate.fog_drop(g, entry)   # fog_drop works by substring: we pass it the whole entry
+    mutate.note_add(g, f"{NEW['id']} born from a fog entry: {entry}")

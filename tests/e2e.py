@@ -71,6 +71,7 @@ def main() -> int:
         verifica((radice / "core" / "cli.py").is_file(), "motore scompattato")
         verifica((radice / "bin" / "atlas").stat().st_mode & 0o111, "entrypoint eseguibile")
         verifica((target / ".claude" / "skills" / "atlas-work").is_symlink(), "skill collegate con symlink")
+        verifica((radice / "scripts" / "000-promote-fog.py").is_file(), "esempio promote-fog installato")
 
         registro = json.loads(atlas_config.read_text(encoding="utf-8"))
         slug = slugify(target.resolve().name)  # register() slugifica il nome cartella, non lo usa nudo
@@ -198,7 +199,7 @@ def verifica_install_in_inglese() -> None:
         globale(target, "install", str(target), "--yes", "--lang", "en", "--graph", "demo", env=env)
         radice = target / ".atlas"
         locale(target, "new-script", "primo")
-        script = sorted((radice / "scripts").glob("*.py"))[0]
+        script = sorted((radice / "scripts").glob("*.py"))[-1]
         script.write_text(
             "from core import mutate\n\n"
             "def run(g):\n"

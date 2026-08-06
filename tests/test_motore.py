@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import runpy
 import shutil
 import subprocess
 import sys
@@ -468,6 +469,38 @@ class PiuGrafi(Base):
     def test_slug_inesistente(self):
         with self.assertRaises(self.config.ConfigError):
             self.ws.graph("mai-esistito")
+
+
+class PromozioneDallaNebbia(Base):
+    """L'esempio installato in scripts/ viene eseguito davvero, non imitato: e' l'unico
+    modo perche' il test si accorga se il template smette di girare."""
+
+    def template(self, lingua: str) -> Path:
+        return SORGENTE / "templates" / f"promote-fog.{lingua}.py.tmpl"
+
+    def test_esegue_l_esempio_e_promuove_la_voce(self):
+        self.popola()
+        with self.store.transaction(self.ref.json_path) as data:
+            data["fog"] = ["per F03: il primo dubbio", "un secondo dubbio, di nessuno"]
+
+        script = self.root / "scripts" / "000-promote-fog.py"
+        script.write_text(self.template("it").read_text(encoding="utf-8")
+                          .replace("INDICE = None", "INDICE = 0")
+                          .replace('"id": "X01"', '"id": "F04"')
+                          .replace('"branch": "A"', '"branch": "F"'), encoding="utf-8")
+        with self.mutate.editing(self.ref) as g:
+            runpy.run_path(str(script))["run"](g)
+
+        data = self.store.load(self.ref.json_path)
+        self.assertEqual("Titolo del nodo nato dalla nebbia", self.model.node_of(data, "F04")["title"])
+        self.assertEqual(["un secondo dubbio, di nessuno"], data["fog"])
+        self.assertTrue([n for n in data["meta"]["notes"] if "F04" in n and "primo dubbio" in n])
+
+    def test_l_esempio_si_rifiuta_finche_non_lo_compili(self):
+        for lingua in ("it", "en"):
+            with self.subTest(lingua=lingua):
+                with self.assertRaises(NotImplementedError):
+                    runpy.run_path(str(self.template(lingua)))["run"](None)
 
 
 class Lingua(Base):

@@ -50,7 +50,7 @@ If something comes up that would deserve a node of its own, **don't create it**.
 python3 .atlas/bin/atlas fog "what came up, in one line" --for <ID>
 ```
 
-and propose it to the user once the node is done. The graph's shape changes only through a mutation script, never on impulse in the middle of other work.
+and propose it to the user once the node is done. The graph's shape changes only through a mutation script, never on impulse in the middle of other work. To turn one into a node there's a ready example at `.atlas/scripts/000-promote-fog.py`: fill in the entry's index and the node's fields, then run it with `atlas exec`.
 
 ## 5. Close it
 
