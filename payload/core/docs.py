@@ -50,7 +50,7 @@ def write_stubs(ref: Graph, data: dict) -> int:
         path = ref.ticket_path(node["id"])
         if path.exists():
             continue
-        path.write_text(_testa(modello, node, rami) + coda, encoding="utf-8-sig")
+        path.write_text(_testa(modello, node, rami) + coda, encoding="utf-8")
         creati += 1
     return creati
 
@@ -103,7 +103,7 @@ def rewrite_heads(ref: Graph, data: dict) -> int:
             continue                       # segnalato da unalignable(), mai sovrascritto alla cieca
         nuovo = _testa(modello, node, rami) + coda
         if nuovo != testo:
-            path.write_text(nuovo, encoding="utf-8-sig")
+            path.write_text(nuovo, encoding="utf-8")
             riscritti += 1
     return riscritti
 
@@ -122,7 +122,7 @@ def ensure_map(ref: Graph, data: dict) -> None:
     ref.map_path.write_text(ref.workspace.template("map.md").format(
         title=data["meta"]["title"], slug=data["meta"]["slug"],
         destination=data["meta"]["destination"],
-    ), encoding="utf-8-sig")
+    ), encoding="utf-8")
 
 
 def _replace_section(text: str, heading: str, corpo: str) -> str:
@@ -162,4 +162,4 @@ def rewrite_lists(ref: Graph, data: dict) -> None:
     for chiave, (parent, key) in LISTS.items():
         items = data[parent][key] if parent else data[key]
         text = _replace_section(text, t(chiave), "\n".join(f"- {i}" for i in items) or t("docs.niente"))
-    ref.map_path.write_text(text, encoding="utf-8-sig")
+    ref.map_path.write_text(text, encoding="utf-8")

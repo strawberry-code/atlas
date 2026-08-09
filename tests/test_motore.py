@@ -378,6 +378,50 @@ class Artefatti(Base):
         node = self.claims.close(self.ref, "F01", "fatto")
         self.assertEqual([], node["artifacts"])
 
+    def test_i_markdown_generati_non_hanno_il_bom(self):
+        """Ticket e mappa.md vanno scritti in UTF-8 puro, senza BOM."""
+        self.popola()
+        self.render_tutto()
+
+        # Leggi in binario per verificare il BOM: in modalita' testo con utf-8-sig
+        # il BOM verrebbe consumato in silenzio e il test non proverebbe niente.
+        ticket_bytes = self.ref.ticket_path("F01").read_bytes()
+        self.assertFalse(ticket_bytes.startswith(b"\xef\xbb\xbf"), "ticket ha il BOM UTF-8")
+
+        map_bytes = self.ref.map_path.read_bytes()
+        self.assertFalse(map_bytes.startswith(b"\xef\xbb\xbf"), "map.md ha il BOM UTF-8")
+
+    def test_un_ticket_preesistente_con_bom_resta_allineabile(self):
+        """Un ticket ereditato col BOM si riallinea e non perde la prosa scritta a mano.
+
+        Non prova la scelta di utf-8-sig in lettura, che oggi non ha effetti osservabili:
+        _coda() lavora con partition(), quindi il BOM cade nella testa scartata comunque.
+        Tiene fermo il comportamento visibile, cioe' che il file esca riscritto e senza firma.
+        """
+        self.popola()
+        data = self.store.load(self.ref.json_path)
+        self.docs.write_stubs(self.ref, data)
+
+        path = self.ref.ticket_path("F01")
+        self.rispondi("F01")
+
+        testo_originale = path.read_text(encoding="utf-8")
+        path.write_bytes(b"\xef\xbb\xbf" + testo_originale.encode("utf-8"))
+
+        # Modifica il nodo per forzare il riallineamento
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.edit_node(g, "F01", title="Primo (modificato)")
+        data = self.store.load(self.ref.json_path)
+
+        self.docs.rewrite_heads(self.ref, data)
+
+        testo_riscritto = path.read_text(encoding="utf-8")
+        self.assertIn("Primo (modificato)", testo_riscritto)
+        self.assertIn("La risposta.\n", testo_riscritto)
+
+        bytes_riscritti = path.read_bytes()
+        self.assertNotIn(b"\xef\xbb\xbf", bytes_riscritti)
+
 
 class Doctor(Base):
     def test_fog_for_confine_di_parola(self):
