@@ -122,7 +122,8 @@ def cmd_doctor(ws: Workspace, args) -> int:
     stato_skill = t("doctor.skill_ok") if not mancanti else t("doctor.skill_mancanti", elenco=", ".join(mancanti))
     print(t("doctor.skill", stato=stato_skill))
     hook = ws.project_root / ".claude" / "settings.json"
-    stato_hook = t("doctor.hook_ok") if hook.is_file() and "atlas" in hook.read_text() else t("doctor.hook_assente")
+    contenuto_hook = hook.read_text(encoding="utf-8") if hook.is_file() else ""
+    stato_hook = t("doctor.hook_ok") if "atlas" in contenuto_hook else t("doctor.hook_assente")
     print(t("doctor.hook", stato=stato_hook))
     presente = t("si") if (ws.project_root / ".git").exists() else t("no")
     commit_ = t("si") if ws.config["git"]["commit_on_close"] else t("no")

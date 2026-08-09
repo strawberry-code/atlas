@@ -31,7 +31,22 @@ DEFAULTS = {
 
 
 class ConfigError(Exception):
-    """L'harness non e' installato qui, o il grafo chiesto non esiste."""
+    """L'harness non e' installato qui, il grafo chiesto non esiste, o i suoi dati
+    non si leggono. Il CLI la intercetta e la stampa: ogni altra eccezione esce
+    come traceback nudo, che a chi legge non dice quale file aprire."""
+
+
+def leggi_json(path: Path) -> dict:
+    """Un JSON del progetto, con l'errore che nomina il file da aprire.
+
+    Senza questa rete una virgola di troppo in config.json esce come JSONDecodeError
+    nudo, e siccome la config si legge all'avvio di ogni comando muore anche quello
+    che servirebbe a rimettere le cose a posto.
+    """
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as errore:
+        raise ConfigError(t("config.json_rotto", path=path, dettaglio=errore)) from errore
 
 
 def _merge(base: dict, over: dict) -> dict:
@@ -113,8 +128,7 @@ class Workspace:
     @property
     def config(self) -> dict:
         path = self.root / "config.json"
-        stored = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
-        return _merge(DEFAULTS, stored)
+        return _merge(DEFAULTS, leggi_json(path) if path.is_file() else {})
 
     def template(self, name: str) -> str:
         """Inserisce la lingua dopo il primo punto: 'map.md' -> 'map.it.md',

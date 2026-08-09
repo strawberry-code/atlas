@@ -11,6 +11,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from . import registry
+from .errori import leggi_json
 from .strings import set_language, t
 
 DIRNAME = ".atlas"
@@ -25,7 +26,7 @@ def template(nome: str) -> str:
 def cmd_lang_progetto(progetto: Path, valore: str | None) -> int:
     """Cambia la lingua dei contenuti di un progetto e rigenera quel che ne dipende."""
     root = progetto / DIRNAME
-    dati = json.loads((root / "config.json").read_text(encoding="utf-8"))
+    dati = leggi_json(root / "config.json")
     if valore is None:
         print(dati.get("language", "it"))
         return 0

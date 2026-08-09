@@ -17,6 +17,7 @@ import sys
 from pathlib import Path
 
 from . import install_cmd, list_cmd, progetto, registry, self_update
+from .errori import ErroreAtlas
 from .strings import set_language, t
 from .version import current_version
 
@@ -88,6 +89,21 @@ def progetto_qui(partenza: Path | None = None) -> Path | None:
     return None
 
 
+def _lingua_scritta(radice: Path) -> str | None:
+    """La lingua nel config del progetto, None se il file non si legge.
+
+    Qui un config rotto si ingoia di proposito: la lingua e' una preferenza estetica,
+    e farla decidere se il CLI parte o no significa spegnere anche 'uninstall' e
+    'list', cioe' i due comandi con cui si esce dal guasto. A dirlo ci pensa dopo il
+    comando che quel file lo apre per lavorarci.
+    """
+    try:
+        dati = json.loads((radice / ".atlas" / "config.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return dati.get("language") if isinstance(dati, dict) else None
+
+
 def _allinea_lingua() -> None:
     """Una lingua sola per i due cataloghi, quello del gestore e quello del motore.
 
@@ -96,11 +112,10 @@ def _allinea_lingua() -> None:
     """
     from core import strings as strings_motore
     radice = progetto_qui()
-    if radice is not None:
-        dati = json.loads((radice / ".atlas" / "config.json").read_text(encoding="utf-8"))
-        lingua = dati.get("language") or registry.language_for(None)
-    else:
-        lingua = registry.language_for(None)
+    try:
+        lingua = (_lingua_scritta(radice) if radice is not None else None) or registry.language_for(None)
+    except ErroreAtlas:
+        lingua = "it"     # registro illeggibile: lo dira' il comando che lo usa davvero
     set_language(lingua)
     strings_motore.set_language(lingua)
 
@@ -117,7 +132,11 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     args = build_parser().parse_args(argv)
-    if args.cmd in RESERVED:
-        return COMANDI[args.cmd](args)
-    from core.cli import esegui
-    return esegui(args)
+    try:
+        if args.cmd in RESERVED:
+            return COMANDI[args.cmd](args)
+        from core.cli import esegui
+        return esegui(args)
+    except ErroreAtlas as errore:
+        print(f"\n  {errore}\n", file=sys.stderr)
+        return 1

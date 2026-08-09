@@ -1,4 +1,4 @@
-"""Il registro dei progetti installati: ~/.atlas/registry.json, slug -> path assoluto.
+"""Il registro dei progetti installati: ~/.config/atlas.json, slug -> path assoluto.
 
 Non duplica stato mutabile del progetto: versione installata e validita' si leggono
 sempre dal vivo (status_of), mai dalla cache. Il registro sa solo
@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
+from .errori import leggi_json
 from .paths import config_path, progetto_valido
 from .strings import t
 
@@ -37,7 +38,10 @@ def load() -> dict:
     path = config_path()
     if not path.is_file():
         return {"version": SCHEMA_VERSION, "language": "it", "projects": {}}
-    dati = json.loads(path.read_text(encoding="utf-8"))
+    # Il registro si legge all'avvio di quasi ogni comando, anche di quelli che col
+    # registro non c'entrano: un traceback qui murerebbe il CLI su tutta la macchina,
+    # non un progetto solo.
+    dati = leggi_json(path, "errore.registro_rotto")
     dati.setdefault("language", "it")
     dati.setdefault("projects", {})
     return dati

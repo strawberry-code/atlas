@@ -18,7 +18,8 @@ import sys
 import tarfile
 from pathlib import Path
 
-from . import registry
+from . import hook, registry
+from .errori import leggi_json
 from .registry import RegistryError
 from .progetto import template
 from .strings import set_language, t
@@ -137,7 +138,7 @@ class Installer:
         if self.args.dry_run:
             return
         path = self.root / "config.json"
-        dati = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else dict(CONFIG, project=self.target.name)
+        dati = leggi_json(path) if path.is_file() else dict(CONFIG, project=self.target.name)
         dati["language"] = self.lingua
         path.write_text(json.dumps(dati, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
@@ -173,15 +174,13 @@ class Installer:
         if self.args.no_hooks:
             return
         path = self.target / ".claude" / "settings.json"
-        dati = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
-        # Un comando, non uno script copiato nel progetto: il motore e' l'eseguibile.
-        comando = "atlas render --all"
+        dati = leggi_json(path, "errore.settings_rotto") if path.is_file() else {}
         gruppi = dati.setdefault("hooks", {}).setdefault("SessionEnd", [])
-        if any(DIRNAME in json.dumps(g) for g in gruppi):
+        aggiornato = hook.elenco_aggiornato(gruppi, t("install.hook_status"))
+        if gruppi == aggiornato:
             self.dice(t("install.hook_esiste"))
             return
-        gruppi.append({"hooks": [{"type": "command", "command": comando,
-                                  "statusMessage": t("install.hook_status")}]})
+        dati["hooks"]["SessionEnd"] = aggiornato
         self.scrive(path, json.dumps(dati, ensure_ascii=False, indent=2) + "\n")
         self.dice(t("install.hook_registrato"))
 
@@ -249,12 +248,7 @@ class Installer:
                 link.unlink()
             elif link.is_dir() and (link / MARCATORE).is_file():
                 shutil.rmtree(link)
-        impostazioni = self.target / ".claude" / "settings.json"
-        if impostazioni.is_file():
-            dati = json.loads(impostazioni.read_text(encoding="utf-8"))
-            gruppi = dati.get("hooks", {}).get("SessionEnd", [])
-            dati["hooks"]["SessionEnd"] = [g for g in gruppi if DIRNAME not in json.dumps(g)]
-            impostazioni.write_text(json.dumps(dati, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        hook.sgancia(self.target / ".claude" / "settings.json")
         claude_md = self.target / "CLAUDE.md"
         if claude_md.is_file():
             testo = re.sub(re.escape(BEGIN) + r".*?" + re.escape(END) + r"\n?", "",

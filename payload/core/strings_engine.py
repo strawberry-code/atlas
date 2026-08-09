@@ -64,6 +64,18 @@ STRINGS: dict[str, dict[str, str]] = {
     "config.grafo_inesistente": {"it": "il grafo '{scelto}' non esiste: ci sono {elenco}",
                                  "en": "graph '{scelto}' doesn't exist: there are {elenco}"},
     "config.zero_grafi": {"it": "zero grafi", "en": "zero graphs"},
+    "config.json_rotto": {"it": "{path} non è JSON valido ({dettaglio}).\n"
+                                "  Correggilo a mano, oppure cancellalo e rilancia 'atlas install'.",
+                          "en": "{path} is not valid JSON ({dettaglio}).\n"
+                                "  Fix it by hand, or delete it and run 'atlas install' again."},
+
+    # --- store.py ---
+    "store.grafo_rotto": {"it": "{path} non è JSON valido ({dettaglio}).\n"
+                                "  Il grafo non si può leggere: recuperalo da git, se il progetto lo versiona.",
+                          "en": "{path} is not valid JSON ({dettaglio}).\n"
+                                "  The graph can't be read: restore it from git, if the project versions it."},
+    "store.grafo_senza_nodi": {"it": "{path} non ha la lista 'nodes', quindi non è un grafo Atlas.",
+                               "en": "{path} has no 'nodes' list, so it is not an Atlas graph."},
 
     # --- docs.py (errori) ---
     "docs.marker_sezione_persa": {"it": "la sezione '{heading}' di map.md ha perso il marker {mark}.\n"

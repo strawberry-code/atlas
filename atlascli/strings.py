@@ -121,6 +121,26 @@ STRINGS: dict[str, dict[str, str]] = {
                     "en": "\n  {slug}\n  path      {path}\n  status    {stato}\n\n"
                           "  Graph commands are given from inside the project.\n"},
 
+    # --- errori.py ---
+    "errore.config_rotto": {"it": "{path} non è JSON valido ({dettaglio}).\n"
+                                  "  Correggilo a mano, oppure cancellalo e rilancia 'atlas install'.",
+                            "en": "{path} is not valid JSON ({dettaglio}).\n"
+                                  "  Fix it by hand, or delete it and run 'atlas install' again."},
+    "errore.registro_rotto": {"it": "{path} non è JSON valido ({dettaglio}).\n"
+                                    "  Correggilo o cancellalo, perché è solo l'elenco dei progetti "
+                                    "e si ricostruisce reinstallandoli.",
+                              "en": "{path} is not valid JSON ({dettaglio}).\n"
+                                    "  Fix it or delete it, since it is only the list of projects "
+                                    "and it rebuilds by reinstalling them."},
+    "errore.settings_rotto": {"it": "{path} non è JSON valido ({dettaglio}).\n"
+                                    "  È un file di Claude Code, non di Atlas: correggilo tu, "
+                                    "oppure installa con --no-hooks.",
+                              "en": "{path} is not valid JSON ({dettaglio}).\n"
+                                    "  It belongs to Claude Code, not to Atlas: fix it yourself, "
+                                    "or install with --no-hooks."},
+    "errore.non_oggetto": {"it": "il contenuto non è un oggetto JSON",
+                           "en": "the content is not a JSON object"},
+
     # --- registry.py ---
     "registry.slug_occupato": {"it": "'{slug}' è già registrato per {path}: usa --slug per un nome diverso",
                               "en": "'{slug}' is already registered for {path}: use --slug for a different name"},

@@ -317,11 +317,133 @@ def verifica_uninstall() -> None:
         shutil.rmtree(atlas_home, ignore_errors=True)
 
 
+def verifica_file_rotti() -> None:
+    """Un JSON malformato deve diventare un messaggio, e non deve murare il progetto.
+
+    Prima di questa prova un carattere di troppo in config.json faceva uscire un
+    traceback da ogni comando, compresi 'list' e 'uninstall', cioe' i due con cui si
+    esce dal guasto.
+    """
+    target = Path(tempfile.mkdtemp())
+    atlas_home = Path(tempfile.mkdtemp())
+    env = dict(os.environ, ATLAS_CONFIG=str(atlas_home / "atlas.json"))
+    try:
+        subprocess.run(["git", "init", "-q"], cwd=target, check=True)
+        globale(target, "install", str(target), "--yes", "--graph", "epic-test", env=env)
+
+        grafo = target / ".atlas" / "graphs" / "epic-test" / "graph.json"
+        grafo.write_text('{"nodes": [', encoding="utf-8")
+        esito = globale(target, "validate", env=env)
+        verifica("Traceback" not in esito.stderr and "graph.json" in esito.stderr,
+                 "grafo rotto: validate lo dice invece di morire")
+        esito = globale(target, "doctor", env=env)
+        verifica("Traceback" not in esito.stderr and "graph.json" in esito.stdout,
+                 "grafo rotto: doctor lo diagnostica")
+        grafo.write_text('{"meta": {"slug": "epic-test"}, "nodes": []}', encoding="utf-8")
+
+        (target / ".atlas" / "config.json").write_text("{ rotto", encoding="utf-8")
+        esito = globale(target, "status", env=env)
+        verifica("Traceback" not in esito.stderr and "config.json" in esito.stderr,
+                 "config rotto: il messaggio dice quale file aprire")
+        esito = globale(target, "list", env=env)
+        verifica(esito.returncode == 0, "config rotto: i comandi globali funzionano lo stesso")
+        esito = globale(target, "uninstall", str(target), env=env)
+        verifica(esito.returncode == 0 and "Traceback" not in esito.stderr,
+                 "config rotto: uninstall resta una via d'uscita")
+
+        registro = atlas_home / "atlas.json"
+        registro.write_text("{ rotto", encoding="utf-8")
+        esito = globale(target, "list", env=env)
+        verifica("Traceback" not in esito.stderr and "atlas.json" in esito.stderr,
+                 "registro rotto: lo dice invece di morire")
+        esito = globale(target, "--version", env=env)
+        verifica(esito.returncode == 0, "registro rotto: --version funziona lo stesso")
+    finally:
+        shutil.rmtree(target, ignore_errors=True)
+        shutil.rmtree(atlas_home, ignore_errors=True)
+
+
+def verifica_hook_una_volta_sola() -> None:
+    """Install e' idempotente sull'hook, uninstall lo toglie, quelli di altri restano."""
+    target = Path(tempfile.mkdtemp())
+    atlas_home = Path(tempfile.mkdtemp())
+    env = dict(os.environ, ATLAS_CONFIG=str(atlas_home / "atlas.json"))
+    impostazioni = target / ".claude" / "settings.json"
+
+    def gruppi() -> list:
+        return json.loads(impostazioni.read_text(encoding="utf-8"))["hooks"]["SessionEnd"]
+
+    try:
+        subprocess.run(["git", "init", "-q"], cwd=target, check=True)
+        (target / ".claude").mkdir()
+        # Un hook della 0.6, morto dalla 0.7, piu' uno di qualcun altro.
+        impostazioni.write_text(json.dumps({"hooks": {"SessionEnd": [
+            {"hooks": [{"type": "command", "command": 'python3 "$CLAUDE_PROJECT_DIR/.atlas/hooks/session_end.py"'}]},
+            {"hooks": [{"type": "command", "command": "echo preesistente"}]},
+        ]}}), encoding="utf-8")
+
+        globale(target, "install", str(target), "--yes", env=env)
+        testo = json.dumps(gruppi())
+        verifica("session_end.py" not in testo, "hook: quello morto della 0.6 viene sostituito")
+        verifica("echo preesistente" in testo, "hook: quelli di altri restano")
+        verifica(testo.count("atlas render --all") == 1, "hook: uno solo dopo la prima install")
+
+        globale(target, "install", str(target), "--yes", env=env)
+        globale(target, "install", str(target), "--yes", env=env)
+        verifica(json.dumps(gruppi()).count("atlas render --all") == 1,
+                 "hook: tre install ne lasciano sempre uno solo")
+
+        globale(target, "uninstall", str(target), env=env)
+        testo = json.dumps(gruppi())
+        verifica("atlas render" not in testo, "hook: uninstall lo toglie")
+        verifica("echo preesistente" in testo, "hook: uninstall non tocca quelli di altri")
+
+        # settings.json senza la chiave 'hooks': l'uninstall ci moriva sopra a meta' lavoro.
+        secondo = Path(tempfile.mkdtemp())
+        try:
+            subprocess.run(["git", "init", "-q"], cwd=secondo, check=True)
+            globale(secondo, "install", str(secondo), "--yes", "--no-hooks", env=env)
+            (secondo / ".claude").mkdir(exist_ok=True)
+            (secondo / ".claude" / "settings.json").write_text('{"permissions": {}}', encoding="utf-8")
+            esito = globale(secondo, "uninstall", str(secondo), env=env)
+            verifica(esito.returncode == 0 and "Traceback" not in esito.stderr,
+                     "hook: uninstall regge un settings.json senza 'hooks'")
+        finally:
+            shutil.rmtree(secondo, ignore_errors=True)
+    finally:
+        shutil.rmtree(target, ignore_errors=True)
+        shutil.rmtree(atlas_home, ignore_errors=True)
+
+
+def verifica_uscita_non_utf8() -> None:
+    """Output rediretto e codifica di sistema non UTF-8: e' il caso di Windows quando
+    si scrive su file o in pipe, dove cp1252 non sa rappresentare i nostri caratteri."""
+    target = Path(tempfile.mkdtemp())
+    atlas_home = Path(tempfile.mkdtemp())
+    env = dict(os.environ, ATLAS_CONFIG=str(atlas_home / "atlas.json"), PYTHONIOENCODING="ascii")
+    try:
+        subprocess.run(["git", "init", "-q"], cwd=target, check=True)
+        globale(target, "install", str(target), "--yes", "--graph", "epic-test", env=env)
+        for comando in ("how-to", "status", "doctor"):
+            esito = globale(target, comando, env=env)
+            verifica(esito.returncode == 0 and "UnicodeEncodeError" not in esito.stderr,
+                     f"stdout non UTF-8: '{comando}' non ci muore sopra")
+        esito = globale(target, "how-to", env=env)
+        verifica("─" in esito.stdout and "Ã" not in esito.stdout,
+                 "stdout non UTF-8: i caratteri escono interi, non in mojibake")
+    finally:
+        shutil.rmtree(target, ignore_errors=True)
+        shutil.rmtree(atlas_home, ignore_errors=True)
+
+
 if __name__ == "__main__":
     esito = main()
     verifica_install_in_inglese()
     verifica_migrazione_dal_motore_a_sorgenti()
     verifica_uninstall()
+    verifica_file_rotti()
+    verifica_hook_una_volta_sola()
+    verifica_uscita_non_utf8()
     rotti = [cosa for ok, cosa in esiti if not ok]
     print(f"\n  totale: {len(esiti) - len(rotti)}/{len(esiti)} verifiche passate\n")
     raise SystemExit(1 if rotti else esito)

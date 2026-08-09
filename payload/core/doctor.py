@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from . import claims, docs, gitscan
-from .config import Graph, Workspace
+from .config import ConfigError, Graph, Workspace
 from .model import blocks, by_id, claimed, is_done
 from .report import ETICHETTA
 from .store import load
@@ -66,7 +66,15 @@ def show_doctor(ws: Workspace) -> None:
     agente = ws.config["agent"]
     for slug in ws.slugs():
         ref = Graph(ws, slug)
-        data = load(ref.json_path)
+        try:
+            data = load(ref.json_path)
+        except ConfigError as errore:
+            # Un grafo illeggibile e' la diagnosi piu' importante che doctor possa
+            # dare: se lo lasciassimo passare, l'unico comando che serve a capire
+            # cosa non va sarebbe anche l'unico che si ferma prima di dirlo.
+            print(t("doctor.grafo_titolo", slug=slug))
+            print(f"    {errore}")
+            continue
         avvisi = doctor_avvisi(data, ref, agente)
         if avvisi:
             print(t("doctor.grafo_titolo", slug=slug))
