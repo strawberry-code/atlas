@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 
 from . import docs, gitscan
 from .config import ENV_IDENTITY, Graph
-from .model import by_id, is_done, node_of
+from .model import by_id, is_done, node_of, claimed
 from .store import CLAIMED, CLOSED, OPEN, StateError, transaction
 from .strings import t
 
@@ -134,8 +134,12 @@ def release(ref: Graph, node_id: str, reason: str | None = None) -> dict:
 
 
 def close(ref: Graph, node_id: str, summary: str, force: bool = False,
-          cost: str | None = None, artifacts: list[str] | None = None) -> dict:
-    """Chiude un nodo. Il possesso da parte di una sessione morta non e' un ostacolo."""
+          cost: str | None = None, artifacts: list[str] | None = None) -> tuple[dict, str | None]:
+    """Chiude un nodo. Il possesso da parte di una sessione morta non e' un ostacolo.
+
+    Restituisce una tupla (nodo, avviso) dove avviso e' None se la deduzione degli
+    artefatti e' avvenuta regolarmente, oppure un messaggio di avvertimento se e'
+    stata saltata perche' piu' nodi sono in lavorazione insieme."""
     agent = ref.workspace.config["agent"]
     pid, _ = session()
     with transaction(ref.json_path) as data:
@@ -149,11 +153,16 @@ def close(ref: Graph, node_id: str, summary: str, force: bool = False,
         if not docs.answer_written(ref, node_id) and not force:
             raise StateError(t("close.risposta_vuota", file=ref.ticket_path(node_id).name))
         preso = holder(node).get("at")
+        avviso = None
+        if artifacts is None:
+            altri_rivendicati = [n for n in claimed(data) if n["id"] != node_id]
+            if altri_rivendicati:
+                avviso = t("close.artifacts_non_dedotti")
+            else:
+                artifacts = gitscan.touched(ref.workspace.project_root, preso) or None
         node.update(status=CLOSED, assignee=None, claim=None, answer=summary, cost=cost,
                     closedBy=identity(),
                     closedAt=datetime.now().astimezone().isoformat(timespec="seconds"))
-        if artifacts is None:
-            artifacts = gitscan.touched(ref.workspace.project_root, preso) or None
         if artifacts is not None:
             node["artifacts"] = list(artifacts)
-        return dict(node)
+        return dict(node), avviso

@@ -58,7 +58,7 @@ e proponilo all'utente a fine nodo. La forma del grafo si cambia solo con uno sc
 python3 .atlas/bin/atlas close <ID> -s "la sintesi in una riga"
 ```
 
-Se vuoi lasciare un ordine di grandezza di quanto è costato (chiamate, token, tempo), aggiungi `-c/--costo "..."`. I file prodotti non devi elencarli: in una repo git `close` li ricava da solo, guardando cosa hai toccato da quando hai rivendicato il nodo. Con `--artefatti path/uno path/due` li dichiari tu; `--artefatti` senza argomenti lascia il campo vuoto. Nel ticket, le sotto-sezioni **Scelte non canoniche**, **Debito dichiarato** e **Autorizzazioni ricevute** sotto Risposta sono facoltative: usale quando c'è davvero qualcosa da dire, altrimenti lasciale vuote.
+Se vuoi lasciare un ordine di grandezza di quanto è costato (chiamate, token, tempo), aggiungi `-c/--costo "..."`. I file prodotti non devi elencarli: in una repo git `close` li ricava da solo, guardando cosa hai toccato da quando hai rivendicato il nodo. Se lavori in parallelo con altri nodi, questa deduzione salta e devi dichiarare gli artefatti con `--artefatti path/uno path/due`. Con `--artefatti` senza argomenti il campo rimane vuoto. Nel ticket, le sotto-sezioni **Scelte non canoniche**, **Debito dichiarato** e **Autorizzazioni ricevute** sotto Risposta sono facoltative: usale quando c'è davvero qualcosa da dire, altrimenti lasciale vuote.
 
 La sintesi finisce da sola in `map.md` sotto Decisioni prese, e la dashboard si rigenera. Se `close` rifiuta perché la Risposta è vuota, scrivila: non è un ostacolo da aggirare con `--force`.
 

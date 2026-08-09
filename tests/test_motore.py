@@ -169,7 +169,7 @@ class Lucchetti(Base):
         with self.assertRaises(self.store.StateError):
             self.claims.close(self.ref, "F01", "sintesi")
         self.rispondi("F01")
-        node = self.claims.close(self.ref, "F01", "sintesi")
+        node, _ = self.claims.close(self.ref, "F01", "sintesi")
         self.assertEqual("closed", node["status"])
         self.assertIn("closedAt", node)
 
@@ -177,14 +177,14 @@ class Lucchetti(Base):
         self.popola()
         self.claims.claim(self.ref, "F01")
         self.rispondi("F01")
-        node = self.claims.close(self.ref, "F01", "sintesi", cost="~40 chiamate")
+        node, _ = self.claims.close(self.ref, "F01", "sintesi", cost="~40 chiamate")
         self.assertEqual("~40 chiamate", node["cost"])
 
     def test_close_registra_gli_artifacts_se_dichiarati(self):
         self.popola()
         self.claims.claim(self.ref, "F01")
         self.rispondi("F01")
-        node = self.claims.close(self.ref, "F01", "sintesi", artifacts=["a.py", "b.py"])
+        node, _ = self.claims.close(self.ref, "F01", "sintesi", artifacts=["a.py", "b.py"])
         self.assertEqual(["a.py", "b.py"], node["artifacts"])
 
     def test_lucchetto_orfano(self):
@@ -292,7 +292,7 @@ class Artefatti(Base):
         self.popola()
         self.rispondi("F01")
         self.claims.claim(self.ref, "F01")
-        self.claims.close(self.ref, "F01", "così si è deciso")
+        _, _ = self.claims.close(self.ref, "F01", "così si è deciso")
         self.ref.map_path.unlink(missing_ok=True)
         self.render_tutto()
         self.assertIn("così si è deciso", self.ref.map_path.read_text(encoding="utf-8"))
@@ -338,7 +338,7 @@ class Artefatti(Base):
         self.popola()
         self.rispondi("F01")
         self.claims.claim(self.ref, "F01")
-        self.claims.close(self.ref, "F01", "fatto", cost="~40 chiamate")
+        _, _ = self.claims.close(self.ref, "F01", "fatto", cost="~40 chiamate")
         self.render_tutto()
         html = self.ref.dashboard_path.read_text(encoding="utf-8")
         self.assertIn("~40 chiamate", html)
@@ -348,7 +348,7 @@ class Artefatti(Base):
         self.popola()
         self.rispondi("F01")
         self.claims.claim(self.ref, "F01")
-        self.claims.close(self.ref, "F01", "fatto", cost="Una sessione lunga... .")
+        _, _ = self.claims.close(self.ref, "F01", "fatto", cost="Una sessione lunga... .")
         self.render_tutto()
         html = self.ref.dashboard_path.read_text(encoding="utf-8")
         self.assertIn("Una sessione lunga", html)
@@ -370,18 +370,18 @@ class Artefatti(Base):
 
     def test_artifacts_dedotti_da_git_senza_flag(self):
         self.prepara_lavoro()
-        node = self.claims.close(self.ref, "F01", "fatto")
+        node, _ = self.claims.close(self.ref, "F01", "fatto")
         self.assertIn("prodotto.txt", node["artifacts"])
         self.assertFalse([p for p in node["artifacts"] if p.startswith(".atlas/")])
 
     def test_artifacts_espliciti_vincono_sulla_deduzione(self):
         self.prepara_lavoro()
-        node = self.claims.close(self.ref, "F01", "fatto", artifacts=["esplicito.txt"])
+        node, _ = self.claims.close(self.ref, "F01", "fatto", artifacts=["esplicito.txt"])
         self.assertEqual(["esplicito.txt"], node["artifacts"])
 
     def test_artifacts_lista_vuota_svuota_il_campo(self):
         self.prepara_lavoro()
-        node = self.claims.close(self.ref, "F01", "fatto", artifacts=[])
+        node, _ = self.claims.close(self.ref, "F01", "fatto", artifacts=[])
         self.assertEqual([], node["artifacts"])
 
     def test_artifacts_non_dedotti_fuori_da_una_repo_git(self):
@@ -389,8 +389,58 @@ class Artefatti(Base):
         self.rispondi("F01")
         self.claims.claim(self.ref, "F01")
         (self.tmp / "prodotto.txt").write_text("output", encoding="utf-8")
-        node = self.claims.close(self.ref, "F01", "fatto")
+        node, _ = self.claims.close(self.ref, "F01", "fatto")
         self.assertEqual([], node["artifacts"])
+
+    def test_artifacts_non_dedotti_con_piu_nodi_rivendicati(self):
+        """Con due nodi rivendicati insieme, la deduzione scatta solo se --artefatti è esplicito."""
+        self.prepara_lavoro()
+        # Rimuovi la dipendenza fra F02 e F01 in modo che F02 possa essere rivendicato in parallelo
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.unlink(g, "F02", blocked_by="F01")
+        os.environ["ATLAS_IDENTITY"] = "esecutore-2"
+        try:
+            self.claims.claim(self.ref, "F02")
+        finally:
+            os.environ.pop("ATLAS_IDENTITY", None)
+        (self.tmp / "secondo-file.txt").write_text("output2", encoding="utf-8")
+        node, avviso = self.claims.close(self.ref, "F01", "fatto")
+        self.assertEqual([], node["artifacts"], "con piu' nodi in parallelo, artifacts deve restare vuoto")
+        self.assertIsNotNone(avviso, "deve esserci un avviso sulla deduzione saltata")
+        self.assertIn("--artefatti", avviso)
+
+    def test_artifacts_deduzione_con_un_nodo_rivendicato(self):
+        """Con un solo nodo rivendicato, la deduzione scatta regolarmente."""
+        self.prepara_lavoro()
+        node, avviso = self.claims.close(self.ref, "F01", "fatto")
+        self.assertIn("prodotto.txt", node["artifacts"], "la deduzione deve funzionare con un solo nodo")
+        self.assertIsNone(avviso, "non deve esserci avviso quando la deduzione riesce")
+
+    def test_artifacts_non_dedotti_nodo_aperto_mentre_altri_rivendicati(self):
+        """Un nodo aperto che si chiude mentre un altro è rivendicato non deduce gli artefatti.
+
+        Questo test cattura il buco: un nodo open (non rivendicato) si chiude, claimed(data)
+        non lo include, e se ci sono altri nodi rivendicati la deduzione andrebbe comunque
+        a pescare i file di quelli altri."""
+        # Prepara il grafo con F01 e F02 indipendenti
+        self.popola()
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.unlink(g, "F02", blocked_by="F01")
+        self.rispondi("F01")
+        self.git_init()
+        # Rivendica F02 da un altro agente (rimane rivendicato)
+        os.environ["ATLAS_IDENTITY"] = "esecutore-2"
+        try:
+            self.claims.claim(self.ref, "F02")
+        finally:
+            os.environ.pop("ATLAS_IDENTITY", None)
+        # Scrivi un file (simulando il lavoro)
+        (self.tmp / "prodotto.txt").write_text("output", encoding="utf-8")
+        # Chiudi F01 senza rivendicarlo (rimane open), senza --artefatti
+        node, avviso = self.claims.close(self.ref, "F01", "fatto")
+        self.assertEqual([], node["artifacts"], "nodo aperto in parallelo con altri rivendicati non deduce")
+        self.assertIsNotNone(avviso, "deve esserci avviso quando altri nodi sono rivendicati")
+        self.assertIn("--artefatti", avviso)
 
     def test_i_markdown_generati_non_hanno_il_bom(self):
         """Ticket e mappa.md vanno scritti in UTF-8 puro, senza BOM."""
@@ -484,7 +534,7 @@ class Doctor(Base):
         self.popola()
         self.rispondi("F01")
         self.claims.claim(self.ref, "F01")
-        self.claims.close(self.ref, "F01", "fatto")
+        _, _ = self.claims.close(self.ref, "F01", "fatto")
         self.claims.claim(self.ref, "F02")
         data = self.store.load(self.ref.json_path)
         avvisi = self.report.doctor_avvisi(data, self.ref, self.ws.config["agent"])
@@ -496,7 +546,7 @@ class Doctor(Base):
         self.claims.claim(self.ref, "F01")
         artefatto = self.ws.project_root / "prodotto.txt"
         artefatto.write_text("v1", encoding="utf-8")
-        self.claims.close(self.ref, "F01", "fatto", artifacts=["prodotto.txt"])
+        _, _ = self.claims.close(self.ref, "F01", "fatto", artifacts=["prodotto.txt"])
         with self.store.transaction(self.ref.json_path) as data:
             passato = (datetime.now().astimezone() - timedelta(hours=1)).isoformat(timespec="seconds")
             self.model.node_of(data, "F01")["closedAt"] = passato
@@ -517,7 +567,7 @@ class Doctor(Base):
         for nodo_id in ("F01", "F02", "F03"):
             self.rispondi(nodo_id)
             self.claims.claim(self.ref, nodo_id)
-            self.claims.close(self.ref, nodo_id, "fatto")
+            _, _ = self.claims.close(self.ref, nodo_id, "fatto")
         avvisi = self.report.doctor_avvisi(self.store.load(self.ref.json_path), self.ref, self.ws.config["agent"])
         self.assertFalse([a for a in avvisi if "F02" in a and "F03" in a])
 

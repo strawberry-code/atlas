@@ -27,6 +27,10 @@ STRINGS: dict[str, dict[str, str]] = {
                              "en": "the Answer section of {file} is empty.\n"
                                    "  Write it before closing, or use --force if the node\n"
                                    "  closes without an answer because it became irrelevant."},
+    "close.artifacts_non_dedotti": {"it": "artefatti non dedotti: più nodi sono in lavorazione insieme,\n"
+                                          "  dichiarali con --artefatti",
+                                    "en": "artifacts not deduced: several nodes are in progress at once,\n"
+                                          "  declare them with --artefatti"},
 
     # --- mutate.py ---
     "mutate.id_duplicato": {"it": "id duplicato: {id}", "en": "duplicate id: {id}"},
