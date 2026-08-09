@@ -237,6 +237,20 @@ class Lucchetti(Base):
         self.assertEqual(1, len(data["releases"]))
         self.assertEqual("non pronto", data["releases"][0]["reason"])
 
+    def test_flag_identity_vince_su_variabile_ambiente(self):
+        self.popola()
+        os.environ["ATLAS_IDENTITY"] = "env-identity"
+        try:
+            from core.cli import main
+            argv = ["claim", "F01", "--identity", "flag-identity"]
+            result = main(argv)
+            self.assertEqual(0, result)
+            data = self.store.load(self.ref.json_path)
+            node = self.model.node_of(data, "F01")
+            self.assertEqual("flag-identity", node["claim"]["identity"])
+        finally:
+            os.environ.pop("ATLAS_IDENTITY", None)
+
 
 class LucchettiWindows(Base):
     """claims.alive() sul ramo win32: os.kill(pid, 0) su Windows non e' un probe innocuo

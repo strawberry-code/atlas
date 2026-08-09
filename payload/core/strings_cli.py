@@ -22,6 +22,8 @@ STRINGS: dict[str, dict[str, str]] = {
                   "en": "claims a node and prints its context right away"},
     "help.release": {"it": "restituisce un nodo alla frontiera", "en": "returns a node to the frontier"},
     "help.close": {"it": "chiude un nodo con la sua sintesi", "en": "closes a node with its summary"},
+    "help.identity": {"it": "identità che tiene il lucchetto, vince su ATLAS_IDENTITY",
+                      "en": "identity holding the lock, overrides ATLAS_IDENTITY"},
     "help.fog": {"it": "appunta ciò che è emerso e non ha ancora un nodo",
                  "en": "notes down what came up and has no node yet"},
     "help.render": {"it": "rigenera ticket, mappa e dashboard",

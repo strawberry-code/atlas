@@ -7,13 +7,14 @@ mutate: e' la ragione per cui qui non esiste nessun comando che crea un nodo.
 from __future__ import annotations
 
 import argparse
+import os
 import runpy
 import subprocess
 import sys
 from pathlib import Path
 
 from . import claims, docs, howto, mutate, render as dash, report, strings
-from .config import ConfigError, Workspace, workspace
+from .config import ENV_IDENTITY, ConfigError, Workspace, workspace
 from .model import node_of
 from .mutate import editing, validate
 from .store import StateError, load, transaction
@@ -126,6 +127,15 @@ def cmd_doctor(ws: Workspace, args) -> int:
     return 0
 
 
+def _identity(p: argparse.ArgumentParser) -> None:
+    """Il flag comune ai comandi che prendono o mollano il lucchetto.
+
+    Vive qui e non nel parser radice perche' un flag globale andrebbe scritto prima
+    del sottocomando, cioe' nel punto dove nessuno lo cerca.
+    """
+    p.add_argument("--identity", default=None, help=t("help.identity"))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="atlas", description=t("parser.description"))
     parser.add_argument("-g", "--graph", help=t("opt.graph"))
@@ -140,15 +150,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("claim", help=t("help.claim"))
     p.add_argument("node"); p.add_argument("-a", "--assignee"); p.add_argument("--force", action="store_true")
+    _identity(p)
     p = sub.add_parser("take", help=t("help.take"))
     p.add_argument("node"); p.add_argument("-a", "--assignee"); p.add_argument("--force", action="store_true")
+    _identity(p)
     p = sub.add_parser("release", help=t("help.release")); p.add_argument("node")
-    p.add_argument("-r", "--ragione", default=None)
+    p.add_argument("-r", "--ragione", default=None); _identity(p)
     p = sub.add_parser("close", help=t("help.close"))
     p.add_argument("node"); p.add_argument("-s", "--sintesi", required=True)
     p.add_argument("-t", "--tipo", default=None); p.add_argument("--force", action="store_true")
     p.add_argument("-c", "--costo", default=None)
-    p.add_argument("--artefatti", nargs="*", default=None)
+    p.add_argument("--artefatti", nargs="*", default=None); _identity(p)
     p = sub.add_parser("fog", help=t("help.fog"))
     p.add_argument("riga", nargs="?", default=None)
     p.add_argument("--for", dest="destinatario", default=None)
@@ -239,6 +251,8 @@ def main(argv: list[str] | None = None) -> int:
     except ConfigError:
         pass  # nessun progetto da qui: build_parser() mostra comunque --help, in italiano di default
     args = build_parser().parse_args(argv)
+    if getattr(args, "identity", None):
+        os.environ[ENV_IDENTITY] = args.identity
     try:
         return dispatch(ws or workspace(), args)
     except (StateError, ConfigError) as errore:
