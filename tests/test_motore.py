@@ -486,6 +486,81 @@ class Artefatti(Base):
         bytes_riscritti = path.read_bytes()
         self.assertNotIn(b"\xef\xbb\xbf", bytes_riscritti)
 
+    def test_claim_rigenera_la_dashboard_sotto_lock(self):
+        """Il percorso comune di dispatch (claim, release, fog, render) rilegge e
+        rigenera dentro read_transaction, non dopo una load a lock rilasciato.
+
+        La prova e' strutturale di proposito: in un processo solo il lock non ha
+        effetti osservabili sull'output, quindi la regressione della dashboard non
+        si vede confrontando pagine. Quel che si puo' tenere fermo e' che il
+        comando passi davvero dalla sezione critica, ed e' l'invariante di #14.
+        """
+        from core import cli, store
+        self.popola()
+        spia = mock.Mock(wraps=store.read_transaction)
+        with mock.patch.object(cli, "read_transaction", spia):
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(0, cli.main(["claim", "F01"]))
+        spia.assert_called_once_with(self.ref.json_path)
+        html = self.ref.dashboard_path.read_text(encoding="utf-8")
+        self.assertIn("F01", html)
+
+    def test_dashboard_non_regredisce_su_mutazioni_consecutive(self):
+        """Verifica che read_transaction impedisce la regressione della dashboard
+        quando due mutazioni avvengono in sequenza rapida.
+
+        Il bug: claim() scrive graph.json, poi refresh() faceva load() fuori dal
+        lock. Un secondo claim poteva scrivere graph.json nel frattempo, rendendo
+        la dashboard stantia: mostra N1 claimed ma non N2.
+
+        La correzione: read_transaction() rilegge sotto lock, quindi la dashboard
+        contiene SEMPRE lo stato aggiornato.
+
+        Il test simula: cattura lo stato dopo il primo claim, esegui il secondo claim
+        (che modifica graph.json mentre il primo process sta per rigenerare), poi
+        rigenerale con read_transaction e verifica che la dashboard sia corretta.
+        """
+        # Crea un grafo con due nodi paralleli (senza dipendenze)
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.add_node(g, id="N1", branch="A", title="Node 1", question="?")
+            self.mutate.add_node(g, id="N2", branch="A", title="Node 2", question="?")
+
+        # Primo claim: scrive N1 claimed in graph.json
+        self.claims.claim(self.ref, "N1")
+        dati_dopo_n1 = self.store.load(self.ref.json_path)
+
+        # Verifica: N1 è claimed
+        n1_claimed = [n for n in dati_dopo_n1["nodes"] if n["id"] == "N1"][0]
+        self.assertEqual(self.store.CLAIMED, n1_claimed["status"])
+
+        # Secondo claim: scrive N2 claimed in graph.json MENTRE il primo process
+        # sta ancora rigenerando la dashboard (avrebbe letto i vecchi dati)
+        self.claims.claim(self.ref, "N2", force=True)
+
+        # Verifica: graph.json ora contiene ENTRAMBI i claim
+        dati_veri = self.store.load(self.ref.json_path)
+        n1_vera = [n for n in dati_veri["nodes"] if n["id"] == "N1"][0]
+        n2_vera = [n for n in dati_veri["nodes"] if n["id"] == "N2"][0]
+        self.assertEqual(self.store.CLAIMED, n1_vera["status"])
+        self.assertEqual(self.store.CLAIMED, n2_vera["status"])
+
+        # Simulazione del bug: il primo processo usa i dati OLD (dopo N1, prima N2)
+        # e rigenerera la dashboard. Se usasse load() fuori dal lock, mostrerebbe
+        # N1 claimed ma N2 ancora aperto.
+        self.render.write(self.ref, dati_dopo_n1)  # usa OLD: N1 claimed, N2 aperto
+        dash_stantia = self.ref.dashboard_path.read_text(encoding="utf-8")
+        self.assertIn('⬤ N1', dash_stantia, "Nella dashboard stantia, N1 è in lavorazione")
+        self.assertNotIn('⬤ N2', dash_stantia, "Nella dashboard stantia, N2 è ancora aperto (non claimed)")
+
+        # Con il fix: read_transaction rilegge sotto lock lo stato VERO
+        with self.store.read_transaction(self.ref.json_path) as data:
+            self.render.write(self.ref, data)  # rilegge stato VERO sotto lock
+
+        # Verifica: la dashboard corretta contiene ENTRAMBI i claim
+        dash_corretta = self.ref.dashboard_path.read_text(encoding="utf-8")
+        self.assertIn('⬤ N1', dash_corretta, "Dashboard corretta: N1 è in lavorazione")
+        self.assertIn('⬤ N2', dash_corretta, "Dashboard corretta: N2 è in lavorazione (il fix chiude la finestra)")
+
 
 class Doctor(Base):
     def test_fog_for_confine_di_parola(self):

@@ -17,11 +17,11 @@ from . import claims, docs, doctor, howto, mutate, render as dash, report, strin
 from .config import ENV_IDENTITY, ConfigError, Workspace, workspace
 from .model import node_of
 from .mutate import editing, validate
-from .store import StateError, load, transaction
+from .store import StateError, load, read_transaction, transaction
 from .strings import t
 
 
-def refresh(ref, data: dict, aprila: bool = False) -> None:
+def refresh(ref, data: dict) -> None:
     """Ticket mancanti, liste della mappa e dashboard: i tre artefatti derivati."""
     docs.ensure_map(ref, data)
     if creati := docs.write_stubs(ref, data):
@@ -30,9 +30,12 @@ def refresh(ref, data: dict, aprila: bool = False) -> None:
         print(t("refresh.ticket_riallineati", n=riallineati))
     docs.rewrite_lists(ref, data)
     dash.write(ref, data)
-    if aprila:
-        apri = {"darwin": "open", "win32": "start"}.get(sys.platform, "xdg-open")
-        subprocess.run([apri, str(ref.dashboard_path)], check=False)
+
+
+def _apri_browser(ref) -> None:
+    """Apre la dashboard nel browser. Fuori dal lock perche' lancia un processo esterno."""
+    apri = {"darwin": "open", "win32": "start"}.get(sys.platform, "xdg-open")
+    subprocess.run([apri, str(ref.dashboard_path)], check=False)
 
 
 def commit(ws: Workspace, ref, node: dict, tipo: str) -> None:
@@ -197,16 +200,16 @@ def dispatch(ws: Workspace, args) -> int:
         print(t("close.fatto", id=node["id"]))
         if avviso:
             print(f"  {avviso}")
-        data = load(ref.json_path)
-        refresh(ref, data)
+        with read_transaction(ref.json_path) as data:
+            refresh(ref, data)
+        report.show_status(ref, data)      # stampare non vuole il lock: data e' gia' in memoria
         commit(ws, ref, node, args.tipo or ws.config["git"]["commit_type"])
-        report.show_status(ref, data)
         return 0
 
     if args.cmd == "take":
         node = claims.claim(ref, args.node, args.assignee, args.force)
-        data = load(ref.json_path)
-        refresh(ref, data)
+        with read_transaction(ref.json_path) as data:
+            refresh(ref, data)
         report.show_brief(ref, data, node["id"])
         return 0
 
@@ -232,14 +235,20 @@ def dispatch(ws: Workspace, args) -> int:
         report.show_brief(ref, load(ref.json_path), args.node)
         return 0
 
-    data = load(ref.json_path)
+    # Comandi di sola lettura: non mutano, non rigenerano, escono prima
     if args.cmd == "status":
-        report.show_status(ref, data)  # sola lettura: non tocca gli artefatti
+        report.show_status(ref, load(ref.json_path))  # sola lettura: non tocca gli artefatti
         return 0
     if args.cmd == "next":
-        report.show_next(ref, data)  # sola lettura: non tocca gli artefatti
+        report.show_next(ref, load(ref.json_path))  # sola lettura: non tocca gli artefatti
         return 0
-    refresh(ref, data, getattr(args, "aprila", False))
+
+    # Comandi che mutano (claim, release, fog, render): rigenerano sotto lock
+    aprila = getattr(args, "aprila", False)
+    with read_transaction(ref.json_path) as data:
+        refresh(ref, data)
+    if aprila:
+        _apri_browser(ref)
     if args.cmd not in ("claim", "fog"):
         report.show_status(ref, data)
     return 0

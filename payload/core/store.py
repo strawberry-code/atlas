@@ -77,3 +77,19 @@ def transaction(path: Path):
             fh.truncate()
         finally:
             _unlock(fh)
+
+
+@contextmanager
+def read_transaction(path: Path):
+    """Sezione critica di sola lettura: il lock esclusivo protegge la rilettura
+    dal rischio che il file venga modificato fra il load e l'uscita dal with.
+
+    Usato dopo una mutazione per rigenerare gli artefatti con dati coerenti al grafo.
+    """
+    with path.open("r", encoding="utf-8") as fh:
+        _lock(fh)
+        try:
+            graph = json.load(fh)
+            yield graph
+        finally:
+            _unlock(fh)
