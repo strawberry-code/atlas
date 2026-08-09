@@ -73,7 +73,11 @@ def pack_payload() -> tuple[str, str]:
         for path in sorted(PAYLOAD_DIR.rglob("*")):
             if "__pycache__" in path.parts or path.name == ".DS_Store":
                 continue
-            tf.add(path, arcname=str(path.relative_to(PAYLOAD_DIR)), filter=_normalizza)
+            # recursive=False, altrimenti aggiungere una cartella ci infila dentro tutto
+            # il suo contenuto e il filtro qui sopra non lo vede mai: rglob enumera gia'
+            # ogni file da solo, e senza questo il bytecode finiva spedito agli utenti.
+            tf.add(path, arcname=str(path.relative_to(PAYLOAD_DIR)), filter=_normalizza,
+                   recursive=False)
     return versione, base64.b64encode(buffer.getvalue()).decode("ascii")
 
 

@@ -32,6 +32,20 @@ def verifica(condizione: bool, cosa: str) -> None:
     print(f"  {'ok  ' if condizione else 'ROTTO'} {cosa}")
 
 
+def payload_pyc() -> list[str]:
+    """I .pyc dentro il tar imbustato in dist/atlas, che dovrebbero essere zero.
+
+    Si guarda il pacchetto e non il progetto installato: appena il motore gira si
+    compila il proprio bytecode, quindi sul filesystem i .pyc ci sono comunque e
+    la prova non distinguerebbe niente.
+    """
+    import base64, io, re, tarfile, zipfile  # noqa: E401  (solo per questa prova)
+    sorgente = zipfile.ZipFile(CLI).read("atlascli/_payload.py").decode()
+    blob = re.search(r'PAYLOAD_B64 = "([^"]+)"', sorgente).group(1)
+    with tarfile.open(fileobj=io.BytesIO(base64.b64decode(blob))) as tf:
+        return [m.name for m in tf.getmembers() if m.name.endswith(".pyc")]
+
+
 def locale(cwd: Path, *args: str) -> subprocess.CompletedProcess:
     """Il motore per-progetto, invocato direttamente: .atlas/bin/atlas <cmd>."""
     return subprocess.run([str(cwd / ".atlas" / "bin" / "atlas"), *args],
@@ -72,6 +86,7 @@ def main() -> int:
         verifica((radice / "bin" / "atlas").stat().st_mode & 0o111, "entrypoint eseguibile")
         verifica((target / ".claude" / "skills" / "atlas-work").is_symlink(), "skill collegate con symlink")
         verifica((radice / "scripts" / "000-promote-fog.py").is_file(), "esempio promote-fog installato")
+        verifica(not payload_pyc(), "nessun bytecode dentro il payload impacchettato")
 
         registro = json.loads(atlas_config.read_text(encoding="utf-8"))
         slug = slugify(target.resolve().name)  # register() slugifica il nome cartella, non lo usa nudo
