@@ -47,8 +47,8 @@ def payload_pyc() -> list[str]:
 
 
 def locale(cwd: Path, *args: str) -> subprocess.CompletedProcess:
-    """Il motore per-progetto, invocato direttamente: .atlas/bin/atlas <cmd>."""
-    return subprocess.run([str(cwd / ".atlas" / "bin" / "atlas"), *args],
+    """Il motore per-progetto, invocato direttamente: .atlas/atlas <cmd>."""
+    return subprocess.run([str(cwd / ".atlas" / "atlas"), *args],
                           cwd=cwd, capture_output=True, text=True)
 
 
@@ -82,8 +82,10 @@ def main() -> int:
         esito = globale(target, "install", str(target), "--yes", "--graph", "epic-test", env=env)
         verifica(esito.returncode == 0, "atlas install va a buon fine")
         radice = target / ".atlas"
-        verifica((radice / "core" / "cli.py").is_file(), "motore scompattato")
-        verifica((radice / "bin" / "atlas").stat().st_mode & 0o111, "entrypoint eseguibile")
+        verifica((radice / "atlas").is_file(), "motore scompattato come archivio unico")
+        verifica((radice / "atlas").stat().st_mode & 0o111, "l'archivio è eseguibile")
+        verifica(not (radice / "core").exists() and not (radice / "bin").exists(),
+                 "nessun sorgente nudo dentro il progetto")
         verifica((target / ".claude" / "skills" / "atlas-work").is_symlink(), "skill collegate con symlink")
         verifica((radice / "scripts" / "000-promote-fog.py").is_file(), "esempio promote-fog installato")
         verifica(not payload_pyc(), "nessun bytecode dentro il payload impacchettato")
@@ -98,6 +100,12 @@ def main() -> int:
         gruppi = impostazioni["hooks"]["SessionEnd"]
         verifica(len(gruppi) == 2, "hook aggiunto senza cancellare i preesistenti")
         verifica("preesistente" in json.dumps(gruppi[0]), "hook preesistente intatto")
+        # Eseguito davvero, non solo registrato: l'hook importa il motore per conto suo,
+        # quindi e' l'unico pezzo che si accorge se 'core' cambia posto.
+        esito_hook = subprocess.run([sys.executable, str(radice / "hooks" / "session_end.py")],
+                                    cwd=target, capture_output=True, text=True)
+        verifica(esito_hook.returncode == 0 and "Traceback" not in esito_hook.stderr,
+                 "l'hook di fine sessione gira e trova il motore")
 
         contratto = (target / "CLAUDE.md").read_text(encoding="utf-8")
         verifica("Regole preesistenti." in contratto, "CLAUDE.md preesistente conservato")
@@ -240,9 +248,49 @@ def verifica_install_in_inglese() -> None:
         shutil.rmtree(atlas_home, ignore_errors=True)
 
 
+def verifica_migrazione_dal_motore_a_sorgenti() -> None:
+    """Un progetto installato quando il motore era core/ + bin/ passa all'archivio unico.
+
+    La migrazione la si fa una volta sola e deve funzionare al primo colpo, quindi
+    il layout vecchio va ricostruito davvero invece che dato per buono: qui si
+    fabbricano le due cartelle e si controlla che l'update se le porti via senza
+    toccare i dati, che sono l'unica cosa che l'utente non puo' rigenerare.
+    """
+    target = Path(tempfile.mkdtemp())
+    atlas_home = Path(tempfile.mkdtemp())
+    env = dict(os.environ, ATLAS_CONFIG=str(atlas_home / "atlas.json"))
+    try:
+        subprocess.run(["git", "init", "-q"], cwd=target, check=True)
+        globale(target, "install", str(target), "--yes", "--graph", "epic-test", env=env)
+        radice = target / ".atlas"
+        grafo = radice / "graphs" / "epic-test" / "graph.json"
+        prima = grafo.read_text(encoding="utf-8")
+
+        vecchio_core = radice / "core"
+        vecchio_core.mkdir()
+        (vecchio_core / "cli.py").write_text("# motore di una versione precedente\n", encoding="utf-8")
+        (vecchio_core / "__pycache__").mkdir()
+        (vecchio_core / "__pycache__" / "cli.pyc").write_bytes(b"\x00")
+        (radice / "bin").mkdir()
+        (radice / "bin" / "atlas").write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+
+        esito = globale(target, slugify(target.resolve().name), "update", env=env)
+        verifica(esito.returncode == 0, "migrazione: l'update di un progetto vecchio va a buon fine")
+        verifica(not vecchio_core.exists() and not (radice / "bin").exists(),
+                 "migrazione: core/ e bin/ della versione precedente sono spariti")
+        verifica("rimossi dalla versione precedente" in esito.stdout,
+                 "migrazione: l'update dice cosa ha portato via")
+        verifica((radice / "atlas").is_file(), "migrazione: resta l'archivio unico")
+        verifica(grafo.read_text(encoding="utf-8") == prima, "migrazione: i dati del grafo sono intatti")
+    finally:
+        shutil.rmtree(target, ignore_errors=True)
+        shutil.rmtree(atlas_home, ignore_errors=True)
+
+
 if __name__ == "__main__":
     esito = main()
     verifica_install_in_inglese()
+    verifica_migrazione_dal_motore_a_sorgenti()
     rotti = [cosa for ok, cosa in esiti if not ok]
     print(f"\n  totale: {len(esiti) - len(rotti)}/{len(esiti)} verifiche passate\n")
     raise SystemExit(1 if rotti else esito)

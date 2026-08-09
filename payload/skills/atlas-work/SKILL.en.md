@@ -10,7 +10,7 @@ The graph says what's up for grabs right now. One node per session, from claim t
 ## 1. Get your bearings
 
 ```sh
-python3 .atlas/bin/atlas status
+python3 .atlas/atlas status
 ```
 
 Also read the active graph's map, `.atlas/graphs/<slug>/map.md`: the Destination says where this is going, the Notes say the standing preferences, the Decisions made say what's already been decided and from which node, close or reasoned release. No need to open closed tickets: the map is the index, you zoom in only on what you actually need.
@@ -22,7 +22,7 @@ If `status` flags orphan or stalled locks, sort them out before claiming anythin
 The user names the node. If they don't, check `atlas next` or take the first one on the frontier.
 
 ```sh
-python3 .atlas/bin/atlas take <ID>
+python3 .atlas/atlas take <ID>
 ```
 
 `take` claims the node and prints its card (branch, type, mode, status), question, blockers' answers, and the fog that names it, in the same step — the same package `atlas brief <ID>` gives, without rebuilding it by hand from ticket after ticket.
@@ -47,7 +47,7 @@ The ticket is `.atlas/graphs/<slug>/tickets/<ID>.md`. Write from **Work** downwa
 If something comes up that would deserve a node of its own, **don't create it**. Note it down, addressed to a node if it concerns one:
 
 ```sh
-python3 .atlas/bin/atlas fog "what came up, in one line" --for <ID>
+python3 .atlas/atlas fog "what came up, in one line" --for <ID>
 ```
 
 and propose it to the user once the node is done. The graph's shape changes only through a mutation script, never on impulse in the middle of other work. To turn one into a node there's a ready example at `.atlas/scripts/000-promote-fog.py`: fill in the entry's index and the node's fields, then run it with `atlas exec`.
@@ -55,7 +55,7 @@ and propose it to the user once the node is done. The graph's shape changes only
 ## 5. Close it
 
 ```sh
-python3 .atlas/bin/atlas close <ID> -s "the one-line summary"
+python3 .atlas/atlas close <ID> -s "the one-line summary"
 ```
 
 To leave a rough order of magnitude for what it cost (calls, tokens, time), add `-c/--costo "..."`. You don't have to list the files you produced: inside a git repository `close` works them out on its own, from what you touched since you claimed the node. If you're working in parallel with other nodes, this deduction skips and you must declare the artifacts with `--artefatti path/one path/two`. `--artefatti` with no arguments leaves the field empty. In the ticket, the **Non-canonical choices**, **Declared debt**, and **Authorizations received** sub-sections under Answer are optional: use them when there's actually something to say, leave them empty otherwise.

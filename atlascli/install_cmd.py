@@ -23,7 +23,12 @@ from .strings import set_language, t
 DIRNAME = ".atlas"
 MARCATORE = ".atlas-managed"  # dentro una copia di skill (fallback Windows al posto del simlink)
 BEGIN, END = "<!-- atlas:begin -->", "<!-- atlas:end -->"
-SOSTITUIBILI = ("core", "bin", "hooks", "skills", "templates", "VERSION")
+SOSTITUIBILI = ("hooks", "skills", "templates", "VERSION")
+MOTORE = "atlas"                    # il motore e' un archivio unico, non piu' una cartella
+# Il motore stava in core/ come sorgenti e si lanciava da bin/atlas. Restano li' finche'
+# qualcuno non li toglie, e un progetto con due motori installati insieme e' lo stato
+# peggiore: l'aggiornamento li porta via da solo e dice quali.
+RESIDUI = ("core", "bin")
 IGNORE = [f"{DIRNAME}/graphs/*/dashboard.html", f"{DIRNAME}/current", "__pycache__/"]
 
 CONFIG = {
@@ -72,7 +77,8 @@ class Installer:
             self.root.mkdir(parents=True, exist_ok=True)
             kw = {"filter": "data"} if sys.version_info >= (3, 12) else {}
             tf.extractall(self.root, **kw)
-        (self.root / "bin" / "atlas").chmod(0o755)
+        (self.root / MOTORE).chmod(0o755)
+        self.sgombera()
         for cartella in ("graphs", "scripts"):
             (self.root / cartella).mkdir(exist_ok=True)
         esempio = self.root / "scripts" / "000-promote-fog.py"
@@ -84,6 +90,19 @@ class Installer:
         shutil.copyfile(self.root / "templates" / f"contract.{self.lingua}.md", self.root / "CONTRACT.md")
         versione = (self.root / "VERSION").read_text(encoding="utf-8").strip()
         self.dice(t("install.motore_in", dirname=DIRNAME, versione=versione))
+
+    def sgombera(self) -> None:
+        """Porta via il motore delle versioni precedenti, che ora e' un archivio solo."""
+        tolti = []
+        for voce in RESIDUI:
+            vecchio = self.root / voce
+            if vecchio.is_dir():
+                shutil.rmtree(vecchio)
+                tolti.append(f"{DIRNAME}/{voce}/")
+        for cache in self.root.rglob("__pycache__"):
+            shutil.rmtree(cache, ignore_errors=True)
+        if tolti:
+            self.dice(t("install.residui_rimossi", elenco=", ".join(tolti)))
 
     def configura(self) -> None:
         path = self.root / "config.json"
@@ -182,7 +201,8 @@ class Installer:
     def primo_grafo(self) -> None:
         if not self.args.graph or self.args.dry_run:
             return
-        sys.path.insert(0, str(self.root))
+        # L'archivio appena scompattato, non la cartella: 'core' vive dentro .atlas/atlas
+        sys.path.insert(0, str(self.root / MOTORE))
         os.environ["ATLAS_ROOT"] = str(self.root)
         from core.cli import main  # noqa: E402
         main(["new", self.args.graph, "-t", self.args.graph.replace("-", " ").capitalize()])
@@ -201,7 +221,9 @@ class Installer:
         self.dice(t("install.registrato", slug=slug))
 
     def disinstalla(self) -> int:
-        for voce in SOSTITUIBILI + ("CONTRACT.md",):
+        # RESIDUI compreso: chi disinstalla da una versione precedente non deve
+        # restare con mezzo motore sul disco.
+        for voce in SOSTITUIBILI + RESIDUI + (MOTORE, "CONTRACT.md"):
             path = self.root / voce
             shutil.rmtree(path) if path.is_dir() else path.unlink(missing_ok=True)
         skills = self.target / ".claude" / "skills"

@@ -32,7 +32,7 @@ def _normalizza(info: tarfile.TarInfo) -> tarfile.TarInfo:
     info.uid = info.gid = 0
     info.uname = info.gname = ""
     info.mtime = 0
-    info.mode = 0o755 if info.isdir() or info.name.endswith("bin/atlas") else 0o644
+    info.mode = 0o755 if info.isdir() or info.name == "atlas" else 0o644
     return info
 
 
@@ -65,19 +65,47 @@ def valida_coppie_lingua() -> None:
         raise SystemExit(f"  Traduzioni mancanti, build interrotta:\n{elenco}\n")
 
 
+def _motore(staging: Path) -> Path:
+    """Il motore come archivio unico: core/ piu' __main__.py dentro un solo file.
+
+    Eseguibile e importabile insieme, che e' quel che serve: la CLI parte da
+    __main__.py, e uno script di mutazione mette l'archivio in sys.path e scrive
+    'from core import mutate' come quando core/ era una cartella di sorgenti.
+    """
+    sorgente = staging / "src"
+    shutil.copytree(PAYLOAD_DIR / "core", sorgente / "core",
+                    ignore=shutil.ignore_patterns("__pycache__", ".DS_Store"))
+    shutil.copy2(PAYLOAD_DIR / "__main__.py", sorgente / "__main__.py")
+    archivio = staging / "atlas"
+    zipapp.create_archive(sorgente, archivio, interpreter="/usr/bin/env python3")
+    archivio.chmod(0o755)
+    return archivio
+
+
+# Quel che finisce dentro un progetto ospite accanto al motore: file veri, non
+# codice. Restano fuori dall'archivio perche' il motore li legge da disco e
+# perche' le skill vanno raggiunte da un simlink di .claude/skills/.
+ACCANTO = ("templates", "skills", "hooks", "VERSION")
+
+
 def pack_payload() -> tuple[str, str]:
-    """Ritorna (versione, blob base64) del motore in payload/."""
+    """Ritorna (versione, blob base64) di quel che si installa in .atlas/."""
     versione = (PAYLOAD_DIR / "VERSION").read_text(encoding="utf-8").strip()
     buffer = io.BytesIO()
-    with tarfile.open(fileobj=buffer, mode="w:gz", compresslevel=9) as tf:
-        for path in sorted(PAYLOAD_DIR.rglob("*")):
-            if "__pycache__" in path.parts or path.name == ".DS_Store":
-                continue
-            # recursive=False, altrimenti aggiungere una cartella ci infila dentro tutto
-            # il suo contenuto e il filtro qui sopra non lo vede mai: rglob enumera gia'
-            # ogni file da solo, e senza questo il bytecode finiva spedito agli utenti.
-            tf.add(path, arcname=str(path.relative_to(PAYLOAD_DIR)), filter=_normalizza,
-                   recursive=False)
+    with tempfile.TemporaryDirectory() as staging:
+        motore = _motore(Path(staging))
+        with tarfile.open(fileobj=buffer, mode="w:gz", compresslevel=9) as tf:
+            tf.add(motore, arcname="atlas", filter=_normalizza, recursive=False)
+            for voce in ACCANTO:
+                origine = PAYLOAD_DIR / voce
+                for path in sorted(origine.rglob("*")) if origine.is_dir() else [origine]:
+                    if "__pycache__" in path.parts or path.name == ".DS_Store":
+                        continue
+                    # recursive=False, altrimenti aggiungere una cartella ci infila dentro
+                    # tutto il suo contenuto e il filtro qui sopra non lo vede mai: rglob
+                    # enumera gia' ogni file, e senza questo il bytecode finiva spedito.
+                    tf.add(path, arcname=str(path.relative_to(PAYLOAD_DIR)),
+                           filter=_normalizza, recursive=False)
     return versione, base64.b64encode(buffer.getvalue()).decode("ascii")
 
 

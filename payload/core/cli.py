@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 from . import claims, docs, doctor, howto, mutate, render as dash, report, strings
-from .config import ENV_IDENTITY, ConfigError, Workspace, workspace
+from .config import ENV_IDENTITY, MOTORE, ConfigError, Workspace, workspace
 from .model import node_of
 from .mutate import editing, validate
 from .store import StateError, load, read_transaction, transaction
@@ -82,7 +82,12 @@ def cmd_exec(ws: Workspace, args) -> int:
     script = Path(args.script).resolve()
     if not script.is_file():
         raise ConfigError(t("exec.script_assente", script=script))
-    sys.path.insert(0, str(ws.root))
+    # L'archivio del motore, non la cartella che lo contiene: 'core' vive dentro
+    # .atlas/atlas, e zipimport lo rende importabile da li' come da una cartella.
+    # E' quel che tiene in piedi il 'from core import mutate' degli script.
+    # Dai sorgenti (sviluppo e test) l'archivio non c'e' e core/ e' una cartella vera.
+    archivio = ws.root / MOTORE
+    sys.path.insert(0, str(archivio if archivio.is_file() else ws.root))
     modulo = runpy.run_path(str(script))
     if "run" not in modulo:
         raise StateError(t("exec.senza_run", nome=script.name))

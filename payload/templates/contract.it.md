@@ -3,12 +3,12 @@
 Il lavoro di questo progetto è un grafo di task in `.atlas/`. Un nodo è un pezzo di lavoro dimensionato su una sessione, gli archi `blockedBy` sono le dipendenze, e la **frontiera** è l'insieme dei nodi aperti i cui blocker sono tutti chiusi. Non si sceglie cosa fare leggendo una lista: si guarda la frontiera.
 
 ```sh
-python3 .atlas/bin/atlas how-to              # questo contratto, i comandi, le mutazioni, le skill e i path
-python3 .atlas/bin/atlas status              # frontiera, lucchetti, avanzamento
-python3 .atlas/bin/atlas next                 # la frontiera ordinata per impatto: un suggerimento
-python3 .atlas/bin/atlas take <ID>            # rivendica e stampa il contesto insieme, prima di toccare qualsiasi cosa
-python3 .atlas/bin/atlas close <ID> -s "..."  # chiude, dopo aver scritto la Risposta nel ticket
-python3 .atlas/bin/atlas fog "una riga" --for <ID>   # appunta ciò che è emerso, indirizzato a un nodo se lo riguarda
+python3 .atlas/atlas how-to              # questo contratto, i comandi, le mutazioni, le skill e i path
+python3 .atlas/atlas status              # frontiera, lucchetti, avanzamento
+python3 .atlas/atlas next                 # la frontiera ordinata per impatto: un suggerimento
+python3 .atlas/atlas take <ID>            # rivendica e stampa il contesto insieme, prima di toccare qualsiasi cosa
+python3 .atlas/atlas close <ID> -s "..."  # chiude, dopo aver scritto la Risposta nel ticket
+python3 .atlas/atlas fog "una riga" --for <ID>   # appunta ciò che è emerso, indirizzato a un nodo se lo riguarda
 ```
 
 `atlas brief <ID>` stampa lo stesso pacchetto di contesto di `take` (domanda, Risposte dei bloccanti, nebbia che lo nomina) senza rivendicare: utile per rileggerlo senza toccare il lucchetto.
@@ -39,8 +39,8 @@ Un agente che risponde da solo a un nodo HITL ha rotto la regola più importante
 `graph.json` non si edita a mano, e la CLI non ha comandi che creano nodi o archi. Ogni modifica strutturale è uno script Python in `.atlas/scripts/` che passa da `core/mutate.py`:
 
 ```sh
-python3 .atlas/bin/atlas new-script aggiunge-ramo-deploy
-python3 .atlas/bin/atlas exec .atlas/scripts/003-aggiunge-ramo-deploy.py
+python3 .atlas/atlas new-script aggiunge-ramo-deploy
+python3 .atlas/atlas exec .atlas/scripts/003-aggiunge-ramo-deploy.py
 ```
 
 Lo script gira in una sola transazione e il grafo viene validato prima di essere scritto, quindi un ciclo o un arco verso un nodo inesistente lo fanno fallire senza toccare il file. Gli script restano versionati: sono la storia delle modifiche alla mappa.

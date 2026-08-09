@@ -13,6 +13,7 @@ from pathlib import Path
 from .strings import t
 
 DIRNAME = ".atlas"
+MOTORE = "atlas"                 # l'archivio unico dentro DIRNAME: eseguibile e importabile
 ENV_GRAPH = "ATLAS_GRAPH"
 ENV_ROOT = "ATLAS_ROOT"
 ENV_IDENTITY = "ATLAS_IDENTITY"
@@ -46,8 +47,12 @@ def find_root(start: Path | None = None) -> Path:
         return Path(env).resolve()
     here = (start or Path.cwd()).resolve()
     for folder in (here, *here.parents):
-        if (folder / DIRNAME / "core").is_dir():
-            return folder / DIRNAME
+        # Il motore installato e' l'archivio; core/ come cartella vale solo quando si
+        # gira dai sorgenti (sviluppo e test). Cercare .atlas/ e basta non distingue
+        # un'installazione vera da una cartella di dati rimasta dopo un uninstall.
+        radice = folder / DIRNAME
+        if (radice / MOTORE).is_file() or (radice / "core").is_dir():
+            return radice
     raise ConfigError(t("config.root_mancante", dirname=DIRNAME))
 
 

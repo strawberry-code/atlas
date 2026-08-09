@@ -10,7 +10,7 @@ Il grafo dice cosa è prendibile adesso. Un nodo per sessione, dal claim alla ch
 ## 1. Orientati
 
 ```sh
-python3 .atlas/bin/atlas status
+python3 .atlas/atlas status
 ```
 
 Leggi anche la mappa del grafo attivo, `.atlas/graphs/<slug>/map.md`: la Destinazione dice dove si va, le Note dicono le preferenze permanenti, le Decisioni prese dicono cosa è già stato deciso e da quale nodo, chiusura o rilascio motivato. Non serve aprire i ticket chiusi: la mappa è l'indice, si zooma solo su quello che serve davvero.
@@ -22,7 +22,7 @@ Se `status` segnala lucchetti orfani o fermi, sistemali prima di prendere altro.
 Il nodo lo nomina l'utente. Se non lo nomina, guarda `atlas next` o prendi il primo della frontiera.
 
 ```sh
-python3 .atlas/bin/atlas take <ID>
+python3 .atlas/atlas take <ID>
 ```
 
 `take` rivendica il nodo e stampa nello stesso passo la sua scheda (ramo, tipo, modo, stato), la domanda, le Risposte dei suoi bloccanti e la nebbia che lo nomina — lo stesso pacchetto che dà `atlas brief <ID>`, senza doverlo ricostruire a mano rileggendo ticket su ticket.
@@ -47,7 +47,7 @@ Il ticket è `.atlas/graphs/<slug>/tickets/<ID>.md`. Scrivi da **Lavorazione** i
 Se emerge qualcosa che meriterebbe un nodo suo, **non crearlo**. Appuntalo, indirizzato a un nodo se lo riguarda:
 
 ```sh
-python3 .atlas/bin/atlas fog "quel che è emerso, in una riga" --for <ID>
+python3 .atlas/atlas fog "quel che è emerso, in una riga" --for <ID>
 ```
 
 e proponilo all'utente a fine nodo. La forma del grafo si cambia solo con uno script di mutazione, mai di slancio in mezzo a un altro lavoro. Per farne un nodo c'è un esempio pronto in `.atlas/scripts/000-promote-fog.py`: si compila con l'indice della voce e i campi del nodo, e si lancia con `atlas exec`.
@@ -55,7 +55,7 @@ e proponilo all'utente a fine nodo. La forma del grafo si cambia solo con uno sc
 ## 5. Chiudi
 
 ```sh
-python3 .atlas/bin/atlas close <ID> -s "la sintesi in una riga"
+python3 .atlas/atlas close <ID> -s "la sintesi in una riga"
 ```
 
 Se vuoi lasciare un ordine di grandezza di quanto è costato (chiamate, token, tempo), aggiungi `-c/--costo "..."`. I file prodotti non devi elencarli: in una repo git `close` li ricava da solo, guardando cosa hai toccato da quando hai rivendicato il nodo. Se lavori in parallelo con altri nodi, questa deduzione salta e devi dichiarare gli artefatti con `--artefatti path/uno path/due`. Con `--artefatti` senza argomenti il campo rimane vuoto. Nel ticket, le sotto-sezioni **Scelte non canoniche**, **Debito dichiarato** e **Autorizzazioni ricevute** sotto Risposta sono facoltative: usale quando c'è davvero qualcosa da dire, altrimenti lasciale vuote.

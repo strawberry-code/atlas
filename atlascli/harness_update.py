@@ -67,7 +67,7 @@ def _redraw_all(path: Path) -> tuple[list[str], list[str]]:
     grafi_dir = path / ".atlas" / "graphs"
     grafi = sorted(p.name for p in grafi_dir.iterdir() if (p / "graph.json").is_file()) \
         if grafi_dir.is_dir() else []
-    entrypoint = path / ".atlas" / "bin" / "atlas"
+    entrypoint = path / ".atlas" / "atlas"
     falliti = [grafo for grafo in grafi
                if subprocess.run([sys.executable, str(entrypoint), "-g", grafo, "render"],
                                   cwd=path).returncode != 0]

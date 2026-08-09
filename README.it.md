@@ -60,7 +60,7 @@ Cambiare lingua a un progetto esistente rigenera `SKILL.md`, `CONTRACT.md` e pro
 
 ## Lavorare
 
-Da dentro il progetto, `atlas <comando>` fa da passthrough al motore locale — stesso effetto di `.atlas/bin/atlas <comando>`, forma consigliata perché non richiede il path:
+Da dentro il progetto, `atlas <comando>` fa da passthrough al motore locale — stesso effetto di `.atlas/atlas <comando>`, forma consigliata perché non richiede il path:
 
 ```bash
 atlas status                         # frontiera, lucchetti, avanzamento

@@ -61,6 +61,8 @@ STRINGS: dict[str, dict[str, str]] = {
                               "en": "would unpack {n} files into {dirname}/"},
     "install.motore_in": {"it": "motore in {dirname}/ (versione {versione})",
                          "en": "engine in {dirname}/ (version {versione})"},
+    "install.residui_rimossi": {"it": "rimossi dalla versione precedente: {elenco}",
+                                "en": "removed from the previous version: {elenco}"},
     "install.config_presente": {"it": "config.json già presente, lasciato com'era",
                                "en": "config.json already present, left as-is"},
     "install.nome_progetto": {"it": "  nome del progetto [{default}]: ", "en": "  project name [{default}]: "},
@@ -89,10 +91,10 @@ STRINGS: dict[str, dict[str, str]] = {
                        "en": "\n  Engine removed. Your data stays in {dirname}/: "
                              "graphs/, scripts/, config.json.\n  Delete it by hand if you don't need it anymore.\n"},
     "install.riepilogo": {"it": "\n  Atlas {versione} in {target}\n", "en": "\n  Atlas {versione} in {target}\n"},
-    "install.prova_con": {"it": "\n  Prova con:  {dirname}/bin/atlas doctor",
-                         "en": "\n  Try:  {dirname}/bin/atlas doctor"},
-    "install.primo_grafo": {"it": "  Primo grafo: {dirname}/bin/atlas new <slug> -t \"Titolo\"",
-                           "en": "  First graph: {dirname}/bin/atlas new <slug> -t \"Title\""},
+    "install.prova_con": {"it": "\n  Prova con:  {dirname}/atlas doctor",
+                         "en": "\n  Try:  {dirname}/atlas doctor"},
+    "install.primo_grafo": {"it": "  Primo grafo: {dirname}/atlas new <slug> -t \"Titolo\"",
+                           "en": "  First graph: {dirname}/atlas new <slug> -t \"Title\""},
 
     # --- harness_update.py ---
     "harness.non_registrato": {"it": "\n  '{slug}' non è registrato. Registralo con "

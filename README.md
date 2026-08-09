@@ -60,7 +60,7 @@ Switching an existing project's language regenerates `SKILL.md`, `CONTRACT.md`, 
 
 ## Working
 
-From inside the project, `atlas <command>` passes through to the local engine — same effect as `.atlas/bin/atlas <command>`, the recommended form since it doesn't need the path:
+From inside the project, `atlas <command>` passes through to the local engine — same effect as `.atlas/atlas <command>`, the recommended form since it doesn't need the path:
 
 ```bash
 atlas how-to                         # the whole briefing: contract, commands, mutations, skills, paths

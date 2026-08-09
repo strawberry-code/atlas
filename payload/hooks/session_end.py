@@ -12,7 +12,10 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
+# Il motore e' l'archivio .atlas/atlas, non una cartella di sorgenti accanto a questo
+# file: zipimport lo rende importabile. Dai sorgenti (sviluppo e test) c'e' core/.
+_MOTORE = ROOT / "atlas"
+sys.path.insert(0, str(_MOTORE if _MOTORE.is_file() else ROOT))
 
 from core import claims, render as dash  # noqa: E402
 from core.config import Graph, Workspace  # noqa: E402

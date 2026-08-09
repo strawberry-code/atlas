@@ -3,7 +3,7 @@
 E' l'unico punto che decide se un comando e' del CLI globale (install/update/
 uninstall/list) o di un progetto (status/claim/close/...): i comandi di progetto
 non li conosce affatto, li esegue com'e' via os.execv sull'entrypoint del progetto
-bersaglio (payload/bin/atlas, invariato). Sostituzione di processo e non
+bersaglio (l'archivio .atlas/atlas, invariato). Sostituzione di processo e non
 subprocess/import in-process apposta: evita che il pacchetto 'core' imbustato nel
 CLI globale collida in sys.modules con quello del progetto bersaglio, ed eredita
 cwd/env/stdio/segnali esattamente come fa git per i suoi comandi esterni.
@@ -16,6 +16,7 @@ import sys
 from pathlib import Path
 
 from . import install_cmd, list_cmd, registry, self_update
+from .paths import motore_installato
 from .strings import set_language, t
 from .version import current_version
 
@@ -71,13 +72,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _radice_locale(partenza: Path) -> Path | None:
     for cartella in (partenza, *partenza.parents):
-        if (cartella / ".atlas" / "core").is_dir():
+        if motore_installato(cartella):
             return cartella
     return None
 
 
 def _passthrough(radice: Path, argv: list[str]) -> None:
-    entrypoint = radice / ".atlas" / "bin" / "atlas"
+    entrypoint = radice / ".atlas" / "atlas"
     os.execv(sys.executable, [sys.executable, str(entrypoint), *argv])
 
 

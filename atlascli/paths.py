@@ -12,3 +12,14 @@ from pathlib import Path
 
 def config_path() -> Path:
     return Path(os.environ.get("ATLAS_CONFIG", str(Path.home() / ".config" / "atlas.json"))).expanduser()
+
+
+def motore_installato(progetto: Path) -> bool:
+    """Vero se in questo progetto c'e' un motore Atlas, di questa forma o di quella prima.
+
+    L'archivio unico ha preso il posto di core/ piu' bin/. La forma vecchia resta
+    riconosciuta apposta: e' quella dei progetti che devono ancora migrare, e se il
+    CLI globale li dichiarasse non validi rifiuterebbe di aggiornare proprio loro.
+    """
+    root = progetto / ".atlas"
+    return (root / "atlas").is_file() or (root / "core").is_dir()
