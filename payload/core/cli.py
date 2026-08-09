@@ -13,7 +13,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import claims, docs, howto, mutate, render as dash, report, strings
+from . import claims, docs, doctor, howto, mutate, render as dash, report, strings
 from .config import ENV_IDENTITY, ConfigError, Workspace, workspace
 from .model import node_of
 from .mutate import editing, validate
@@ -123,7 +123,7 @@ def cmd_doctor(ws: Workspace, args) -> int:
     presente = t("si") if (ws.project_root / ".git").exists() else t("no")
     commit_ = t("si") if ws.config["git"]["commit_on_close"] else t("no")
     print(t("doctor.git", presente=presente, commit=commit_))
-    report.show_doctor(ws)
+    doctor.show_doctor(ws)
     return 0
 
 

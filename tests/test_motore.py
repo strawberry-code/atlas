@@ -34,10 +34,10 @@ class Base(unittest.TestCase):
         os.environ["ATLAS_ROOT"] = str(self.root)
         for modulo in [m for m in sys.modules if m == "core" or m.startswith("core.")]:
             del sys.modules[modulo]
-        from core import config, docs, howto, mutate, render, store, model, claims, strings, report
+        from core import config, docs, doctor, howto, mutate, render, store, model, claims, strings, report
         self.config, self.docs, self.mutate = config, docs, mutate
         self.render, self.store, self.model, self.claims = render, store, model, claims
-        self.strings, self.report, self.howto = strings, report, howto
+        self.strings, self.report, self.howto, self.doctor = strings, report, howto, doctor
         self.ws = config.workspace(self.tmp)
         self.ref = mutate.create_graph(self.ws, "prova", "Grafo di prova", "Verificare il motore.")
 
@@ -509,7 +509,7 @@ class Doctor(Base):
     def test_nessun_avviso_su_un_grafo_sano(self):
         self.popola()
         data = self.store.load(self.ref.json_path)
-        avvisi = self.report.doctor_avvisi(data, self.ref, self.ws.config["agent"])
+        avvisi = self.doctor.doctor_avvisi(data, self.ref, self.ws.config["agent"])
         self.assertEqual([], avvisi)
 
     def test_nodo_pendente_segnalato_se_non_e_lunico_cancello(self):
@@ -517,7 +517,7 @@ class Doctor(Base):
         with self.mutate.editing(self.ref) as g:
             self.mutate.add_node(g, id="F04", branch="F", title="Isolato", question="?")
         data = self.store.load(self.ref.json_path)
-        avvisi = self.report.doctor_avvisi(data, self.ref, self.ws.config["agent"])
+        avvisi = self.doctor.doctor_avvisi(data, self.ref, self.ws.config["agent"])
         self.assertTrue(any("F04" in a for a in avvisi))
 
     def test_lucchetto_fermo_segnalato(self):
@@ -527,7 +527,7 @@ class Doctor(Base):
             vecchio = (datetime.now().astimezone() - timedelta(hours=5)).isoformat(timespec="seconds")
             self.model.node_of(data, "F01")["claim"]["heartbeat"] = vecchio
         data = self.store.load(self.ref.json_path)
-        avvisi = self.report.doctor_avvisi(data, self.ref, self.ws.config["agent"])
+        avvisi = self.doctor.doctor_avvisi(data, self.ref, self.ws.config["agent"])
         self.assertTrue(any("F01" in a for a in avvisi))
 
     def test_autoverifica_segnalata(self):
@@ -537,7 +537,7 @@ class Doctor(Base):
         _, _ = self.claims.close(self.ref, "F01", "fatto")
         self.claims.claim(self.ref, "F02")
         data = self.store.load(self.ref.json_path)
-        avvisi = self.report.doctor_avvisi(data, self.ref, self.ws.config["agent"])
+        avvisi = self.doctor.doctor_avvisi(data, self.ref, self.ws.config["agent"])
         self.assertTrue(any("F02" in a and "F01" in a for a in avvisi))
 
     def test_scrittura_fuori_scopo_dopo_chiusura_segnalata(self):
@@ -552,7 +552,7 @@ class Doctor(Base):
             self.model.node_of(data, "F01")["closedAt"] = passato
         artefatto.write_text("v2 dopo la chiusura", encoding="utf-8")
         data = self.store.load(self.ref.json_path)
-        avvisi = self.report.doctor_avvisi(data, self.ref, self.ws.config["agent"])
+        avvisi = self.doctor.doctor_avvisi(data, self.ref, self.ws.config["agent"])
         self.assertTrue(any("F01" in a and "prodotto.txt" in a for a in avvisi))
 
     def test_nodi_pendenti_avvisati_finche_restano_aperti(self):
@@ -561,15 +561,85 @@ class Doctor(Base):
         self.popola()
         with self.mutate.editing(self.ref) as g:
             self.mutate.unlink(g, "F03", blocked_by="F02")   # due foglie aperte: F02 e F03
-        avvisi = self.report.doctor_avvisi(self.store.load(self.ref.json_path), self.ref, self.ws.config["agent"])
+        avvisi = self.doctor.doctor_avvisi(self.store.load(self.ref.json_path), self.ref, self.ws.config["agent"])
         self.assertTrue([a for a in avvisi if "F02" in a and "F03" in a])
 
         for nodo_id in ("F01", "F02", "F03"):
             self.rispondi(nodo_id)
             self.claims.claim(self.ref, nodo_id)
             _, _ = self.claims.close(self.ref, nodo_id, "fatto")
-        avvisi = self.report.doctor_avvisi(self.store.load(self.ref.json_path), self.ref, self.ws.config["agent"])
+        avvisi = self.doctor.doctor_avvisi(self.store.load(self.ref.json_path), self.ref, self.ws.config["agent"])
         self.assertFalse([a for a in avvisi if "F02" in a and "F03" in a])
+
+    def test_falso_positivo_sparisce_se_contenuto_non_cambia_in_git(self):
+        """Quando la repo e' git, un file toccato ma non modificato nel contenuto
+        (ad es. riscrittura identica o riallineamento mtime) non produce avviso.
+        Questo test fallirebbe col vecchio criterio basato solo su mtime."""
+        self.popola()
+        self.git_init()
+        self.rispondi("F01")
+        self.claims.claim(self.ref, "F01")
+        artefatto = self.ws.project_root / "prodotto.txt"
+        artefatto.write_text("v1", encoding="utf-8")
+        # Fa un commit per registrare il file e portare HEAD avanti.
+        subprocess.run(["git", "add", "."], cwd=self.tmp, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "artefatto"], cwd=self.tmp, check=True, capture_output=True)
+        _, _ = self.claims.close(self.ref, "F01", "fatto", artifacts=["prodotto.txt"])
+        # closedAt viene assegnato al momento della chiusura (adesso).
+        # Aspetta un attimo per garantire che il prossimo evento sia dopo closedAt.
+        import time
+        time.sleep(0.05)
+        # Tocca il file: riscrivilo con lo stesso contenuto.
+        # Questo muove l'mtime ma git non vede cambio di contenuto.
+        artefatto.write_text("v1", encoding="utf-8")
+        data = self.store.load(self.ref.json_path)
+        avvisi = self.doctor.doctor_avvisi(data, self.ref, self.ws.config["agent"])
+        # L'avviso NOT deve esserci (il falso positivo sparisce).
+        self.assertFalse(any("F01" in a and "prodotto.txt" in a for a in avvisi))
+
+    def test_vero_positivo_resta_se_contenuto_cambia_in_git(self):
+        """Quando il contenuto del file cambia davvero dopo la chiusura del nodo,
+        anche in una repo git, l'avviso di doctor deve apparire."""
+        self.popola()
+        self.git_init()
+        self.rispondi("F01")
+        self.claims.claim(self.ref, "F01")
+        artefatto = self.ws.project_root / "prodotto.txt"
+        artefatto.write_text("v1", encoding="utf-8")
+        subprocess.run(["git", "add", "."], cwd=self.tmp, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "artefatto"], cwd=self.tmp, check=True, capture_output=True)
+        _, _ = self.claims.close(self.ref, "F01", "fatto", artifacts=["prodotto.txt"])
+        # closedAt viene assegnato al momento della chiusura (adesso).
+        # Aspetta un attimo per garantire che il prossimo evento sia dopo closedAt.
+        import time
+        time.sleep(0.05)
+        # Cambia davvero il contenuto.
+        artefatto.write_text("v2 dopo la chiusura", encoding="utf-8")
+        data = self.store.load(self.ref.json_path)
+        avvisi = self.doctor.doctor_avvisi(data, self.ref, self.ws.config["agent"])
+        # L'avviso DEVE esserci (il vero positivo non scompare).
+        self.assertTrue(any("F01" in a and "prodotto.txt" in a for a in avvisi))
+
+    def test_show_status_con_nodo_rivendicato(self):
+        """show_status deve stampare correttamente i nodi rivendicati con lo stato tradotto.
+        Questo test scopre bug come la perdita di ETICHETTA durante i refactoring."""
+        self.popola()
+        self.rispondi("F01")
+        self.claims.claim(self.ref, "F01")
+        data = self.store.load(self.ref.json_path)
+
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            self.report.show_status(self.ref, data)
+        uscita = buffer.getvalue()
+
+        # Verifica che la riga del nodo rivendicato sia presente e contenga:
+        # - l'ID del nodo
+        # - l'assignee (chi lo tiene, l'agente di default è "claude")
+        # - la traduzione dello stato (dall'etichetta ETICHETTA["live"])
+        self.assertIn("F01", uscita)
+        self.assertIn("claude", uscita)  # l'agente di default che ha rivendicato
+        self.assertIn("sessione viva", uscita)  # la traduzione dello stato 'live'
 
 
 class PiuGrafi(Base):
@@ -681,7 +751,7 @@ class TicketRiallineati(Base):
         self.assertEqual(["F01"], self.docs.unalignable(self.ref, data))
         self.assertEqual(0, self.docs.rewrite_heads(self.ref, data))
         self.assertEqual("Ho riscritto tutto a modo mio.\n", path.read_text(encoding="utf-8-sig"))
-        avvisi = self.report.doctor_avvisi(data, self.ref, self.ws.config["agent"])
+        avvisi = self.doctor.doctor_avvisi(data, self.ref, self.ws.config["agent"])
         self.assertTrue([a for a in avvisi if "F01" in a and self.docs.MARK_END in a])
 
 
