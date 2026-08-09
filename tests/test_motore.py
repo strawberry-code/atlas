@@ -329,6 +329,23 @@ class Artefatti(Base):
         html = self.ref.dashboard_path.read_text(encoding="utf-8")
         self.assertIn("~40 chiamate", html)
 
+    def test_dashboard_regge_un_costo_senza_cifre(self):
+        """La punteggiatura di un costo in prosa non deve far saltare il render."""
+        self.popola()
+        self.rispondi("F01")
+        self.claims.claim(self.ref, "F01")
+        self.claims.close(self.ref, "F01", "fatto", cost="Una sessione lunga... .")
+        self.render_tutto()
+        html = self.ref.dashboard_path.read_text(encoding="utf-8")
+        self.assertIn("Una sessione lunga", html)
+
+    def test_costo_numerico_estrae_solo_numeri_veri(self):
+        casi = {"~40 chiamate": 40.0, "circa 1.5 ore": 1.5, "1,5 ore": 1.5,
+                "15k token": 15.0, "Una sessione... .": None, "a occhio": None}
+        for testo, atteso in casi.items():
+            with self.subTest(testo=testo):
+                self.assertEqual(self.render._costo_numerico(testo), atteso)
+
     def prepara_lavoro(self):
         """Un nodo rivendicato in una repo git, con un file di lavoro appena scritto."""
         self.popola()

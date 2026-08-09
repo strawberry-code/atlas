@@ -5,3 +5,5 @@ __pycache__/
 /sandbox/
 # Generato da build.py, mai committato: vedi atlascli/version.py
 /atlascli/_payload.py
+# Coda locale degli attriti da sistemare, si svuota man mano che li chiudiamo
+/atlas-friction.md

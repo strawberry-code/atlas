@@ -33,8 +33,14 @@ def _card_lista(titolo: str, voci: list[str], vuoto: str, classe: str = "box") -
 
 
 def _costo_numerico(testo: str) -> float | None:
-    trovato = re.search(r"[\d.]+", testo)
-    return float(trovato.group()) if trovato else None
+    """Primo numero dentro un costo scritto a mano, None se non ce n'e' nessuno.
+
+    Il separatore decimale deve stare fra due cifre: una regex piu' larga
+    matcherebbe la punteggiatura della prosa ("una sessione... .") e float()
+    la rifiuterebbe, facendo saltare l'intera dashboard per un punto fermo.
+    """
+    trovato = re.search(r"\d+(?:[.,]\d+)?", testo)
+    return float(trovato.group().replace(",", ".")) if trovato else None
 
 
 def _card_costi(chiusi: list[dict]) -> str:
