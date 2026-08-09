@@ -15,20 +15,23 @@ import shutil
 import sys
 import tarfile
 from pathlib import Path
+from types import SimpleNamespace
 
 from . import registry
 from .registry import RegistryError
+from .progetto import ridisegna, template
 from .strings import set_language, t
+from .version import current_version
 
 DIRNAME = ".atlas"
 MARCATORE = ".atlas-managed"  # dentro una copia di skill (fallback Windows al posto del simlink)
 BEGIN, END = "<!-- atlas:begin -->", "<!-- atlas:end -->"
-SOSTITUIBILI = ("hooks", "skills", "templates", "VERSION")
-MOTORE = "atlas"                    # il motore e' un archivio unico, non piu' una cartella
-# Il motore stava in core/ come sorgenti e si lanciava da bin/atlas. Restano li' finche'
-# qualcuno non li toglie, e un progetto con due motori installati insieme e' lo stato
-# peggiore: l'aggiornamento li porta via da solo e dice quali.
-RESIDUI = ("core", "bin")
+SOSTITUIBILI = ("skills",)
+# Quel che le versioni precedenti scrivevano dentro il progetto e che ora vive
+# nell'eseguibile: sorgenti del motore (0.5 e prima), archivio unico (0.6), template
+# e hook. Restano li' finche' qualcuno non li toglie, e un progetto con due motori
+# addosso e' lo stato peggiore: l'installazione li porta via e dice quali.
+RESIDUI = ("core", "bin", "atlas", "templates", "hooks", "VERSION")
 IGNORE = [f"{DIRNAME}/graphs/*/dashboard.html", f"{DIRNAME}/current", "__pycache__/"]
 
 CONFIG = {
@@ -64,6 +67,12 @@ class Installer:
     # --- passi ------------------------------------------------------------
 
     def scompatta(self) -> None:
+        """Scrive dentro il progetto quel che deve stare su disco: le skill e i documenti.
+
+        Dalla 0.7 il motore non ci finisce piu': vive nell'eseguibile atlas e basta.
+        Qui restano le skill, che Claude Code legge da .claude/skills/ via symlink, e
+        i due documenti generati, CONTRACT.md e README.md.
+        """
         from . import _payload
         blob = base64.b64decode(_payload.PAYLOAD_B64)
         with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tf:
@@ -77,28 +86,34 @@ class Installer:
             self.root.mkdir(parents=True, exist_ok=True)
             kw = {"filter": "data"} if sys.version_info >= (3, 12) else {}
             tf.extractall(self.root, **kw)
-        (self.root / MOTORE).chmod(0o755)
         self.sgombera()
         for cartella in ("graphs", "scripts"):
             (self.root / cartella).mkdir(exist_ok=True)
         esempio = self.root / "scripts" / "000-promote-fog.py"
         if not esempio.is_file():          # scripts/ e' territorio dell'utente: mai sovrascriverlo
-            shutil.copyfile(self.root / "templates" / f"promote-fog.{self.lingua}.py.tmpl", esempio)
+            self.scrive(esempio, template(f"promote-fog.{self.lingua}.py.tmpl"))
+        self.scrive_documenti()
+        self.dice(t("install.motore_in", dirname=DIRNAME, versione=current_version()))
+
+    def scrive_documenti(self) -> None:
+        """SKILL.md nella lingua scelta, il contratto e il README della cartella."""
         for skill in (self.root / "skills").iterdir():
             if skill.is_dir():
                 shutil.copyfile(skill / f"SKILL.{self.lingua}.md", skill / "SKILL.md")
-        shutil.copyfile(self.root / "templates" / f"contract.{self.lingua}.md", self.root / "CONTRACT.md")
-        versione = (self.root / "VERSION").read_text(encoding="utf-8").strip()
-        self.dice(t("install.motore_in", dirname=DIRNAME, versione=versione))
+        self.scrive(self.root / "CONTRACT.md", template(f"contract.{self.lingua}.md"))
+        self.scrive(self.root / "README.md", template(f"readme.{self.lingua}.md"))
 
     def sgombera(self) -> None:
-        """Porta via il motore delle versioni precedenti, che ora e' un archivio solo."""
+        """Porta via il motore delle versioni precedenti, che ora non abita piu' qui."""
         tolti = []
         for voce in RESIDUI:
             vecchio = self.root / voce
             if vecchio.is_dir():
                 shutil.rmtree(vecchio)
                 tolti.append(f"{DIRNAME}/{voce}/")
+            elif vecchio.is_file():
+                vecchio.unlink()
+                tolti.append(f"{DIRNAME}/{voce}")
         for cache in self.root.rglob("__pycache__"):
             shutil.rmtree(cache, ignore_errors=True)
         if tolti:
@@ -158,7 +173,8 @@ class Installer:
             return
         path = self.target / ".claude" / "settings.json"
         dati = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
-        comando = f'python3 "$CLAUDE_PROJECT_DIR/{DIRNAME}/hooks/session_end.py"'
+        # Un comando, non uno script copiato nel progetto: il motore e' l'eseguibile.
+        comando = "atlas render --all"
         gruppi = dati.setdefault("hooks", {}).setdefault("SessionEnd", [])
         if any(DIRNAME in json.dumps(g) for g in gruppi):
             self.dice(t("install.hook_esiste"))
@@ -201,10 +217,10 @@ class Installer:
     def primo_grafo(self) -> None:
         if not self.args.graph or self.args.dry_run:
             return
-        # L'archivio appena scompattato, non la cartella: 'core' vive dentro .atlas/atlas
-        sys.path.insert(0, str(self.root / MOTORE))
+        # Niente sys.path: il motore e' questo stesso programma. ATLAS_ROOT serve
+        # perche' la cwd puo' essere altrove quando si installa su un path esplicito.
         os.environ["ATLAS_ROOT"] = str(self.root)
-        from core.cli import main  # noqa: E402
+        from core.cli import main
         main(["new", self.args.graph, "-t", self.args.graph.replace("-", " ").capitalize()])
 
     def registra_globalmente(self) -> None:
@@ -259,9 +275,7 @@ class Installer:
         self.gitignore()
         self.primo_grafo()
         self.registra_globalmente()
-        versione = (self.root / "VERSION").read_text(encoding="utf-8").strip() \
-            if (self.root / "VERSION").is_file() else "?"
-        print(t("install.riepilogo", versione=versione, target=self.target))
+        print(t("install.riepilogo", versione=current_version(), target=self.target))
         for riga in self.fatti:
             print(f"    · {riga}")
         print(t("install.prova_con", dirname=DIRNAME))

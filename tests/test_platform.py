@@ -5,6 +5,7 @@ in tearDown - stesso principio di isolamento di ATLAS_ROOT nei test del motore.
 """
 from __future__ import annotations
 
+import io
 import os
 import shutil
 import sys
@@ -16,6 +17,9 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+# Dalla 0.7 atlascli e il motore sono lo stesso programma: build.py li mette nello
+# stesso archivio, e qui 'core' va reso importabile come lo sarebbe li' dentro.
+sys.path.insert(0, str(ROOT / "payload"))
 
 from atlascli import dispatch, install_cmd, registry  # noqa: E402
 from atlascli import strings as atlascli_strings  # noqa: E402
@@ -33,9 +37,10 @@ class Registry(unittest.TestCase):
         shutil.rmtree(self.progetti, ignore_errors=True)
 
     def _finto_progetto(self, nome: str) -> Path:
+        """Un progetto e' tale se ha i suoi dati: config.json, non il motore."""
         path = self.progetti / nome
-        (path / ".atlas" / "core").mkdir(parents=True)
-        (path / ".atlas" / "VERSION").write_text("0.1.0\n", encoding="utf-8")
+        (path / ".atlas").mkdir(parents=True)
+        (path / ".atlas" / "config.json").write_text('{"project": "%s"}' % nome, encoding="utf-8")
         return path
 
     def test_slugify(self):
@@ -91,7 +96,7 @@ class Registry(unittest.TestCase):
         path = self._finto_progetto("gamma")
         self.assertEqual(registry.STATO_OK, registry.status_of(path))
         self.assertEqual(registry.STATO_MANCANTE, registry.status_of(self.progetti / "mai-esistito"))
-        shutil.rmtree(path / ".atlas" / "core")
+        (path / ".atlas" / "config.json").unlink()
         self.assertEqual(registry.STATO_NON_VALIDO, registry.status_of(path))
 
     def test_lingua_default_globale(self):
@@ -135,24 +140,31 @@ class Dispatch(unittest.TestCase):
         self.assertEqual("en", registry.language_for())
         self.assertEqual(0, dispatch.main(["lang"]))
 
-    def test_radice_locale_risale_le_cartelle(self):
+    def test_progetto_qui_risale_le_cartelle(self):
+        """La firma di un progetto e' config.json: i dati, non il motore, che dalla
+        0.7 non abita piu' li' dentro."""
         base = Path(tempfile.mkdtemp())
         try:
-            (base / ".atlas" / "core").mkdir(parents=True)
+            (base / ".atlas").mkdir(parents=True)
+            (base / ".atlas" / "config.json").write_text("{}", encoding="utf-8")
             profonda = base / "a" / "b" / "c"
             profonda.mkdir(parents=True)
-            self.assertEqual(base, dispatch._radice_locale(profonda))
-            self.assertIsNone(dispatch._radice_locale(Path(tempfile.gettempdir())))
+            self.assertEqual(base.resolve(), dispatch.progetto_qui(profonda))
+            self.assertIsNone(dispatch.progetto_qui(Path(tempfile.gettempdir())))
         finally:
             shutil.rmtree(base, ignore_errors=True)
 
-    def test_comando_sconosciuto_ritorna_1(self):
+    def test_comando_sconosciuto_esce_con_errore(self):
+        """Con un elenco unico se ne occupa argparse, che esce con 2 e stampa l'usage."""
         vuota = Path(tempfile.mkdtemp())
         try:
             cwd = os.getcwd()
             os.chdir(vuota)
             try:
-                self.assertEqual(1, dispatch.main(["comando-inesistente"]))
+                with self.assertRaises(SystemExit) as contesto:
+                    with mock.patch("sys.stderr", io.StringIO()):
+                        dispatch.main(["comando-inesistente"])
+                self.assertEqual(2, contesto.exception.code)
             finally:
                 os.chdir(cwd)
         finally:
@@ -208,3 +220,29 @@ class CollegaSkill(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Catalogo(unittest.TestCase):
+    """Le chiavi t("...") del CLI globale esistono davvero nel catalogo.
+
+    Una chiave che sparisce non rompe niente finche' nessuno passa da quella riga:
+    si scopre quando un utente incontra proprio quell'errore, cioe' nel momento
+    peggiore. Qui si scopre subito, e in entrambe le lingue.
+    """
+
+    def _chiavi_usate(self) -> set[str]:
+        import re
+        usate: set[str] = set()
+        for f in (ROOT / "atlascli").glob("*.py"):
+            if f.name == "strings.py":
+                continue
+            usate |= set(re.findall(r't\("([a-z_]+\.[a-z_]+)"', f.read_text(encoding="utf-8")))
+        return usate
+
+    def test_ogni_chiave_usata_esiste(self):
+        mancanti = sorted(self._chiavi_usate() - set(atlascli_strings.STRINGS))
+        self.assertEqual([], mancanti, f"chiavi usate ma assenti dal catalogo: {mancanti}")
+
+    def test_ogni_voce_ha_entrambe_le_lingue(self):
+        monche = sorted(k for k, v in atlascli_strings.STRINGS.items() if set(v) != {"it", "en"})
+        self.assertEqual([], monche, f"voci senza tutte e due le lingue: {monche}")

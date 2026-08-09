@@ -44,6 +44,10 @@ class Base(unittest.TestCase):
     def tearDown(self):
         sys.path.remove(str(self.root))
         os.environ.pop("ATLAS_ROOT", None)
+        # I moduli 'core' caricati qui puntano alla sandbox che sta per sparire: lasciarli
+        # in sys.modules rompe chi importa core dopo di noi, per esempio i test del CLI.
+        for modulo in [m for m in sys.modules if m == "core" or m.startswith("core.")]:
+            del sys.modules[modulo]
         shutil.rmtree(self.tmp)
 
     def popola(self, **kwargs):

@@ -25,6 +25,9 @@ CLI = ROOT / "dist" / "atlas"
 FIXTURE = ROOT / "tests" / "fixtures" / "grafo-di-prova.py"
 
 esiti: list[tuple[bool, str]] = []
+# Il registro globale della sandbox in corso: locale() ne ha bisogno, e passarlo a ogni
+# chiamata riempirebbe di rumore le verifiche, che sono la parte da leggere.
+_config_sandbox: Path | None = None
 
 
 def verifica(condizione: bool, cosa: str) -> None:
@@ -47,9 +50,10 @@ def payload_pyc() -> list[str]:
 
 
 def locale(cwd: Path, *args: str) -> subprocess.CompletedProcess:
-    """Il motore per-progetto, invocato direttamente: .atlas/atlas <cmd>."""
-    return subprocess.run([str(cwd / ".atlas" / "atlas"), *args],
-                          cwd=cwd, capture_output=True, text=True)
+    """I comandi del grafo: dalla 0.7 li fa lo stesso eseguibile, dentro il progetto."""
+    return subprocess.run([sys.executable, str(CLI), *args], cwd=cwd,
+                          env=dict(os.environ, ATLAS_CONFIG=str(_config_sandbox)),
+                          capture_output=True, text=True)
 
 
 def globale(cwd: Path, *args: str, env: dict) -> subprocess.CompletedProcess:
@@ -71,9 +75,11 @@ def main() -> int:
     if not CLI.is_file():
         print("  Manca dist/atlas: lancia prima 'python3 build.py'.", file=sys.stderr)
         return 1
+    global _config_sandbox
     target = Path(tempfile.mkdtemp())
     atlas_home = Path(tempfile.mkdtemp())
     atlas_config = atlas_home / "atlas.json"
+    _config_sandbox = atlas_config
     env = dict(os.environ, ATLAS_CONFIG=str(atlas_config))
     try:
         prepara(target)
@@ -82,10 +88,10 @@ def main() -> int:
         esito = globale(target, "install", str(target), "--yes", "--graph", "epic-test", env=env)
         verifica(esito.returncode == 0, "atlas install va a buon fine")
         radice = target / ".atlas"
-        verifica((radice / "atlas").is_file(), "motore scompattato come archivio unico")
-        verifica((radice / "atlas").stat().st_mode & 0o111, "l'archivio è eseguibile")
-        verifica(not (radice / "core").exists() and not (radice / "bin").exists(),
-                 "nessun sorgente nudo dentro il progetto")
+        verifica((radice / "config.json").is_file(), "il progetto nasce con i suoi dati")
+        verifica((radice / "README.md").is_file(), "README che spiega come ottenere atlas")
+        verifica(not any((radice / v).exists() for v in ("core", "bin", "atlas", "templates", "hooks")),
+                 "nel progetto non finisce una riga di motore")
         verifica((target / ".claude" / "skills" / "atlas-work").is_symlink(), "skill collegate con symlink")
         verifica((radice / "scripts" / "000-promote-fog.py").is_file(), "esempio promote-fog installato")
         verifica(not payload_pyc(), "nessun bytecode dentro il payload impacchettato")
@@ -100,12 +106,9 @@ def main() -> int:
         gruppi = impostazioni["hooks"]["SessionEnd"]
         verifica(len(gruppi) == 2, "hook aggiunto senza cancellare i preesistenti")
         verifica("preesistente" in json.dumps(gruppi[0]), "hook preesistente intatto")
-        # Eseguito davvero, non solo registrato: l'hook importa il motore per conto suo,
-        # quindi e' l'unico pezzo che si accorge se 'core' cambia posto.
-        esito_hook = subprocess.run([sys.executable, str(radice / "hooks" / "session_end.py")],
-                                    cwd=target, capture_output=True, text=True)
-        verifica(esito_hook.returncode == 0 and "Traceback" not in esito_hook.stderr,
-                 "l'hook di fine sessione gira e trova il motore")
+        comando_hook = json.dumps(gruppi[1])
+        verifica("atlas render --all" in comando_hook and ".atlas/hooks" not in comando_hook,
+                 "l'hook chiama il comando, non uno script copiato nel progetto")
 
         contratto = (target / "CLAUDE.md").read_text(encoding="utf-8")
         verifica("Regole preesistenti." in contratto, "CLAUDE.md preesistente conservato")
@@ -119,8 +122,9 @@ def main() -> int:
         uscita = locale(target, "status").stdout
         verifica("F01" in uscita and "D03" not in uscita, "la frontiera mostra solo i nodi sbloccati")
 
-        passthrough = globale(target, "status", env=env)
-        verifica(passthrough.stdout == uscita, "il passthrough del CLI globale == il motore locale")
+        aiuto = globale(target, "help", env=env).stdout
+        verifica("install" in aiuto and "close" in aiuto,
+                 "'atlas help' elenca gestione e grafo insieme, in un elenco solo")
 
         verifica(locale(target, "claim", "D03").returncode == 1, "claim di un nodo bloccato rifiutato")
         verifica(locale(target, "claim", "F01").returncode == 0, "claim di un nodo libero accettato")
@@ -173,26 +177,25 @@ def main() -> int:
         verifica(slug in elenco and "ok" in elenco, "'atlas list' mostra il progetto con stato ok")
 
         prima = (radice / "config.json").read_text(encoding="utf-8")
-        esito = globale(target, slug, "update", env=env)
-        verifica(esito.returncode == 0, "'atlas <slug> update' va a buon fine")
+        esito = globale(target, "install", str(target), "--yes", env=env)
+        verifica(esito.returncode == 0, "reinstallare su un progetto vivo va a buon fine")
         verifica((radice / "config.json").read_text(encoding="utf-8") == prima,
-                 "slug update: config intatta")
+                 "reinstall: config intatta")
         verifica(len(json.loads((radice / "graphs" / "epic-test" / "graph.json")
                                 .read_text(encoding="utf-8"))["nodes"]) == 12,
-                 "slug update: grafi intatti")
+                 "reinstall: grafi intatti")
         verifica((target / "CLAUDE.md").read_text(encoding="utf-8").count("atlas:begin") == 1,
-                 "slug update: contratto non duplicato")
-        verifica("ridisegnati 2/2" in esito.stdout, "slug update: redraw automatico riportato nel riepilogo")
+                 "reinstall: contratto non duplicato")
 
         dashboard = radice / "graphs" / "epic-test" / "dashboard.html"
         dashboard.unlink()
-        esito = globale(target, slug, "redraw", env=env)
-        verifica(esito.returncode == 0 and dashboard.is_file(), "'atlas <slug> redraw' rigenera la dashboard")
-        verifica("ridisegnati 2/2" in esito.stdout, "redraw: riepilogo corretto")
+        esito = locale(target, "render", "--all")
+        verifica(esito.returncode == 0 and dashboard.is_file(), "'render --all' rigenera le dashboard")
+        verifica("2" in esito.stdout, "render --all: dice quanti grafi ha rigenerato")
 
         mappa_it_prima = (radice / "graphs" / "epic-test" / "map.md").read_text(encoding="utf-8")
-        esito = globale(target, slug, "lang", "en", env=env)
-        verifica("regenerated" in esito.stdout, "'atlas <slug> lang en' produce un riepilogo")
+        esito = locale(target, "lang", "en")
+        verifica(esito.returncode == 0, "'atlas lang en' dentro il progetto va a buon fine")
         verifica(json.loads((radice / "config.json").read_text(encoding="utf-8"))["language"] == "en",
                  "lang en: config.json aggiornato")
         verifica("Works a node" in (target / ".claude" / "skills" / "atlas-work" / "SKILL.md"
@@ -209,7 +212,7 @@ def main() -> int:
         verifica(ticket_nuovo.is_dir() and not any(ticket_nuovo.iterdir()),
                  "lang en: nuovo grafo senza nodi, nessun ticket da creare")
 
-        esito = globale(target, slug, "lang", "it", env=env)
+        esito = locale(target, "lang", "it")
         verifica(json.loads((radice / "config.json").read_text(encoding="utf-8"))["language"] == "it",
                  "lang it: torna in italiano")
 
@@ -273,14 +276,18 @@ def verifica_migrazione_dal_motore_a_sorgenti() -> None:
         (vecchio_core / "__pycache__" / "cli.pyc").write_bytes(b"\x00")
         (radice / "bin").mkdir()
         (radice / "bin" / "atlas").write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+        (radice / "atlas").write_text("archivio della 0.6\n", encoding="utf-8")
+        (radice / "templates").mkdir()
+        (radice / "hooks").mkdir()
+        (radice / "VERSION").write_text("0.5.4\n", encoding="utf-8")
 
-        esito = globale(target, slugify(target.resolve().name), "update", env=env)
-        verifica(esito.returncode == 0, "migrazione: l'update di un progetto vecchio va a buon fine")
-        verifica(not vecchio_core.exists() and not (radice / "bin").exists(),
-                 "migrazione: core/ e bin/ della versione precedente sono spariti")
+        esito = globale(target, "install", str(target), "--yes", env=env)
+        verifica(esito.returncode == 0, "migrazione: reinstallare su un progetto vecchio va a buon fine")
+        verifica(not any((radice / v).exists() for v in ("core", "bin", "atlas", "templates", "hooks")),
+                 "migrazione: del motore vecchio non resta niente")
         verifica("rimossi dalla versione precedente" in esito.stdout,
-                 "migrazione: l'update dice cosa ha portato via")
-        verifica((radice / "atlas").is_file(), "migrazione: resta l'archivio unico")
+                 "migrazione: l'installazione dice cosa ha portato via")
+        verifica((radice / "README.md").is_file(), "migrazione: arriva il README che spiega la cartella")
         verifica(grafo.read_text(encoding="utf-8") == prima, "migrazione: i dati del grafo sono intatti")
     finally:
         shutil.rmtree(target, ignore_errors=True)

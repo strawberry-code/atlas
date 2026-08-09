@@ -99,9 +99,20 @@ def dove(ws: Workspace) -> list[str]:
     return righe
 
 
+def versione_motore() -> str:
+    """La versione di chi sta girando, non un file nel progetto: dalla 0.7 il motore
+    non abita piu' li' dentro, e un VERSION scritto sul disco mentirebbe al primo
+    aggiornamento dell'eseguibile."""
+    try:
+        from atlascli.version import current_version
+        return current_version()
+    except ModuleNotFoundError:
+        return (Path(__file__).resolve().parent.parent / "VERSION").read_text(encoding="utf-8").strip()
+
+
 def show(ws: Workspace, aiuto: str) -> None:
     """Le sei sezioni, numerate perche' chi legge possa citarle."""
-    versione = (ws.root / "VERSION").read_text(encoding="utf-8").strip()
+    versione = versione_motore()
     print()
     print(t("howto.intestazione", versione=versione, progetto=ws.config["project"],
             lingua=ws.config.get("language", "it")))

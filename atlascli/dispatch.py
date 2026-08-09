@@ -1,38 +1,41 @@
-"""Il dispatcher del CLI globale: riservato -> slug registrato -> passthrough locale -> errore.
+"""Il dispatcher dell'unico atlas: gestione del parco progetti e lavoro sul grafo.
 
-E' l'unico punto che decide se un comando e' del CLI globale (install/update/
-uninstall/list) o di un progetto (status/claim/close/...): i comandi di progetto
-non li conosce affatto, li esegue com'e' via os.execv sull'entrypoint del progetto
-bersaglio (l'archivio .atlas/atlas, invariato). Sostituzione di processo e non
-subprocess/import in-process apposta: evita che il pacchetto 'core' imbustato nel
-CLI globale collida in sys.modules con quello del progetto bersaglio, ed eredita
-cwd/env/stdio/segnali esattamente come fa git per i suoi comandi esterni.
+Dalla 0.7 e' un programma solo. I comandi di gestione (install, uninstall, update,
+list, lang) stanno qui; quelli del grafo (status, take, close, ...) li mette nello
+stesso elenco core.cli.aggiungi_comandi, e finiscono in core.cli.esegui. Un utente
+vede un help solo e non deve sapere che dentro ci sono due strati.
+
+Prima il motore stava dentro ogni progetto e questo file gli girava i comandi che
+non conosceva. Quel passaggio non esiste piu': niente due binari con lo stesso nome,
+niente blob nel git di chi usa Atlas, niente help che risponde da due programmi.
 """
 from __future__ import annotations
 
 import argparse
-import os
+import json
 import sys
 from pathlib import Path
 
-from . import install_cmd, list_cmd, registry, self_update
-from .paths import motore_installato
+from . import install_cmd, list_cmd, progetto, registry, self_update
 from .strings import set_language, t
 from .version import current_version
 
 RESERVED = {"install", "update", "uninstall", "list", "lang"}
 
 def cmd_lang(args) -> int:
-    """'atlas lang [it|en]': senza valore stampa il default globale, con valore lo cambia.
+    """'atlas lang [it|en]': la lingua del progetto in cui ti trovi.
 
-    Non tocca alcun progetto gia' installato: solo i default per install futuri e
-    per chi non ha un override esplicito al prossimo update/lang che lo tocca.
+    Con --global si tocca invece il default dei progetti futuri. Sono due cose
+    diverse e nessuna delle due deve dipendere da dove ti trovi per caso, quindi
+    la distinzione la fa un flag e non la posizione.
     """
-    if args.valore is None:
-        print(registry.language_for(None))
+    if args.globale or progetto_qui() is None:
+        if args.valore is None:
+            print(registry.language_for(None))
+            return 0
+        registry.set_language(args.valore)
         return 0
-    registry.set_language(args.valore)
-    return 0
+    return progetto.cmd_lang_progetto(progetto_qui(), args.valore)
 
 
 COMANDI = {"install": install_cmd.cmd_install, "uninstall": install_cmd.cmd_uninstall,
@@ -62,64 +65,59 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("update", help=t("help.update"))
 
     p = sub.add_parser("list", help=t("help.list"))
+    p.add_argument("slug", nargs="?", help=t("opt.list_slug"))
     p.add_argument("--prune", action="store_true", help=t("opt.prune"))
 
     p = sub.add_parser("lang", help=t("help.lang"))
     p.add_argument("valore", nargs="?", choices=("it", "en"), help=t("opt.lang_valore"))
+    p.add_argument("--global", dest="globale", action="store_true", help=t("opt.lang_globale"))
 
+    # I comandi del grafo nello stesso elenco: un help solo, nessun passthrough.
+    from core.cli import aggiungi_comandi
+    aggiungi_comandi(sub)
+    parser.add_argument("-g", "--graph", dest="graph", help=t("opt.graph_attivo"))
     return parser
 
 
-def _radice_locale(partenza: Path) -> Path | None:
+def progetto_qui(partenza: Path | None = None) -> Path | None:
+    """La cartella del progetto Atlas che contiene questa posizione, se c'e'."""
+    partenza = (partenza or Path.cwd()).resolve()
     for cartella in (partenza, *partenza.parents):
-        if motore_installato(cartella):
+        if (cartella / ".atlas" / "config.json").is_file():
             return cartella
     return None
 
 
-def _passthrough(radice: Path, argv: list[str]) -> None:
-    entrypoint = radice / ".atlas" / "atlas"
-    os.execv(sys.executable, [sys.executable, str(entrypoint), *argv])
+def _allinea_lingua() -> None:
+    """Una lingua sola per i due cataloghi, quello del gestore e quello del motore.
 
-
-def _errore_sconosciuto(token: str) -> int:
-    slug_noti = ", ".join(sorted(registry.load()["projects"])) or t("dispatch.nessuno")
-    print(t("dispatch.sconosciuto", token=token, slug_noti=slug_noti,
-            comandi=", ".join(sorted(RESERVED))), file=sys.stderr)
-    return 1
+    L'help unico pesca da entrambi: se restassero indipendenti, dentro un progetto
+    inglese meta' elenco uscirebbe in italiano.
+    """
+    from core import strings as strings_motore
+    radice = progetto_qui()
+    if radice is not None:
+        dati = json.loads((radice / ".atlas" / "config.json").read_text(encoding="utf-8"))
+        lingua = dati.get("language") or registry.language_for(None)
+    else:
+        lingua = registry.language_for(None)
+    set_language(lingua)
+    strings_motore.set_language(lingua)
 
 
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else list(argv)
-    set_language(registry.language_for(argv[0] if argv and argv[0] not in RESERVED else None))
+    _allinea_lingua()
 
-    if not argv or argv[0] in ("-h", "--help"):
+    if not argv or argv[0] in ("-h", "--help", "help"):
         build_parser().print_help()
         return 0
     if argv[0] == "--version":
         print(current_version())
         return 0
 
-    primo = argv[0]
-    if primo in RESERVED:
-        args = build_parser().parse_args(argv)
+    args = build_parser().parse_args(argv)
+    if args.cmd in RESERVED:
         return COMANDI[args.cmd](args)
-
-    if registry.resolve(primo) is not None:
-        resto = argv[1:]
-        if resto and resto[0] == "update":
-            from .harness_update import cmd_slug_update
-            return cmd_slug_update(primo, resto)
-        if resto and resto[0] == "redraw":
-            from .harness_update import cmd_slug_redraw
-            return cmd_slug_redraw(primo, resto)
-        if resto and resto[0] == "lang":
-            from .harness_update import cmd_slug_lang
-            return cmd_slug_lang(primo, resto)
-        return list_cmd.scheda_progetto(primo)
-
-    radice = _radice_locale(Path.cwd())
-    if radice is not None:
-        _passthrough(radice, argv)  # non ritorna: os.execv sostituisce il processo
-
-    return _errore_sconosciuto(primo)
+    from core.cli import esegui
+    return esegui(args)

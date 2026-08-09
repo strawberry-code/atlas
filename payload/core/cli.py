@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 from . import claims, docs, doctor, howto, mutate, render as dash, report, strings
-from .config import ENV_IDENTITY, MOTORE, ConfigError, Workspace, workspace
+from .config import ENV_IDENTITY, ConfigError, Workspace, workspace
 from .model import node_of
 from .mutate import editing, validate
 from .store import StateError, load, read_transaction, transaction
@@ -82,12 +82,8 @@ def cmd_exec(ws: Workspace, args) -> int:
     script = Path(args.script).resolve()
     if not script.is_file():
         raise ConfigError(t("exec.script_assente", script=script))
-    # L'archivio del motore, non la cartella che lo contiene: 'core' vive dentro
-    # .atlas/atlas, e zipimport lo rende importabile da li' come da una cartella.
-    # E' quel che tiene in piedi il 'from core import mutate' degli script.
-    # Dai sorgenti (sviluppo e test) l'archivio non c'e' e core/ e' una cartella vera.
-    archivio = ws.root / MOTORE
-    sys.path.insert(0, str(archivio if archivio.is_file() else ws.root))
+    # Niente da mettere in sys.path: lo script fa 'from core import mutate' e 'core'
+    # e' gia' importato in questo processo, perche' il motore e' il programma stesso.
     modulo = runpy.run_path(str(script))
     if "run" not in modulo:
         raise StateError(t("exec.senza_run", nome=script.name))
@@ -118,7 +114,7 @@ def cmd_doctor(ws: Workspace, args) -> int:
     print()
     print(t("doctor.radice", root=ws.root))
     print(t("doctor.progetto", progetto=ws.config["project"], root=ws.project_root))
-    print(t("doctor.versione", versione=(ws.root / "VERSION").read_text().strip()))
+    print(t("doctor.versione", versione=howto.versione_motore()))
     print(t("doctor.grafi", grafi=", ".join(ws.slugs()) or t("doctor.nessuno")))
     skills = ws.project_root / ".claude" / "skills"
     attese = [d.name for d in (ws.root / "skills").iterdir() if d.is_dir()]
@@ -144,11 +140,24 @@ def _identity(p: argparse.ArgumentParser) -> None:
     p.add_argument("--identity", default=None, help=t("help.identity"))
 
 
+COMANDI = ("status", "next", "graphs", "use", "show", "brief", "claim", "take", "release",
+           "close", "fog", "render", "new", "new-script", "exec", "validate", "doctor", "how-to")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="atlas", description=t("parser.description"))
+    aggiungi_comandi(parser.add_subparsers(dest="cmd", required=True))
     parser.add_argument("-g", "--graph", help=t("opt.graph"))
-    sub = parser.add_subparsers(dest="cmd", required=True)
+    return parser
 
+
+def aggiungi_comandi(sub) -> None:
+    """Appende i comandi del grafo a un gruppo di sottocomandi gia' esistente.
+
+    Separato da build_parser() perche' il CLI globale ne ha uno suo, con install e
+    compagnia, e i due elenchi devono comparire in un help solo: un utente non deve
+    sapere che dentro c'e' un motore e attorno c'e' un gestore.
+    """
     sub.add_parser("status", help=t("help.status"))
     sub.add_parser("next", help=t("help.next"))
     sub.add_parser("graphs", help=t("help.graphs"))
@@ -175,6 +184,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--list", dest="elenca", action="store_true")
     p = sub.add_parser("render", help=t("help.render"))
     p.add_argument("--open", dest="aprila", action="store_true")
+    p.add_argument("--all", dest="tutti", action="store_true", help=t("help.render_all"))
 
     p = sub.add_parser("new", help=t("help.new"))
     p.add_argument("slug"); p.add_argument("-t", "--title", required=True)
@@ -185,7 +195,6 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("validate", help=t("help.validate"))
     sub.add_parser("doctor", help=t("help.doctor"))
     sub.add_parser("how-to", help=t("help.how_to"))
-    return parser
 
 
 def dispatch(ws: Workspace, args) -> int:
@@ -198,6 +207,15 @@ def dispatch(ws: Workspace, args) -> int:
             ws.graph(args.slug); ws.pin(args.slug); print(t("use.attivo", slug=args.slug)); return 0
         return {"new": cmd_new, "new-script": cmd_new_script, "exec": cmd_exec,
                 "validate": cmd_validate, "doctor": cmd_doctor}[args.cmd](ws, args)
+
+    if args.cmd == "render" and getattr(args, "tutti", False):
+        # Il giro che faceva l'hook di fine sessione quando era uno script nel progetto.
+        for slug in ws.slugs():
+            ref = ws.graph(slug)
+            with read_transaction(ref.json_path) as data:
+                refresh(ref, data)
+        print(t("render.tutti", n=len(ws.slugs())))
+        return 0
 
     ref = ws.graph(args.graph)
     if args.cmd == "close":
@@ -259,14 +277,18 @@ def dispatch(ws: Workspace, args) -> int:
     return 0
 
 
-def main(argv: list[str] | None = None) -> int:
+def esegui(args) -> int:
+    """Un comando del grafo gia' parsato: trova il progetto e lo manda in dispatch.
+
+    E' il punto d'ingresso del CLI globale, che il parsing lo ha fatto per conto suo
+    su un elenco di comandi unico.
+    """
     ws = None
     try:
         ws = workspace()
         strings.set_language(ws.config.get("language", "it"))
     except ConfigError:
-        pass  # nessun progetto da qui: build_parser() mostra comunque --help, in italiano di default
-    args = build_parser().parse_args(argv)
+        pass  # senza progetto qui sotto, dispatch rilancia l'errore con il messaggio giusto
     if getattr(args, "identity", None):
         os.environ[ENV_IDENTITY] = args.identity
     try:
@@ -274,3 +296,12 @@ def main(argv: list[str] | None = None) -> int:
     except (StateError, ConfigError) as errore:
         print(f"\n  {errore}\n", file=sys.stderr)
         return 1
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Il motore invocato da solo, senza il CLI globale attorno: serve ai test."""
+    try:
+        strings.set_language(workspace().config.get("language", "it"))
+    except ConfigError:
+        pass  # nessun progetto da qui: --help si vede lo stesso, in italiano di default
+    return esegui(build_parser().parse_args(argv))

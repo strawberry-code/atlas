@@ -10,10 +10,10 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from .risorse import leggi_template
 from .strings import t
 
 DIRNAME = ".atlas"
-MOTORE = "atlas"                 # l'archivio unico dentro DIRNAME: eseguibile e importabile
 ENV_GRAPH = "ATLAS_GRAPH"
 ENV_ROOT = "ATLAS_ROOT"
 ENV_IDENTITY = "ATLAS_IDENTITY"
@@ -42,17 +42,18 @@ def _merge(base: dict, over: dict) -> dict:
 
 
 def find_root(start: Path | None = None) -> Path:
-    """Risale dalla cartella corrente fino alla prima che contiene .atlas/."""
+    """Risale dalla cartella corrente fino al primo progetto Atlas.
+
+    La firma e' config.json e non .atlas/ da sola, che resta anche dopo un uninstall,
+    ne' il motore, che dalla 0.7 non abita piu' dentro il progetto: li' ci sono solo
+    dati, e sono i dati a dire che questo e' un progetto.
+    """
     if env := os.environ.get(ENV_ROOT):
         return Path(env).resolve()
     here = (start or Path.cwd()).resolve()
     for folder in (here, *here.parents):
-        # Il motore installato e' l'archivio; core/ come cartella vale solo quando si
-        # gira dai sorgenti (sviluppo e test). Cercare .atlas/ e basta non distingue
-        # un'installazione vera da una cartella di dati rimasta dopo un uninstall.
-        radice = folder / DIRNAME
-        if (radice / MOTORE).is_file() or (radice / "core").is_dir():
-            return radice
+        if (folder / DIRNAME / "config.json").is_file():
+            return folder / DIRNAME
     raise ConfigError(t("config.root_mancante", dirname=DIRNAME))
 
 
@@ -106,10 +107,6 @@ class Workspace:
         return self.root / "scripts"
 
     @property
-    def templates_dir(self) -> Path:
-        return self.root / "templates"
-
-    @property
     def current_file(self) -> Path:
         return self.root / "current"
 
@@ -126,7 +123,7 @@ class Workspace:
         lingua = self.config.get("language", "it")
         base, sep, resto = name.partition(".")
         nome_lingua = f"{base}.{lingua}.{resto}" if sep else f"{base}.{lingua}"
-        return (self.templates_dir / nome_lingua).read_text(encoding="utf-8")
+        return leggi_template(nome_lingua)
 
     def slugs(self) -> list[str]:
         if not self.graphs_dir.is_dir():

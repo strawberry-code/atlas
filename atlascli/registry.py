@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from .paths import config_path, motore_installato
+from .paths import config_path, progetto_valido
 from .strings import t
 
 SCHEMA_VERSION = 2
@@ -156,7 +156,7 @@ def unregister(slug: str) -> bool:
 def status_of(path: Path) -> str:
     if not path.is_dir():
         return STATO_MANCANTE
-    if not motore_installato(path):
+    if not progetto_valido(path):
         return STATO_NON_VALIDO
     return STATO_OK
 

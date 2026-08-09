@@ -65,47 +65,26 @@ def valida_coppie_lingua() -> None:
         raise SystemExit(f"  Traduzioni mancanti, build interrotta:\n{elenco}\n")
 
 
-def _motore(staging: Path) -> Path:
-    """Il motore come archivio unico: core/ piu' __main__.py dentro un solo file.
-
-    Eseguibile e importabile insieme, che e' quel che serve: la CLI parte da
-    __main__.py, e uno script di mutazione mette l'archivio in sys.path e scrive
-    'from core import mutate' come quando core/ era una cartella di sorgenti.
-    """
-    sorgente = staging / "src"
-    shutil.copytree(PAYLOAD_DIR / "core", sorgente / "core",
-                    ignore=shutil.ignore_patterns("__pycache__", ".DS_Store"))
-    shutil.copy2(PAYLOAD_DIR / "__main__.py", sorgente / "__main__.py")
-    archivio = staging / "atlas"
-    zipapp.create_archive(sorgente, archivio, interpreter="/usr/bin/env python3")
-    archivio.chmod(0o755)
-    return archivio
-
-
-# Quel che finisce dentro un progetto ospite accanto al motore: file veri, non
-# codice. Restano fuori dall'archivio perche' il motore li legge da disco e
-# perche' le skill vanno raggiunte da un simlink di .claude/skills/.
-ACCANTO = ("templates", "skills", "hooks", "VERSION")
+# Quel che va scritto dentro un progetto ospite. Solo le skill: sono file veri
+# perche' Claude Code le legge da .claude/skills/ via symlink, e un package Python
+# non le raggiungerebbe. Tutto il resto del motore viaggia importabile nel CLI.
+DA_INSTALLARE = ("skills",)
 
 
 def pack_payload() -> tuple[str, str]:
-    """Ritorna (versione, blob base64) di quel che si installa in .atlas/."""
+    """Ritorna (versione, blob base64) di quel che si scrive dentro .atlas/."""
     versione = (PAYLOAD_DIR / "VERSION").read_text(encoding="utf-8").strip()
     buffer = io.BytesIO()
-    with tempfile.TemporaryDirectory() as staging:
-        motore = _motore(Path(staging))
-        with tarfile.open(fileobj=buffer, mode="w:gz", compresslevel=9) as tf:
-            tf.add(motore, arcname="atlas", filter=_normalizza, recursive=False)
-            for voce in ACCANTO:
-                origine = PAYLOAD_DIR / voce
-                for path in sorted(origine.rglob("*")) if origine.is_dir() else [origine]:
-                    if "__pycache__" in path.parts or path.name == ".DS_Store":
-                        continue
-                    # recursive=False, altrimenti aggiungere una cartella ci infila dentro
-                    # tutto il suo contenuto e il filtro qui sopra non lo vede mai: rglob
-                    # enumera gia' ogni file, e senza questo il bytecode finiva spedito.
-                    tf.add(path, arcname=str(path.relative_to(PAYLOAD_DIR)),
-                           filter=_normalizza, recursive=False)
+    with tarfile.open(fileobj=buffer, mode="w:gz", compresslevel=9) as tf:
+        for voce in DA_INSTALLARE:
+            for path in sorted((PAYLOAD_DIR / voce).rglob("*")):
+                if "__pycache__" in path.parts or path.name == ".DS_Store":
+                    continue
+                # recursive=False, altrimenti aggiungere una cartella ci infila dentro
+                # tutto il suo contenuto e il filtro qui sopra non lo vede mai: rglob
+                # enumera gia' ogni file, e senza questo il bytecode finiva spedito.
+                tf.add(path, arcname=str(path.relative_to(PAYLOAD_DIR)),
+                       filter=_normalizza, recursive=False)
     return versione, base64.b64encode(buffer.getvalue()).decode("ascii")
 
 
@@ -127,8 +106,20 @@ def build_cli() -> None:
     try:
         DIST.mkdir(exist_ok=True)
         ignora = shutil.ignore_patterns("__pycache__", ".DS_Store")
-        with tempfile.TemporaryDirectory() as staging:
-            shutil.copytree(ATLASCLI_DIR, Path(staging) / "atlascli", ignore=ignora)
+        with tempfile.TemporaryDirectory() as tmp:
+            staging = Path(tmp)
+            shutil.copytree(ATLASCLI_DIR, staging / "atlascli", ignore=ignora)
+            # Il motore entra nello stesso archivio come package importabile: e' quel
+            # che permette a un solo comando di essere insieme gestore e motore, e agli
+            # script di mutazione di scrivere 'from core import mutate' senza che nel
+            # progetto ci sia una riga di codice.
+            shutil.copytree(PAYLOAD_DIR / "core", staging / "core", ignore=ignora)
+            # I template diventano risorse del package: dentro uno zip non si aprono
+            # con Path, e core/risorse.py li legge con importlib.resources.
+            shutil.copytree(PAYLOAD_DIR / "templates", staging / "core" / "templates",
+                            ignore=ignora)
+            (staging / "core" / "templates" / "__init__.py").write_text(
+                '"""I template del motore, letti da core/risorse.py."""\n', encoding="utf-8")
             zipapp.create_archive(staging, CLI_OUT, interpreter="/usr/bin/env python3",
                                    main="atlascli.main:run")
         CLI_OUT.chmod(0o755)
