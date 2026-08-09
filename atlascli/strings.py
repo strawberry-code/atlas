@@ -116,12 +116,10 @@ STRINGS: dict[str, dict[str, str]] = {
     "list.prune_niente": {"it": "\n  nessuna voce morta da rimuovere\n", "en": "\n  no dead entries to remove\n"},
     "list.vuoto": {"it": "\n  nessun progetto registrato. Installa con 'atlas install <path>'.\n",
                   "en": "\n  no registered projects. Install with 'atlas install <path>'.\n"},
-    "list.scheda": {"it": "\n  {slug}\n  path      {path}\n  stato     {stato}\n  versione  {versione}\n\n"
-                          "  Aggiorna con: atlas {slug} update\n"
-                          "  Ridisegna con: atlas {slug} redraw\n",
-                    "en": "\n  {slug}\n  path      {path}\n  status    {stato}\n  version   {versione}\n\n"
-                          "  Update with: atlas {slug} update\n"
-                          "  Redraw with: atlas {slug} redraw\n"},
+    "list.scheda": {"it": "\n  {slug}\n  path      {path}\n  stato     {stato}\n\n"
+                          "  I comandi del grafo si danno da dentro il progetto.\n",
+                    "en": "\n  {slug}\n  path      {path}\n  status    {stato}\n\n"
+                          "  Graph commands are given from inside the project.\n"},
 
     # --- registry.py ---
     "registry.slug_occupato": {"it": "'{slug}' è già registrato per {path}: usa --slug per un nome diverso",

@@ -8,15 +8,15 @@ from .strings import t
 
 
 def scheda_progetto(slug: str) -> int:
-    """'atlas <slug>' senza verbo: scheda informativa invece di un errore secco."""
+    """'atlas list <slug>': la scheda di un progetto solo."""
     path = registry.resolve(slug)
-    stato = registry.status_of(path)
-    versione = registry.installed_version(path) or "-"
-    print(t("list.scheda", slug=slug, path=path, stato=stato, versione=versione))
+    print(t("list.scheda", slug=slug, path=path, stato=registry.status_of(path)))
     return 0
 
 
 def cmd_list(args) -> int:
+    if slug := getattr(args, "slug", None):
+        return scheda_progetto(slug)
     if getattr(args, "prune", False):
         tolti = registry.prune()
         if tolti:
@@ -33,14 +33,12 @@ def cmd_list(args) -> int:
     righe = []
     for slug, voce in sorted(progetti.items()):
         path = Path(voce["path"])
-        stato = registry.status_of(path)
-        versione = registry.installed_version(path) or "-"
-        righe.append((slug, voce["path"], versione, stato))
+        righe.append((slug, voce["path"], registry.status_of(path)))
 
     largh_slug = max(len(r[0]) for r in righe)
     largh_path = max(len(r[1]) for r in righe)
     print()
-    for slug, path, versione, stato in righe:
-        print(f"  {slug.ljust(largh_slug)}   {path.ljust(largh_path)}   {versione:<10} {stato}")
+    for slug, path, stato in righe:
+        print(f"  {slug.ljust(largh_slug)}   {path.ljust(largh_path)}   {stato}")
     print()
     return 0

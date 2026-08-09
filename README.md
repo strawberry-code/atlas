@@ -46,17 +46,19 @@ atlas install . --graph my-epic      # create the first graph right away
 atlas install . --lang en            # content and skills in English instead of Italian
 ```
 
-Everything lands in `.atlas/`, plus two symlinks in `.claude/skills/`, the end-of-session hook in `.claude/settings.json`, and the contract in `CLAUDE.md`. The project also gets registered in `~/.config/atlas.json` under a slug (default: the folder name; `--slug` for a different one).
+Only the project's own data lands in `.atlas/`: `config.json`, the graphs, the mutation scripts, the skills, the contract, and a `README.md` telling whoever finds that folder how to get `atlas`. The engine doesn't go in there: it lives in the executable, one per machine. Outside `.atlas/` you get two symlinks in `.claude/skills/`, the end-of-session hook in `.claude/settings.json`, and the contract in `CLAUDE.md`. The project also gets registered in `~/.config/atlas.json` under a slug (default: the folder name; `--slug` for a different one).
 
 ```bash
 atlas list                           # registered projects and their state
-atlas my-project update              # updates ONLY that project's harness
-atlas update                         # updates ONLY the global CLI, never any project
-atlas lang                           # default language for new projects (it/en)
-atlas my-project lang en             # switches an installed project's language and regenerates skill/contract
+atlas list my-project                # the card for just one
+atlas update                         # updates atlas itself to the latest version
+atlas lang en                        # content language of this project
+atlas lang --global en               # default for future projects
 ```
 
-Switching an existing project's language regenerates `SKILL.md`, `CONTRACT.md`, and tries to re-render every graph: a `map.md` already written in the old language is left untouched (its headings no longer match), so that graph stays as it was until you update it by hand — new tickets still follow the current language.
+There's no command to update a project's engine, because a project has no engine: you update `atlas` and every project uses the new version. Reinstalling (`atlas install .`) only regenerates skills and contract, or cleans up a project coming from an earlier version.
+
+Switching an existing project's language regenerates `SKILL.md`, `CONTRACT.md`, and every dashboard: a `map.md` already written in the old language is left untouched (its headings no longer match), so that graph stays as it was until you update it by hand, while new tickets follow the current language.
 
 ## Working
 

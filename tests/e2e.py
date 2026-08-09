@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Prova end-to-end: installa dist/atlas in un progetto finto e lo usa.
 
-Verifica quel che i test unitari non toccano, cioe' il CLI globale e il motore
-per-progetto visti da fuori: merge degli hook, symlink delle skill, blocco in
-CLAUDE.md, idempotenza, il registro globale, il passthrough dei comandi di
-progetto, e il ciclo di un nodo dal claim alla chiusura.
+Verifica quel che i test unitari non toccano, cioe' l'eseguibile visto da fuori:
+merge degli hook, symlink delle skill, blocco in CLAUDE.md, idempotenza, il
+registro globale, la migrazione da una versione precedente, l'uninstall, e il
+ciclo di un nodo dal claim alla chiusura.
 """
 from __future__ import annotations
 
@@ -294,10 +294,34 @@ def verifica_migrazione_dal_motore_a_sorgenti() -> None:
         shutil.rmtree(atlas_home, ignore_errors=True)
 
 
+def verifica_uninstall() -> None:
+    """uninstall toglie Atlas e lascia i dati: e' la promessa scritta nel messaggio."""
+    target = Path(tempfile.mkdtemp())
+    atlas_home = Path(tempfile.mkdtemp())
+    env = dict(os.environ, ATLAS_CONFIG=str(atlas_home / "atlas.json"))
+    try:
+        subprocess.run(["git", "init", "-q"], cwd=target, check=True)
+        globale(target, "install", str(target), "--yes", "--graph", "epic-test", env=env)
+        radice = target / ".atlas"
+        esito = globale(target, "uninstall", str(target), env=env)
+        verifica(esito.returncode == 0, "uninstall va a buon fine")
+        verifica(not (radice / "skills").exists() and not (radice / "CONTRACT.md").exists(),
+                 "uninstall: quel che aveva scritto Atlas non c'e' piu'")
+        verifica((radice / "graphs" / "epic-test" / "graph.json").is_file(),
+                 "uninstall: i dati del progetto restano")
+        verifica((radice / "config.json").is_file(), "uninstall: config.json resta")
+        verifica(not (target / ".claude" / "skills" / "atlas-work").exists(),
+                 "uninstall: le skill sono scollegate da .claude/")
+    finally:
+        shutil.rmtree(target, ignore_errors=True)
+        shutil.rmtree(atlas_home, ignore_errors=True)
+
+
 if __name__ == "__main__":
     esito = main()
     verifica_install_in_inglese()
     verifica_migrazione_dal_motore_a_sorgenti()
+    verifica_uninstall()
     rotti = [cosa for ok, cosa in esiti if not ok]
     print(f"\n  totale: {len(esiti) - len(rotti)}/{len(esiti)} verifiche passate\n")
     raise SystemExit(1 if rotti else esito)

@@ -1,8 +1,10 @@
-"""Installa/disinstalla l'harness Atlas in un progetto ospite.
+"""Installa/disinstalla Atlas in un progetto ospite.
 
-La classe Installer viene da installer_template.py: stessa logica, un'unica
-implementazione. Il payload (tar.gz+base64 di payload/) arriva da _payload.py,
-generato da build.py e mai committato.
+Installare vuol dire scrivere i dati e i documenti del progetto, mai il motore:
+dalla 0.7 quello vive nell'eseguibile. Le skill arrivano dal blob di _payload.py
+(generato da build.py, mai committato) perche' devono stare su disco per essere
+raggiunte dai symlink di .claude/skills/; contratto e README nascono dai template
+che viaggiano nel pacchetto.
 """
 from __future__ import annotations
 
@@ -15,11 +17,10 @@ import shutil
 import sys
 import tarfile
 from pathlib import Path
-from types import SimpleNamespace
 
 from . import registry
 from .registry import RegistryError
-from .progetto import ridisegna, template
+from .progetto import template
 from .strings import set_language, t
 from .version import current_version
 
@@ -237,9 +238,9 @@ class Installer:
         self.dice(t("install.registrato", slug=slug))
 
     def disinstalla(self) -> int:
-        # RESIDUI compreso: chi disinstalla da una versione precedente non deve
+        # RESIDUI compresi: chi disinstalla da una versione precedente non deve
         # restare con mezzo motore sul disco.
-        for voce in SOSTITUIBILI + RESIDUI + (MOTORE, "CONTRACT.md"):
+        for voce in SOSTITUIBILI + RESIDUI + ("CONTRACT.md", "README.md"):
             path = self.root / voce
             shutil.rmtree(path) if path.is_dir() else path.unlink(missing_ok=True)
         skills = self.target / ".claude" / "skills"

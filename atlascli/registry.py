@@ -1,7 +1,7 @@
 """Il registro dei progetti installati: ~/.atlas/registry.json, slug -> path assoluto.
 
 Non duplica stato mutabile del progetto: versione installata e validita' si leggono
-sempre dal vivo (status_of, installed_version), mai dalla cache. Il registro sa solo
+sempre dal vivo (status_of), mai dalla cache. Il registro sa solo
 chi si chiama come e dove sta.
 """
 from __future__ import annotations
@@ -159,11 +159,6 @@ def status_of(path: Path) -> str:
     if not progetto_valido(path):
         return STATO_NON_VALIDO
     return STATO_OK
-
-
-def installed_version(path: Path) -> str | None:
-    version_file = path / ".atlas" / "VERSION"
-    return version_file.read_text(encoding="utf-8").strip() if version_file.is_file() else None
 
 
 def prune() -> list[str]:
