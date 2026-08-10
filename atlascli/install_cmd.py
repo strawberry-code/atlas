@@ -34,7 +34,11 @@ SOSTITUIBILI = ("skills",)
 # e hook. Restano li' finche' qualcuno non li toglie, e un progetto con due motori
 # addosso e' lo stato peggiore: l'installazione li porta via e dice quali.
 RESIDUI = ("core", "bin", "atlas", "templates", "hooks", "VERSION")
-IGNORE = [f"{DIRNAME}/graphs/*/dashboard.html", f"{DIRNAME}/current", "__pycache__/"]
+# Il lock e il temporaneo della scrittura atomica sono meccanica del motore, non dati:
+# il primo esiste solo per essere bloccato, il secondo sopravvive a un processo ucciso
+# a meta' e sparisce alla scrittura dopo. Versionarli sporcherebbe ogni diff.
+IGNORE = [f"{DIRNAME}/graphs/*/dashboard.html", f"{DIRNAME}/graphs/*/graph.json.lock",
+          f"{DIRNAME}/graphs/*/.graph.json.tmp", f"{DIRNAME}/current", "__pycache__/"]
 
 CONFIG = {
     "project": None,

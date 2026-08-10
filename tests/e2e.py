@@ -463,6 +463,12 @@ def verifica_scrittura_e_conflitti() -> None:
                  "il lock vive su un file dedicato accanto al grafo")
         verifica(list(grafo.parent.glob("*.tmp")) == [],
                  "nessun temporaneo resta dopo una scrittura riuscita")
+        for nome in ("graph.json.lock", ".graph.json.tmp"):
+            ignorato = subprocess.run(["git", "check-ignore", "-q", str(grafo.with_name(nome))],
+                                      cwd=target).returncode == 0
+            verifica(ignorato, f"{nome} non finisce versionato nel progetto ospite")
+        tracciato = subprocess.run(["git", "check-ignore", "-q", str(grafo)], cwd=target)
+        verifica(tracciato.returncode != 0, "il grafo invece resta versionato")
 
         locale(target, "claim", "F01")
         ticket = radice / "graphs" / "epic-test" / "tickets" / "F01.md"
