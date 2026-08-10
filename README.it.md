@@ -1,5 +1,7 @@
 # Atlas
 
+![Una carta nautica dove la costa è un grafo di dipendenze: a sinistra i nodi chiusi col sigillo di ceralacca, sulla frontiera illuminata due lucchetti d'ottone, a destra la nebbia di quel che non si sa ancora.](docs/hero.jpg)
+
 *[English version](README.md)*
 
 Harness di task a grafo. I task sono nodi, le dipendenze sono archi, la **frontiera** è quel che si può prendere adesso. Ogni nodo dichiara se la sua risposta si scrive con l'umano (**HITL**) o la scrive l'agente da solo (**AFK**).

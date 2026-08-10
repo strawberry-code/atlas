@@ -1,5 +1,7 @@
 # Atlas
 
+![A nautical chart whose coastline is a dependency graph: wax-sealed nodes on the left are closed, two brass padlocks rest on the lit frontier, and the right side dissolves into fog.](docs/hero.jpg)
+
 *[Versione italiana](README.it.md)*
 
 A graph-based task harness. Tasks are nodes, dependencies are edges, and the **frontier** is whatever can be picked up right now. Every node declares who writes its answer: the human (**HITL**) or the agent on its own (**AFK**).
