@@ -436,6 +436,56 @@ def verifica_uscita_non_utf8() -> None:
         shutil.rmtree(atlas_home, ignore_errors=True)
 
 
+MUTAZIONE_ESTERNA = '''"""Un altro attore che cambia il nodo mentre qualcuno ci lavora."""
+
+
+def run(g):
+    g.node("F01")["question"] = "la domanda e' cambiata sotto le mani di chi lavora"
+'''
+
+
+def verifica_scrittura_e_conflitti() -> None:
+    """La scrittura atomica vista da fuori, e il rifiuto quando la premessa e' scaduta."""
+    target = Path(tempfile.mkdtemp())
+    atlas_home = Path(tempfile.mkdtemp())
+    env = dict(os.environ, ATLAS_CONFIG=str(atlas_home / "atlas.json"))
+    global _config_sandbox
+    _config_sandbox = atlas_home / "atlas.json"
+    try:
+        subprocess.run(["git", "init", "-q"], cwd=target, check=True)
+        globale(target, "install", str(target), "--yes", "--graph", "epic-test", env=env)
+        radice = target / ".atlas"
+        shutil.copyfile(FIXTURE, radice / "scripts" / "001-grafo-di-prova.py")
+        locale(target, "exec", ".atlas/scripts/001-grafo-di-prova.py")
+        grafo = radice / "graphs" / "epic-test" / "graph.json"
+
+        verifica(grafo.with_name("graph.json.lock").is_file(),
+                 "il lock vive su un file dedicato accanto al grafo")
+        verifica(list(grafo.parent.glob("*.tmp")) == [],
+                 "nessun temporaneo resta dopo una scrittura riuscita")
+
+        locale(target, "claim", "F01")
+        ticket = radice / "graphs" / "epic-test" / "tickets" / "F01.md"
+        ticket.write_text(ticket.read_text(encoding="utf-8").replace(
+            "## Risposta", "## Risposta\n\nUna risposta scritta guardando la domanda di prima."),
+            encoding="utf-8")
+
+        (radice / "scripts" / "002-altro-attore.py").write_text(MUTAZIONE_ESTERNA, encoding="utf-8")
+        locale(target, "exec", ".atlas/scripts/002-altro-attore.py")
+
+        rifiuto = locale(target, "close", "F01", "-s", "sintesi")
+        verifica(rifiuto.returncode == 1 and "F01" in (rifiuto.stdout + rifiuto.stderr),
+                 "close rifiutato: il nodo e' cambiato dopo la presa")
+        forzato = locale(target, "close", "F01", "-s", "sintesi", "--force")
+        verifica(forzato.returncode == 0, "--force chiude comunque")
+        stato = json.loads(grafo.read_text(encoding="utf-8"))
+        chiuso = [n for n in stato["nodes"] if n["id"] == "F01"][0]
+        verifica(chiuso["status"] == "closed", "il nodo forzato risulta chiuso nel grafo")
+    finally:
+        shutil.rmtree(target, ignore_errors=True)
+        shutil.rmtree(atlas_home, ignore_errors=True)
+
+
 if __name__ == "__main__":
     esito = main()
     verifica_install_in_inglese()
@@ -444,6 +494,7 @@ if __name__ == "__main__":
     verifica_file_rotti()
     verifica_hook_una_volta_sola()
     verifica_uscita_non_utf8()
+    verifica_scrittura_e_conflitti()
     rotti = [cosa for ok, cosa in esiti if not ok]
     print(f"\n  totale: {len(esiti) - len(rotti)}/{len(esiti)} verifiche passate\n")
     raise SystemExit(1 if rotti else esito)

@@ -31,6 +31,14 @@ STRINGS: dict[str, dict[str, str]] = {
                                           "  dichiarali con --artefatti",
                                     "en": "artifacts not deduced: several nodes are in progress at once,\n"
                                           "  declare them with --artefatti"},
+    "close.premessa_scaduta": {"it": "{id} è cambiato da quando l'hai preso.\n"
+                                     "  La tua risposta potrebbe poggiare su una premessa che non c'è più:\n"
+                                     "  rileggi il nodo con 'atlas show {id}' e richiudi, oppure usa --force\n"
+                                     "  se il cambiamento non tocca quello che hai scritto.",
+                               "en": "{id} changed since you claimed it.\n"
+                                     "  Your answer may rest on a premise that no longer holds:\n"
+                                     "  re-read the node with 'atlas show {id}' and close again, or use\n"
+                                     "  --force if the change doesn't affect what you wrote."},
 
     # --- mutate.py ---
     "mutate.id_duplicato": {"it": "id duplicato: {id}", "en": "duplicate id: {id}"},

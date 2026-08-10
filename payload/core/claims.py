@@ -13,8 +13,8 @@ from datetime import datetime, timedelta
 
 from . import docs, gitscan
 from .config import ENV_IDENTITY, Graph
-from .model import by_id, is_done, node_of, claimed
-from .store import CLAIMED, CLOSED, OPEN, StateError, transaction
+from .model import by_id, fingerprint, is_done, node_of, claimed
+from .store import CLAIMED, CLOSED, OPEN, StateError, load, transaction
 from .strings import t
 
 
@@ -116,6 +116,10 @@ def claim(ref: Graph, node_id: str, assignee: str | None = None, force: bool = F
         ora = datetime.now().astimezone().isoformat(timespec="seconds")
         node.update(status=CLAIMED, assignee=assignee or agent["default_assignee"],
                     claim={"pid": pid, "session": sid, "identity": me, "at": ora, "heartbeat": ora})
+        # Dopo l'update, non prima: il nodo che l'agente si porta via e' questo, con
+        # status e assignee gia' cambiati. L'impronta esclude claim, quindi scriverla
+        # li' dentro non la invalida.
+        node["claim"]["fingerprint"] = fingerprint(node)
         return dict(node)
 
 
@@ -133,6 +137,25 @@ def release(ref: Graph, node_id: str, reason: str | None = None) -> dict:
         return dict(node)
 
 
+def _artefatti(ref: Graph, node_id: str) -> tuple[list[str] | None, str | None]:
+    """Cosa ha toccato la sessione secondo git, piu' l'eventuale avviso di rinuncia.
+
+    Gira FUORI dalla transazione perche' lancia due processi git: su questo repo sono
+    24 ms, quattro volte la scrittura del grafo, e su un monorepo diventano secondi in
+    cui ogni altro agente resta in coda. Su Windows sarebbe pure peggio, perche'
+    msvcrt.locking non attende all'infinito ma molla dopo dieci secondi.
+
+    Legge il grafo senza lock, quindi puo' vedere un istante di presa vecchio di
+    millisecondi: e' una fotografia del working tree, non un dato transazionale, e
+    un errore di quell'ordine non cambia quali file risultano toccati.
+    """
+    data = load(ref.json_path)
+    if [n for n in claimed(data) if n["id"] != node_id]:
+        return None, t("close.artifacts_non_dedotti")
+    preso = holder(node_of(data, node_id)).get("at")
+    return gitscan.touched(ref.workspace.project_root, preso) or None, None
+
+
 def close(ref: Graph, node_id: str, summary: str, force: bool = False,
           cost: str | None = None, artifacts: list[str] | None = None) -> tuple[dict, str | None]:
     """Chiude un nodo. Il possesso da parte di una sessione morta non e' un ostacolo.
@@ -141,7 +164,9 @@ def close(ref: Graph, node_id: str, summary: str, force: bool = False,
     artefatti e' avvenuta regolarmente, oppure un messaggio di avvertimento se e'
     stata saltata perche' piu' nodi sono in lavorazione insieme."""
     agent = ref.workspace.config["agent"]
-    pid, _ = session()
+    avviso = None
+    if artifacts is None:
+        artifacts, avviso = _artefatti(ref, node_id)
     with transaction(ref.json_path) as data:
         node = node_of(data, node_id)
         if is_done(node):
@@ -152,14 +177,12 @@ def close(ref: Graph, node_id: str, summary: str, force: bool = False,
             raise StateError(t("close.altra_sessione", id=node_id, owner=owner))
         if not docs.answer_written(ref, node_id) and not force:
             raise StateError(t("close.risposta_vuota", file=ref.ticket_path(node_id).name))
-        preso = holder(node).get("at")
-        avviso = None
-        if artifacts is None:
-            altri_rivendicati = [n for n in claimed(data) if n["id"] != node_id]
-            if altri_rivendicati:
-                avviso = t("close.artifacts_non_dedotti")
-            else:
-                artifacts = gitscan.touched(ref.workspace.project_root, preso) or None
+        # Un'impronta che non torna vuol dire che il nodo e' cambiato dopo la presa:
+        # la scrittura entrerebbe pulita, ma la sintesi che sta arrivando e' stata
+        # decisa guardando un nodo diverso. Assente sui claim presi prima della 0.7.0.
+        atteso = holder(node).get("fingerprint")
+        if atteso and atteso != fingerprint(node) and not force:
+            raise StateError(t("close.premessa_scaduta", id=node_id))
         node.update(status=CLOSED, assignee=None, claim=None, answer=summary, cost=cost,
                     closedBy=identity(),
                     closedAt=datetime.now().astimezone().isoformat(timespec="seconds"))

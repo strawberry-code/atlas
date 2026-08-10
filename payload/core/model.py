@@ -1,6 +1,8 @@
 """Sola lettura sul grafo: indici, profondita' topologica, frontiera, avanzamento."""
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 
 from .store import CLAIMED, CLOSED, DROPPED, OPEN, StateError
@@ -20,6 +22,25 @@ def node_of(graph: dict, node_id: str) -> dict:
 def is_done(node: dict) -> bool:
     """Anche un nodo fuori scopo e' soddisfatto: sblocca chi dipendeva da lui."""
     return node["status"] in (CLOSED, DROPPED)
+
+
+def fingerprint(node: dict) -> str:
+    """Impronta del contenuto di un nodo, per accorgersi che e' cambiato sotto le mani.
+
+    Il lock impedisce a due processi di scrivere insieme e la rilettura dentro la
+    transazione impedisce di partire da uno stato vecchio, ma nessuno dei due sa cosa
+    l'agente aveva letto quando ha deciso cosa scrivere: se la premessa e' cambiata
+    mentre lavorava, la sua sintesi entra pulita e poggia sul vuoto. Questa impronta,
+    registrata alla presa e riverificata alla chiusura, e' l'unico modo di accorgersene.
+
+    Esclude claim, che cambia a ogni battito senza che il nodo sia diverso. E' un hash
+    del contenuto e non un contatore incrementale perche' un contatore vive di
+    disciplina: basta una mutazione che si dimentica di alzarlo e il controllo tace
+    proprio quando servirebbe.
+    """
+    corpo = {chiave: valore for chiave, valore in node.items() if chiave != "claim"}
+    testo = json.dumps(corpo, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha1(testo.encode("utf-8")).hexdigest()[:12]
 
 
 def levels(graph: dict) -> dict[str, int]:
