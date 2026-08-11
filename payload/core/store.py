@@ -19,6 +19,9 @@ from .config import ConfigError
 from .strings import t
 
 SCHEMA_VERSION = 1
+# Quando SCHEMA_VERSION cambia, la lettura migrera' automaticamente i dati senza
+# flag per restare sul formato vecchio. Il grafo e' versionato in git (reversibile);
+# chi lo consuma non vede mai il JSON grezzo, solo la struttura in memoria.
 OPEN, CLAIMED, CLOSED, DROPPED = "open", "claimed", "closed", "out-of-scope"
 
 if sys.platform == "win32":

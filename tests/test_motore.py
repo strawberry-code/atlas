@@ -913,5 +913,12 @@ class Lingua(Base):
         self.assertIn("Run with:", self.ws.template("migration.py.tmpl"))
 
 
+class Schema(Base):
+    def test_schemaversion_uno_e_rilegibile(self):
+        """Un grafo appena creato ha schemaVersion 1 e si rilegge senza errori."""
+        data = self.store.load(self.ref.json_path)
+        self.assertEqual(self.store.SCHEMA_VERSION, data["schemaVersion"])
+
+
 if __name__ == "__main__":
     unittest.main()
