@@ -134,9 +134,27 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         if args.cmd in RESERVED:
-            return COMANDI[args.cmd](args)
-        from core.cli import esegui
-        return esegui(args)
+            exitcode = COMANDI[args.cmd](args)
+        else:
+            from core.cli import esegui
+            exitcode = esegui(args)
+
+        # Controlla aggiornamenti dopo il comando, ma non per i comandi di gestione
+        if args.cmd not in {"update", "install", "uninstall"}:
+            _avvisa_aggiornamento()
+
+        return exitcode
     except ErroreAtlas as errore:
         print(f"\n  {errore}\n", file=sys.stderr)
         return 1
+
+
+def _avvisa_aggiornamento() -> None:
+    """Controlla se c'e' un aggiornamento disponibile e avvisa, senza interruzioni."""
+    try:
+        nuova = self_update.check_for_update()
+        if nuova:
+            print(t("update.disponibile", nuova=nuova, attuale=current_version()))
+    except Exception:
+        # Qualsiasi errore nel controllo: silenzio
+        pass

@@ -14,8 +14,10 @@ import sys
 import tempfile
 import urllib.error
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 
+from . import registry
 from .strings import t
 from .version import current_version
 
@@ -54,6 +56,62 @@ def _asset_url(release: dict, nome: str) -> str | None:
         if asset["name"] == nome:
             return asset["browser_download_url"]
     return None
+
+
+def _adesso() -> str:
+    """Timestamp ISO8601 UTC, compatibile con registry._adesso()."""
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _tempo_passato_secondi(timestamp_iso: str) -> float:
+    """Secondi tra un timestamp ISO8601 UTC e ora."""
+    try:
+        passato = datetime.fromisoformat(timestamp_iso)
+        return (datetime.now(timezone.utc) - passato).total_seconds()
+    except (ValueError, TypeError):
+        return float('inf')  # timestamp invalido: tratta come scaduto
+
+
+def check_for_update() -> str | None:
+    """Controlla se c'e' una versione piu' recente, cacheato per 24 ore.
+
+    Ritorna la versione nuova se disponibile e piu' recente della corrente,
+    altrimenti None. Gli errori di rete non sollevano eccezioni: la funzione
+    ritorna None silenziosamente.
+    """
+    attuale = current_version()
+    data = registry.load()
+
+    # Controlla se la cache e' ancora fresca (< 24 ore)
+    ultimo_check = data.get("last_update_check")
+    versione_nota = data.get("latest_known_version")
+
+    if ultimo_check and versione_nota:
+        secondi_passati = _tempo_passato_secondi(ultimo_check)
+        if secondi_passati < 86400:  # 24 * 60 * 60
+            if _parse_version(versione_nota) > _parse_version(attuale):
+                return versione_nota
+            return None
+
+    # Cache assente o scaduta: consulta la rete
+    try:
+        release = _get_json(f"{_base_url()}/repos/{REPO}/releases/latest")
+        nuova = release.get("tag_name", "").lstrip("v")
+
+        # Aggiorna il cache indipendentemente dal risultato
+        data["last_update_check"] = _adesso()
+        if nuova:
+            data["latest_known_version"] = nuova
+        registry.save(data)
+
+        if nuova and _parse_version(nuova) > _parse_version(attuale):
+            return nuova
+        return None
+    except (urllib.error.URLError, urllib.error.HTTPError, ValueError):
+        # Errore di rete: registra comunque il timestamp per evitare retry infiniti
+        data["last_update_check"] = _adesso()
+        registry.save(data)
+        return None
 
 
 def cmd_update(args) -> int:

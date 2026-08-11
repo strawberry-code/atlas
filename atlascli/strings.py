@@ -110,6 +110,8 @@ STRINGS: dict[str, dict[str, str]] = {
                            "en": "\n  sha256 mismatch (expected {atteso}, got {trovato}): update aborted.\n"},
     "update.fatto": {"it": "\n  atlas {attuale} → {ultima}  ({target})\n",
                     "en": "\n  atlas {attuale} → {ultima}  ({target})\n"},
+    "update.disponibile": {"it": "\n  è disponibile atlas {nuova} (hai {attuale}): esegui 'atlas update' per aggiornare\n",
+                          "en": "\n  atlas {nuova} is available (you have {attuale}): run 'atlas update' to upgrade\n"},
 
     # --- list_cmd.py ---
     "list.prune_fatto": {"it": "\n  rimossi dal registro: {elenco}\n", "en": "\n  removed from the registry: {elenco}\n"},

@@ -2,6 +2,8 @@
 
 ATLAS_CONFIG punta sempre a un file temporaneo, impostato in setUp e tolto
 in tearDown - stesso principio di isolamento di ATLAS_ROOT nei test del motore.
+Allo stesso modo, ATLAS_UPDATE_BASE_URL punta a un server HTTP fittizio locale
+per evitare vere chiamate di rete a GitHub.
 """
 from __future__ import annotations
 
@@ -23,6 +25,7 @@ sys.path.insert(0, str(ROOT / "payload"))
 
 from atlascli import dispatch, install_cmd, registry  # noqa: E402
 from atlascli import strings as atlascli_strings  # noqa: E402
+from tests.httpfixture import Fixture  # noqa: E402
 
 
 class Registry(unittest.TestCase):
@@ -122,8 +125,15 @@ class Dispatch(unittest.TestCase):
     def setUp(self):
         self.home = Path(tempfile.mkdtemp())
         os.environ["ATLAS_CONFIG"] = str(self.home / "atlas.json")
+        # Isola la rete: dispatch.main() chiama _avvisa_aggiornamento() che farebbe
+        # una vera richiesta HTTP a GitHub senza questo isolamento
+        self.fixture = Fixture({})
+        self.fixture.start()
+        os.environ["ATLAS_UPDATE_BASE_URL"] = self.fixture.base_url
 
     def tearDown(self):
+        self.fixture.stop()
+        os.environ.pop("ATLAS_UPDATE_BASE_URL", None)
         os.environ.pop("ATLAS_CONFIG", None)
         shutil.rmtree(self.home, ignore_errors=True)
         atlascli_strings.set_language("it")  # dispatch.main() muta uno stato di modulo globale
