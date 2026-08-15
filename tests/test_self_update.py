@@ -6,7 +6,9 @@ scambio atomico non tocca niente di reale.
 """
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import io
 import json
 import os
 import shutil
@@ -316,8 +318,17 @@ class Riallineamento(Infrastruttura, unittest.TestCase):
     def test_progetto_sparito_dal_disco_viene_saltato_senza_fermare_gli_altri(self):
         registry.register(self.tmp / "fantasma", slug="fantasma", yes=True)
         vivo = self._progetto("vivo")
-        self.assertEqual(0, self._aggiorna())
+        with contextlib.redirect_stdout(io.StringIO()) as uscita:
+            self.assertEqual(0, self._aggiorna())
         self.assertTrue((vivo / "RIALLINEATO").is_file())
+        self.assertIn("--prune", uscita.getvalue(), "chi resta indietro deve sapere come toglierlo")
+
+    def test_senza_progetti_saltati_non_si_parla_di_prune(self):
+        """Il rimedio si stampa quando serve: altrimenti e' rumore a ogni update."""
+        self._progetto("tutto-a-posto")
+        with contextlib.redirect_stdout(io.StringIO()) as uscita:
+            self.assertEqual(0, self._aggiorna())
+        self.assertNotIn("--prune", uscita.getvalue())
 
     def test_cartella_senza_config_viene_saltata(self):
         """Restare con .atlas/ dopo un uninstall non fa di una cartella un progetto."""

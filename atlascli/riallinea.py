@@ -82,11 +82,13 @@ def riallinea(eseguibile: Path, *, solo_indietro: bool = False) -> None:
     if not progetti:
         return
     print(t("riallinea.intestazione", n=len(progetti)))
+    saltati = False
     for slug, voce in progetti:
         target = Path(voce["path"])
         stato = registry.status_of(target)
         if stato != registry.STATO_OK:
             print(t("riallinea.saltato", slug=slug, motivo=stato))
+            saltati = True
             continue
         comando = [sys.executable, str(eseguibile), "install", str(target), "--yes", *_scelte(target)]
         try:
@@ -98,4 +100,9 @@ def riallinea(eseguibile: Path, *, solo_indietro: bool = False) -> None:
             print(t("riallinea.ok", slug=slug))
         else:
             print(t("riallinea.errore", slug=slug, motivo=_motivo(esito)))
+    # Dire 'saltato' e fermarsi li' e' un vicolo cieco: chi legge non sa se deve
+    # fare qualcosa. Il rimedio si stampa una volta sola in fondo, non accanto a
+    # ogni riga, che con parecchi progetti mancanti diventerebbe un muro.
+    if saltati:
+        print(t("riallinea.saltati_come_togliere"))
     print()

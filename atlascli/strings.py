@@ -136,9 +136,10 @@ STRINGS: dict[str, dict[str, str]] = {
                               "en": "  bringing skills and contract of {n} projects back in line:"},
     "riallinea.ok": {"it": "    {slug}  in pari", "en": "    {slug}  up to date"},
     "riallinea.saltato": {"it": "    {slug}  saltato ({motivo})", "en": "    {slug}  skipped ({motivo})"},
-    "riallinea.errore": {"it": "    {slug}  non riallineato: {motivo}",
-                        "en": "    {slug}  not realigned: {motivo}"},
+    "riallinea.errore": {"it": "    {slug}  non riallineato: {motivo}", "en": "    {slug}  not realigned: {motivo}"},
     "riallinea.senza_messaggio": {"it": "uscito con codice {codice}", "en": "exited with code {codice}"},
+    "riallinea.saltati_come_togliere": {"it": "  le cartelle che non ci sono più si tolgono dal registro con 'atlas list --prune'",
+                                       "en": "  folders that are no longer there are removed from the registry with 'atlas list --prune'"},
     "update.disponibile":{"it": "\n  è disponibile atlas {nuova} (hai {attuale}): esegui 'atlas update' per aggiornare\n",
                           "en": "\n  atlas {nuova} is available (you have {attuale}): run 'atlas update' to upgrade\n"},
 
@@ -172,8 +173,7 @@ STRINGS: dict[str, dict[str, str]] = {
                               "en": "{path} is not valid JSON ({dettaglio}).\n"
                                     "  It belongs to Claude Code, not to Atlas: fix it yourself, "
                                     "or install with --no-hooks."},
-    "errore.non_oggetto": {"it": "il contenuto non è un oggetto JSON",
-                           "en": "the content is not a JSON object"},
+    "errore.non_oggetto": {"it": "il contenuto non è un oggetto JSON", "en": "the content is not a JSON object"},
 
     # --- registry.py ---
     "registry.slug_occupato": {"it": "'{slug}' è già registrato per {path}: usa --slug per un nome diverso",

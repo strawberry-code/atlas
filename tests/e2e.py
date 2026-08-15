@@ -392,6 +392,7 @@ def verifica_update_riallinea_i_progetti() -> None:
         verifica((sandbox / "alfa" / ".atlas" / "CONTRACT.md").read_text(encoding="utf-8") != "MANOMESSO\n",
                  "update: il contratto dei progetti torna quello della versione nuova")
         verifica("sparito" in esito.stdout, "update: il progetto sparito viene nominato, non taciuto")
+        verifica("--prune" in esito.stdout, "update: dice come togliere dal registro chi non c'e' piu'")
         verifica(not (sandbox / "beta" / "CLAUDE.md").exists(),
                  "update: non rimette il blocco a chi non lo aveva")
 
