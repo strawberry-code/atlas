@@ -52,13 +52,19 @@
     return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
   }
+  /* Un ticket lo scrive un agente, che a sua volta legge fonti che non controlliamo:
+     'javascript:' dietro un link dall'aria innocua eseguirebbe al primo clic. Passano
+     solo gli schemi che servono davvero a un ticket, piu' i percorsi relativi. */
+  var SCHEMA_SICURO = /^(https?:|mailto:|#|[.]{0,2}\/|[\w.-]+[.](md|txt|png|jpe?g|svg|pdf)([#?]|$))/i;
   function inline(s) {
     return s
       .replace(/`([^`]+)`/g, function (_, c) { return "<code>" + c + "</code>"; })
       .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
       .replace(/(^|[\s(])\*([^*\s][^*]*)\*/g, "$1<i>$2</i>")
-      .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g,
-        '<a href="$2" target="_blank" rel="noopener">$1</a>');
+      .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, function (intero, testo, href) {
+        if (!SCHEMA_SICURO.test(href)) return testo + " (" + href + ")";
+        return '<a href="' + href + '" target="_blank" rel="noopener noreferrer">' + testo + "</a>";
+      });
   }
   function markdown(src) {
     src = src.replace(/&lt;!--[\s\S]*?--&gt;/g, "");   // commenti HTML: appunti, non contenuto
