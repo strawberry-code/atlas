@@ -5,6 +5,7 @@
   "use strict";
 
   var DATA = JSON.parse(document.getElementById("atlas-data").textContent);
+  var quiete = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   /* ---------- tema: il toggle vince sul sistema, e resta ---------- */
   var toggle = document.querySelector(".theme");
@@ -16,6 +17,22 @@
     document.documentElement.dataset.theme = scelto;
     try { localStorage.setItem("atlas-theme", scelto); } catch (e) { /* file:// senza storage: il tema vale per la pagina */ }
   });
+
+  /* ---------- count-up del numero di avanzamento, in coppia con l'anello ----------
+     Chi ha chiesto quiete vede subito il valore finale, che il markup porta gia'. */
+  var pct = document.querySelector(".pct");
+  if (pct && !quiete) {
+    var finale = parseInt(pct.dataset.count, 10) || 0;
+    var t0 = null;
+    var passo = function (ts) {
+      if (t0 === null) t0 = ts;
+      var q = Math.min((ts - t0) / 1100, 1);
+      q = 1 - Math.pow(1 - q, 3);
+      pct.textContent = Math.round(finale * q) + "%";
+      if (q < 1) requestAnimationFrame(passo);
+    };
+    requestAnimationFrame(passo);
+  }
 
   /* ---------- legenda: un chip filtra per stato, riclic per togliere ---------- */
   document.querySelectorAll(".legend .chip[data-state]").forEach(function (chip) {

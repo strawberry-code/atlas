@@ -22,9 +22,12 @@ def _blocco_avanzamento(data: dict, fatti: int, totale: int) -> str:
         f'<section class="blocco"><h2>{t("render.avanzamento")}</h2>'
         '<div class="ring-wrap">'
         '<svg class="ring" viewBox="0 0 120 120">'
+        '<defs><linearGradient id="ringgrad" x1="0" y1="0" x2="1" y2="1">'
+        '<stop class="rg-a" offset="0"/><stop class="rg-b" offset="1"/></linearGradient></defs>'
+        '<circle class="ring-ticks" cx="60" cy="60" r="58" pathLength="120"/>'
         '<circle class="ring-bg" cx="60" cy="60" r="49" pathLength="100"/>'
         f'<circle class="ring-fg" cx="60" cy="60" r="49" pathLength="100" style="--p:{quota}"/></svg>'
-        f'<div><span class="pct">{quota}%</span>'
+        f'<div><span class="pct" data-count="{quota}">{quota}%</span>'
         f'<span class="frac">{t("render.nodi_conteggio", fatti=fatti, totale=totale)}</span></div></div>'
         f'<p class="dest">{escape(data["meta"]["destination"])}</p></section>'
     )
