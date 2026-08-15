@@ -22,6 +22,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from atlascli import registry, self_update  # noqa: E402
+from atlascli.version import current_version  # noqa: E402
 from tests.httpfixture import Fixture  # noqa: E402
 
 
@@ -269,6 +270,20 @@ class Riallineamento(Infrastruttura, unittest.TestCase):
              "pathlib.Path(sys.argv[2], 'RIALLINEATO').write_text(' '.join(sys.argv[1:]), encoding='utf-8')\n"
              ).encode("utf-8")
 
+    def _versione_registrata(self, slug: str, versione: str | None) -> None:
+        """Riscrive (o toglie) la versione con cui il progetto risulta installato.
+
+        Senza il campo si simula un progetto registrato da una versione che ancora
+        non lo scriveva: e' lo stato in cui si trova chi aggiorna da una 0.11.0 o
+        precedente, cioe' proprio quello che questo comportamento deve coprire.
+        """
+        dati = registry.load()
+        if versione is None:
+            dati["projects"][slug].pop("version", None)
+        else:
+            dati["projects"][slug]["version"] = versione
+        registry.save(dati)
+
     def _progetto(self, nome: str, *, hook: bool = False, claude_md: bool = False) -> Path:
         target = self.tmp / nome
         (target / ".atlas").mkdir(parents=True)
@@ -324,6 +339,28 @@ class Riallineamento(Infrastruttura, unittest.TestCase):
         argomenti = (completo / "RIALLINEATO").read_text(encoding="utf-8")
         self.assertNotIn("--no-hooks", argomenti)
         self.assertNotIn("--no-claude-md", argomenti)
+
+    def test_eseguibile_gia_in_pari_riallinea_comunque_chi_e_indietro(self):
+        """Il caso di chi ha aggiornato da una versione che ancora non riallineava:
+        l'eseguibile e' all'ultima, i progetti no, e senza questo passaggio ogni
+        update successivo direbbe solo 'sei gia' aggiornato' lasciandoli indietro."""
+        indietro = self._progetto("indietro")
+        self._versione_registrata("indietro", None)
+        # niente download in questo scenario: a riallineare e' l'eseguibile gia'
+        # installato, quindi la sonda dev'essere quello, non l'asset pubblicato
+        self.target.write_bytes(self.SONDA)
+        self._pubblica("v0.0.0-dev", self.SONDA)     # stessa versione del processo di prova
+        self.assertEqual(0, self_update.cmd_update(SimpleNamespace(no_projects=False)))
+        self.assertTrue((indietro / "RIALLINEATO").is_file(), "il progetto indietro viene rimesso in pari")
+
+    def test_eseguibile_e_progetti_in_pari_non_tocca_niente(self):
+        """Chi e' gia' allineato non va reinstallato a ogni update: sarebbe lavoro
+        inutile su ogni progetto della macchina, e un diff a ogni giro."""
+        fermo = self._progetto("fermo")
+        self._versione_registrata("fermo", current_version())
+        self._pubblica("v0.0.0-dev", self.SONDA)
+        self.assertEqual(0, self_update.cmd_update(SimpleNamespace(no_projects=False)))
+        self.assertFalse((fermo / "RIALLINEATO").exists())
 
     def test_no_projects_aggiorna_solo_l_eseguibile(self):
         solo = self._progetto("solo")

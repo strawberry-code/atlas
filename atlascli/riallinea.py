@@ -18,6 +18,7 @@ from . import hook, registry
 from .errori import ErroreAtlas, leggi_json
 from .install_cmd import BEGIN
 from .strings import t
+from .version import current_version
 
 # Un install non chiede niente con --yes e non parla con la rete: se dopo tre
 # minuti un progetto non ha finito, e' bloccato su qualcosa che non e' nostro.
@@ -58,15 +59,26 @@ def _motivo(esito: subprocess.CompletedProcess) -> str:
     return t("riallinea.senza_messaggio", codice=esito.returncode)
 
 
-def riallinea(eseguibile: Path) -> None:
+def riallinea(eseguibile: Path, *, solo_indietro: bool = False) -> None:
     """Passa i progetti registrati uno per uno, senza fermarsi al primo guasto.
 
     Un progetto sparito dal disco, o rimasto senza .atlas/config.json perche'
     disinstallato, non e' un errore da segnalare come tale: si dice che e' stato
     saltato e si va avanti. L'aggiornamento del CLI e' gia' riuscito, e nessun
     progetto puo' rimetterlo in discussione.
+
+    Con solo_indietro si toccano i soli progetti la cui versione registrata non e'
+    quella di adesso. Serve quando l'eseguibile e' gia' all'ultima versione e non
+    c'e' nessun download a dire che qualcosa e' cambiato: senza, chi ha aggiornato
+    partendo da una versione che ancora non riallineava resterebbe indietro per
+    sempre, perche' da li' in poi ogni update direbbe solo 'sei gia' aggiornato'.
+    Il confronto vale solo in quel caso: dopo un aggiornamento vero questo processo
+    e' ancora la versione di prima, e current_version() direbbe il falso.
     """
     progetti = sorted(registry.load()["projects"].items())
+    if solo_indietro:
+        adesso = current_version()
+        progetti = [(slug, voce) for slug, voce in progetti if voce.get("version") != adesso]
     if not progetti:
         return
     print(t("riallinea.intestazione", n=len(progetti)))

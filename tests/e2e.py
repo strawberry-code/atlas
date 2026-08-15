@@ -372,6 +372,24 @@ def verifica_update_riallinea_i_progetti() -> None:
         verifica("sparito" in esito.stdout, "update: il progetto sparito viene nominato, non taciuto")
         verifica(not (sandbox / "beta" / "CLAUDE.md").exists(),
                  "update: non rimette il blocco a chi non lo aveva")
+
+        # Il caso di chi ha aggiornato da una versione che ancora non riallineava:
+        # l'eseguibile e' all'ultima, i progetti no, e non c'e' nessun download da
+        # cui accorgersene. Senza questo passaggio resterebbero indietro per sempre.
+        versione = (ROOT / "payload" / "VERSION").read_text(encoding="utf-8").strip()
+        release["tag_name"] = f"v{versione}"
+        fixture.routes["/repos/strawberry-code/atlas/releases/latest"] = (
+            200, json.dumps(release).encode("utf-8"), "application/json")
+        registro = json.loads((sandbox / "registro.json").read_text(encoding="utf-8"))
+        registro["projects"]["alfa"].pop("version", None)     # registrato da una versione precedente
+        (sandbox / "registro.json").write_text(json.dumps(registro), encoding="utf-8")
+        (sandbox / "alfa" / ".atlas" / "CONTRACT.md").write_text("MANOMESSO\n", encoding="utf-8")
+        (sandbox / "beta" / ".atlas" / "CONTRACT.md").write_text("MANOMESSO\n", encoding="utf-8")
+        esito = atlas("update")
+        verifica((sandbox / "alfa" / ".atlas" / "CONTRACT.md").read_text(encoding="utf-8") != "MANOMESSO\n",
+                 "update: senza niente da scaricare rimette in pari chi era indietro")
+        verifica((sandbox / "beta" / ".atlas" / "CONTRACT.md").read_text(encoding="utf-8") == "MANOMESSO\n",
+                 "update: chi e' gia' in pari non viene reinstallato a ogni giro")
     finally:
         fixture.stop()
         shutil.rmtree(sandbox, ignore_errors=True)

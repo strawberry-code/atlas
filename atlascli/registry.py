@@ -17,6 +17,7 @@ from typing import Callable
 from .errori import leggi_json
 from .paths import config_path, progetto_valido
 from .strings import t
+from .version import current_version
 
 SCHEMA_VERSION = 2
 STATO_OK, STATO_MANCANTE, STATO_NON_VALIDO = "ok", "mancante", "non valido"
@@ -129,6 +130,12 @@ def register(path: Path, slug: str | None = None, *, yes: bool = False,
     Path gia' registrato altrove e slug non forzato esplicitamente -> riusa quella
     voce invece di duplicarla. Slug gia' occupato da un path diverso -> mai
     sovrascrittura silenziosa: prompt in interattivo, errore con --yes.
+
+    Si annota anche con quale versione il progetto e' stato installato: e' cio' che
+    permette a 'atlas update' di sapere chi e' rimasto indietro quando l'eseguibile
+    e' gia' all'ultima versione e non c'e' nessun download da cui dedurlo. Non e'
+    stato mutabile duplicato dal progetto: lo scrive chi installa, nel momento in
+    cui installa, ed e' l'unico che lo sa.
     """
     resolto = str(Path(path).resolve())
     data = load()
@@ -138,6 +145,7 @@ def register(path: Path, slug: str | None = None, *, yes: bool = False,
         esistente = _per_path(projects, resolto)
         if esistente:
             projects[esistente]["last_seen"] = _adesso()
+            projects[esistente]["version"] = current_version()
             save(data)
             return esistente
         slug = slugify(Path(resolto).name)
@@ -155,6 +163,7 @@ def register(path: Path, slug: str | None = None, *, yes: bool = False,
         "path": resolto,
         "registered_at": attuale["registered_at"] if attuale else _adesso(),
         "last_seen": _adesso(),
+        "version": current_version(),
     }
     save(data)
     return slug
@@ -173,15 +182,16 @@ def repoint(slug: str, path: Path) -> None:
     """Ripunta uno slug gia' registrato su un path diverso, senza chiedere conferma:
 
     chi scrive 'atlas <slug> update <path>' ha gia' dichiarato l'intento esplicito.
+    Si cambia il path e si tiene il resto della voce: ricostruirla da zero buttava
+    via l'override di lingua del progetto, e adesso butterebbe anche la versione
+    con cui e' installato. Spostare una cartella non cambia nessuna delle due.
     """
     data = load()
-    resolto = str(Path(path).resolve())
-    esistente = data["projects"].get(slug)
-    data["projects"][slug] = {
-        "path": resolto,
-        "registered_at": esistente["registered_at"] if esistente else _adesso(),
-        "last_seen": _adesso(),
-    }
+    voce = dict(data["projects"].get(slug) or {})
+    voce["path"] = str(Path(path).resolve())
+    voce.setdefault("registered_at", _adesso())
+    voce["last_seen"] = _adesso()
+    data["projects"][slug] = voce
     save(data)
 
 

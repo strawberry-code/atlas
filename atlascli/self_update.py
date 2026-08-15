@@ -161,6 +161,12 @@ def cmd_update(args) -> int:
         return 1
     if _parse_version(ultima) <= _parse_version(attuale):
         print(t("update.gia_ultima", versione=attuale))
+        # L'eseguibile e' in pari, i progetti possono non esserlo: chi ha aggiornato
+        # da una versione che ancora non li riallineava arriva sempre qui, e senza
+        # questo passaggio non avrebbe piu' nessuna occasione di rimetterli in pari.
+        if not getattr(args, "no_projects", False):
+            from . import riallinea
+            riallinea.riallinea(Path(sys.argv[0]).resolve(), solo_indietro=True)
         return 0
 
     asset_url = _asset_url(release, "atlas")

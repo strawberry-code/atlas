@@ -124,16 +124,16 @@ STRINGS: dict[str, dict[str, str]] = {
                             "en": "\n  the download exceeds the expected {tetto} MB: update aborted.\n"},
     "update.fatto": {"it": "\n  atlas {attuale} → {ultima}  ({target})\n",
                     "en": "\n  atlas {attuale} → {ultima}  ({target})\n"},
-    "update.riallinea": {"it": "  skill, contratto e README dei progetti restano quelli della versione "
+    "update.riallinea": {"it": "  skill, .atlas/CONTRACT.md e .atlas/README.md restano quelli della versione "
                                "precedente: {n} progetti registrati si riallineano con 'atlas install <path>'.",
-                        "en": "  each project's skills, contract and README stay at the previous version: "
+                        "en": "  skills, .atlas/CONTRACT.md and .atlas/README.md stay at the previous version: "
                               "{n} registered projects realign with 'atlas install <path>'."},
     "update.riallinea_riga": {"it": "    {slug}", "en": "    {slug}"},
     "update.riallinea_altri": {"it": "    e altri {n}", "en": "    and {n} more"},
 
     # --- riallinea.py ---
-    "riallinea.intestazione": {"it": "  riallineo {n} progetti registrati:",
-                              "en": "  realigning {n} registered projects:"},
+    "riallinea.intestazione": {"it": "  rimetto in pari skill e contratto di {n} progetti:",
+                              "en": "  bringing skills and contract of {n} projects back in line:"},
     "riallinea.ok": {"it": "    {slug}  in pari", "en": "    {slug}  up to date"},
     "riallinea.saltato": {"it": "    {slug}  saltato ({motivo})", "en": "    {slug}  skipped ({motivo})"},
     "riallinea.errore": {"it": "    {slug}  non riallineato: {motivo}",
