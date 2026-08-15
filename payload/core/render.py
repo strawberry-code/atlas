@@ -1,10 +1,10 @@
 """Dashboard: da graph.json a un HTML autoconsistente che si apre da disco.
 
-La pagina e' una plancia: barra dei readout in alto, strumenti in una colonna,
-e il grafo come display centrale, navigabile. Nessuna risorsa remota: stile e
+La pagina ha tre parti: l'intestazione coi numeri di sintesi, la colonna dei
+pannelli e il grafo come mappa navigabile. Nessuna risorsa remota: stile e
 comportamento (templates/dashboard.css e .js) viaggiano inline. Il disegno del
 grafo sta in render_svg.py, la scheda del ticket e i suoi dati in
-render_sheet.py: qui c'e' solo l'assemblaggio della plancia.
+render_sheet.py: qui c'e' solo l'assemblaggio della pagina.
 """
 from __future__ import annotations
 

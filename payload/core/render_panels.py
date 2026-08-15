@@ -1,7 +1,7 @@
-"""I blocchi della colonna strumenti: avanzamento, frontiera, costo, avvisi.
+"""I blocchi della colonna di sinistra: avanzamento, frontiera, costo, avvisi.
 
-Spezzato da render.py, che assembla la plancia (barra dei readout, display del
-grafo, scheda del ticket): qui c'e' solo il contenuto dei pannelli laterali, che
+Spezzato da render.py, che assembla la pagina (intestazione, mappa del grafo,
+scheda del ticket): qui c'e' solo il contenuto dei pannelli laterali, che
 e' la parte che cambia piu' spesso perche' segue quel che il grafo ha da dire.
 """
 from __future__ import annotations
@@ -22,12 +22,9 @@ def _blocco_avanzamento(data: dict, fatti: int, totale: int) -> str:
         f'<section class="blocco"><h2>{t("render.avanzamento")}</h2>'
         '<div class="ring-wrap">'
         '<svg class="ring" viewBox="0 0 120 120">'
-        '<defs><linearGradient id="ringgrad" x1="0" y1="0" x2="1" y2="1">'
-        '<stop class="rg-a" offset="0"/><stop class="rg-b" offset="1"/></linearGradient></defs>'
-        '<circle class="ring-ticks" cx="60" cy="60" r="58" pathLength="120"/>'
         '<circle class="ring-bg" cx="60" cy="60" r="49" pathLength="100"/>'
         f'<circle class="ring-fg" cx="60" cy="60" r="49" pathLength="100" style="--p:{quota}"/></svg>'
-        f'<div><span class="pct" data-count="{quota}">{quota}%</span>'
+        f'<div><span class="pct">{quota}%</span>'
         f'<span class="frac">{t("render.nodi_conteggio", fatti=fatti, totale=totale)}</span></div></div>'
         f'<p class="dest">{escape(data["meta"]["destination"])}</p></section>'
     )
@@ -36,7 +33,7 @@ def _blocco_avanzamento(data: dict, fatti: int, totale: int) -> str:
 def _blocco_lista(titolo: str, voci: list[str], vuoto: str, classe: str = "blocco",
                   hl: str | None = None) -> str:
     """hl e' lo stato visivo che questo blocco rappresenta: passare il mouse sul
-    blocco accende sulla carta i track di quello stato (vedi dashboard.css)."""
+    blocco accende sulla mappa i nodi di quello stato (vedi dashboard.css)."""
     corpo = "".join(voci) or f'<li>{vuoto}</li>'
     attr = f' data-hl="{hl}"' if hl else ""
     return f'<section class="{classe}"{attr}><h2>{titolo}</h2><ul>{corpo}</ul></section>'
@@ -67,7 +64,7 @@ def _blocco_costi(chiusi: list[dict]) -> str:
 
 
 def _blocco_caution(data: dict, fatti: int, totale: int) -> str:
-    """L'annunciatore: il grafo non converge in un nodo finale unico.
+    """L'avviso: il grafo non converge in un nodo finale unico.
 
     Come in doctor, a grafo finito tace: l'avviso serve mentre la struttura
     si puo' ancora correggere. Gli id sono cliccabili come le voci di lista.

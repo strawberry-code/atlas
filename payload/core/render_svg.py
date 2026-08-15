@@ -1,10 +1,10 @@
-"""Il display tattico: layout topologico e track dei nodi, assemblati in SVG.
+"""La mappa del grafo: layout topologico e nodi, assemblati in SVG.
 
 Spezzato da render.py perche' qui c'e' una sola responsabilita', il disegno del
-grafo, mentre render.py assembla la plancia attorno; gli archi e le loro regole
+grafo, mentre render.py assembla la pagina attorno; gli archi e le loro regole
 di hover stanno in render_edges.py. Nessuna risorsa remota.
 I colori di stato non sono attributi SVG ma classi CSS (st-<stato>, vedi
-dashboard.css): e' cio' che fa funzionare il night/day mode su un file gia'
+dashboard.css): e' cio' che fa funzionare il tema chiaro/scuro su un file gia'
 generato. Ogni nodo porta data-node, che il JavaScript della pagina usa per
 aprire la scheda; l'href resta come ripiego per chi naviga senza script.
 """
@@ -17,8 +17,6 @@ from .strings import t
 from .theme import STATE, css_class, state_of
 
 W, H, GAP_X, GAP_Y, PAD = 236, 92, 30, 54, 24
-# ritardi dell'animazione d'ingresso: una riga topologica dopo l'altra
-DELAY_ROW, DELAY_COL = 0.1, 0.03
 
 
 def wrap(text: str, limit: int = 27, lines: int = 3) -> list[str]:
@@ -59,25 +57,6 @@ def layout(data: dict, depth: dict[str, int]) -> dict[str, tuple[float, float]]:
     return pos
 
 
-def _delay(x: float, y: float) -> str:
-    riga = (y - PAD) / (H + GAP_Y)
-    colonna = (x - PAD) / (W + GAP_X)
-    return f"{riga * DELAY_ROW + colonna * DELAY_COL:.2f}s"
-
-
-def _reticolo(x: float, y: float) -> str:
-    """Quattro staffe angolari attorno a un track di frontiera: il bersaglio
-    prioritario del display, quello su cui conviene agganciarsi adesso."""
-    b, s = 5, 11  # sbalzo dal bordo e lunghezza del braccio
-    angoli = (
-        f'M{x - b},{y + s - b} V{y - b} H{x + s - b}',
-        f'M{x + W - s + b},{y - b} H{x + W + b} V{y + s - b}',
-        f'M{x + W + b},{y + H - s + b} V{y + H + b} H{x + W - s + b}',
-        f'M{x + s - b},{y + H + b} H{x - b} V{y + H - s + b}',
-    )
-    return "".join(f'<path class="ret" d="{d}"/>' for d in angoli)
-
-
 def boxes(data: dict, pos: dict, front: set[str]) -> str:
     out = []
     for node in data["nodes"]:
@@ -94,16 +73,14 @@ def boxes(data: dict, pos: dict, front: set[str]) -> str:
             for i, r in enumerate(wrap(node["title"])) if r
         )
         tipo_modo = f'{node["type"]}·{node["mode"]}'
-        reticolo = _reticolo(x, y) if stato == "frontier" else ""
         out.append(
             f'<a href="tickets/{node["id"]}.md" data-node="{node["id"]}">'
             f'<g class="n {css_class(stato)}" id="node-{node["id"]}" '
-            f'data-branch="{escape(node["branch"])}" style="--d:{_delay(x, y)}">'
+            f'data-branch="{escape(node["branch"])}">'
             f'<title>{escape(node["title"])} — {escape(node["question"])}</title>'
             f'<rect class="card" x="{x}" y="{y}" width="{W}" height="{H}" rx="3" '
             f'stroke-width="1.2"{tratto}/>'
             f'<rect x="{x}" y="{y}" width="3" height="{H}" fill="{ramo}"/>'
-            f'{reticolo}'
             f'<text class="nid" x="{x + 16}" y="{y + 21}">{STATE[stato][0]} {node["id"]}</text>'
             f'<text class="nbadge" x="{x + W - 12}" y="{y + 21}" text-anchor="end">{escape(tipo_modo)}</text>'
             f'{titolo}'
@@ -114,7 +91,7 @@ def boxes(data: dict, pos: dict, front: set[str]) -> str:
 
 
 def canvas(data: dict, depth: dict[str, int], front_ids: set[str]) -> str:
-    """Stile dinamico + <svg> completo, pronti da inserire nella plancia."""
+    """Stile dinamico + <svg> completo, pronti da inserire nella pagina."""
     pos = layout(data, depth)
     larghezza = max((x + W for x, _ in pos.values()), default=600) + PAD
     altezza = max((y + H for _, y in pos.values()), default=200) + PAD

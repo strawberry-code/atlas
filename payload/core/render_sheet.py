@@ -1,6 +1,6 @@
 """La scheda del ticket dentro la dashboard: scheletro della side sheet e dati.
 
-Spezzato da render.py perche' sono due lavori: la' l'assemblaggio della plancia,
+Spezzato da render.py perche' sono due lavori: la' l'assemblaggio della pagina,
 qui tutto cio' che serve a leggere un ticket senza lasciare la pagina. I ticket
 sono incorporati come JSON al momento della generazione, perche' da file://
 nessuna fetch potrebbe leggerli dopo; il markdown lo trasforma il JavaScript
