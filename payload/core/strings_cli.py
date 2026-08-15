@@ -76,6 +76,8 @@ STRINGS: dict[str, dict[str, str]] = {
     "doctor.skill": {"it": "  skill    {stato}", "en": "  skills   {stato}"},
     "doctor.skill_ok": {"it": "tutte collegate", "en": "all linked"},
     "doctor.skill_mancanti": {"it": "mancano {elenco}", "en": "missing {elenco}"},
+    "doctor.skill_sorgente_assente": {"it": "{dir} non esiste: reinstalla con 'atlas install'",
+                                     "en": "{dir} is missing: reinstall with 'atlas install'"},
     "doctor.hook": {"it": "  hook     {stato}", "en": "  hook     {stato}"},
     "doctor.hook_ok": {"it": "registrato", "en": "registered"},
     "doctor.hook_assente": {"it": "assente", "en": "absent"},

@@ -5,7 +5,8 @@ from datetime import timedelta
 
 from . import claims, docs
 from .config import Graph, Workspace
-from .model import blocked, blocks, claimed, fog_for, frontier, is_done, node_of, progress, ranked_frontier
+from .model import blocked, blocks, claimed, fog_for, frontier, is_done, node_of, progress
+from .topology import ranked_frontier
 from .store import load
 from .strings import t
 

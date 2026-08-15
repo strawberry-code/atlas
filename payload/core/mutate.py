@@ -10,7 +10,8 @@ from contextlib import contextmanager
 from datetime import datetime
 
 from .config import Graph, Workspace
-from .model import by_id, levels, node_of
+from .model import by_id, node_of
+from .topology import levels
 from .store import OPEN, DROPPED, SCHEMA_VERSION, StateError, transaction, write_new
 from .strings import t
 

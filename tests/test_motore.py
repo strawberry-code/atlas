@@ -34,10 +34,12 @@ class Base(unittest.TestCase):
         os.environ["ATLAS_ROOT"] = str(self.root)
         for modulo in [m for m in sys.modules if m == "core" or m.startswith("core.")]:
             del sys.modules[modulo]
-        from core import config, docs, doctor, howto, mutate, render, store, model, claims, strings, report
+        from core import (config, docs, doctor, howto, identity, mutate, render, render_panels,
+                          store, model, topology, claims, strings, report)
         self.config, self.docs, self.mutate = config, docs, mutate
         self.render, self.store, self.model, self.claims = render, store, model, claims
         self.strings, self.report, self.howto, self.doctor = strings, report, howto, doctor
+        self.topology, self.identity, self.render_panels = topology, identity, render_panels
         self.ws = config.workspace(self.tmp)
         self.ref = mutate.create_graph(self.ws, "prova", "Grafo di prova", "Verificare il motore.")
 
@@ -78,7 +80,7 @@ class Forma(Base):
 
     def test_livelli_topologici(self):
         data = self.popola()
-        self.assertEqual({"F01": 0, "F02": 1, "F03": 2}, self.model.levels(data))
+        self.assertEqual({"F01": 0, "F02": 1, "F03": 2}, self.topology.levels(data))
 
     def test_ciclo_rifiutato_e_grafo_intatto(self):
         self.popola()
@@ -129,20 +131,51 @@ class Forma(Base):
 
     def test_downstream_conta_tutti_i_dipendenti(self):
         data = self.popola()
-        self.assertEqual({"F02", "F03"}, self.model.downstream(data, "F01"))
+        self.assertEqual({"F02", "F03"}, self.topology.downstream(data, "F01"))
 
     def test_cammino_residuo_fino_al_terminale(self):
         data = self.popola()
-        self.assertEqual(2, self.model.residual_path(data, "F01"))
-        self.assertEqual(0, self.model.residual_path(data, "F03"))
+        self.assertEqual(2, self.topology.residual_path(data, "F01"))
+        self.assertEqual(0, self.topology.residual_path(data, "F03"))
 
     def test_convergence_trova_finale_e_rami_sciolti(self):
         data = self.popola()
-        self.assertEqual(("F03", []), self.model.convergence(data))
+        self.assertEqual(("F03", []), self.topology.convergence(data))
         with self.mutate.editing(self.ref) as g:
             self.mutate.unlink(g, "F03", blocked_by="F02")
         data = self.store.load(self.ref.json_path)
-        self.assertEqual(("F02", ["F03"]), self.model.convergence(data))
+        self.assertEqual(("F02", ["F03"]), self.topology.convergence(data))
+
+    def _arco_fantasma(self):
+        """Un graph.json che nomina un blocker inesistente, come dopo un merge mal
+        risolto o una modifica a mano: lo scrive direttamente, perche' mutate
+        rifiuterebbe di produrlo."""
+        self.popola()
+        dati = json.loads(self.ref.json_path.read_text(encoding="utf-8"))
+        dati["nodes"][1]["blockedBy"] = ["FANTASMA"]
+        self.ref.json_path.write_text(json.dumps(dati, ensure_ascii=False), encoding="utf-8")
+
+    def test_arco_fantasma_diagnosticato_non_esploso(self):
+        """Il difetto deve uscire come diagnosi leggibile, non come KeyError nudo:
+        e' lo stesso messaggio che darebbe 'validate', perche' il difetto e' quello."""
+        self._arco_fantasma()
+        data = self.store.load(self.ref.json_path)
+        for nome, funzione in (("levels", self.topology.levels), ("frontier", self.model.frontier),
+                               ("blocked", self.model.blocked), ("convergence", self.topology.convergence)):
+            with self.subTest(funzione=nome):
+                with self.assertRaises(self.store.StateError) as caso:
+                    funzione(data)
+                self.assertIn("FANTASMA", str(caso.exception))
+                self.assertIn("F02", str(caso.exception))
+
+    def test_ciclo_resta_diagnosticato(self):
+        self.popola()
+        dati = json.loads(self.ref.json_path.read_text(encoding="utf-8"))
+        dati["nodes"][0]["blockedBy"] = ["F03"]        # F01 -> F02 -> F03 -> F01
+        self.ref.json_path.write_text(json.dumps(dati, ensure_ascii=False), encoding="utf-8")
+        with self.assertRaises(self.store.StateError) as caso:
+            self.topology.levels(self.store.load(self.ref.json_path))
+        self.assertIn("ciclo", str(caso.exception).lower())
 
     def test_convergence_ignora_i_fuori_scopo(self):
         """Un ramo messo fuori scopo e' stato tagliato apposta: non e' sciolto."""
@@ -151,18 +184,45 @@ class Forma(Base):
             self.mutate.unlink(g, "F03", blocked_by="F02")
             self.mutate.drop(g, "F03", "ramo morto")
         data = self.store.load(self.ref.json_path)
-        self.assertEqual(("F02", []), self.model.convergence(data))
+        self.assertEqual(("F02", []), self.topology.convergence(data))
 
     def test_ranked_frontier_ordina_per_impatto(self):
         self.popola()
         with self.mutate.editing(self.ref) as g:
             self.mutate.unlink(g, "F02", blocked_by="F01")
         data = self.store.load(self.ref.json_path)
-        ordinata = self.model.ranked_frontier(data)
+        ordinata = self.topology.ranked_frontier(data)
         self.assertEqual(["F02", "F01"], [n["id"] for n, _, _ in ordinata])
 
 
 class Lucchetti(Base):
+    def test_due_ignoti_non_sono_lo_stesso_agente(self):
+        """Fuori da una sessione Claude, e senza ATLAS_IDENTITY, l'identita' e' '?'.
+        Prima due processi qualsiasi si riconoscevano come lo stesso attore: il
+        secondo claim sullo stesso nodo tornava 'rivendicato' e rinfrescava il
+        lucchetto del primo, cosi' due agenti lavoravano lo stesso nodo."""
+        self.popola()
+        senza_sessione = {k: v for k, v in os.environ.items()
+                          if k not in ("CLAUDE_PID", "ATLAS_IDENTITY")}
+        with mock.patch.dict(os.environ, senza_sessione, clear=True):
+            os.environ["ATLAS_ROOT"] = str(self.root)
+            self.claims.claim(self.ref, "F01", assignee="agente-uno")
+            with self.assertRaises(self.store.StateError):
+                self.claims.claim(self.ref, "F01", assignee="agente-due")
+        nodo = self.model.node_of(self.store.load(self.ref.json_path), "F01")
+        self.assertEqual("agente-uno", nodo["assignee"], "il nodo resta di chi lo ha preso per primo")
+
+    def test_identita_dichiarata_resta_riconoscibile(self):
+        """La cura non deve rompere il caso legittimo: chi si dichiara si riconosce,
+        quindi il secondo claim dello stesso attore rinfresca il proprio lucchetto."""
+        self.popola()
+        with mock.patch.dict(os.environ, {"ATLAS_IDENTITY": "esecutore-1"}):
+            self.claims.claim(self.ref, "F01")
+            self.claims.claim(self.ref, "F01")        # idempotente per lo stesso attore
+            with mock.patch.dict(os.environ, {"ATLAS_IDENTITY": "esecutore-2"}):
+                with self.assertRaises(self.store.StateError):
+                    self.claims.claim(self.ref, "F01")
+
     def test_ciclo_di_vita(self):
         self.popola()
         self.claims.claim(self.ref, "F01")
@@ -274,22 +334,22 @@ class Lucchetti(Base):
 
 
 class LucchettiWindows(Base):
-    """claims.alive() sul ramo win32: os.kill(pid, 0) su Windows non e' un probe innocuo
+    """identity.alive() sul ramo win32: os.kill(pid, 0) su Windows non e' un probe innocuo
     (per segnali diversi da CTRL_C/CTRL_BREAK la libc chiama TerminateProcess), quindi
     quel ramo deve passare da tasklist e non deve mai toccare os.kill."""
 
     def test_processo_vivo_non_chiama_mai_os_kill(self):
         with mock.patch("sys.platform", "win32"), \
              mock.patch("os.kill", side_effect=AssertionError("os.kill ucciderebbe il processo su Windows")), \
-             mock.patch.object(self.claims, "subprocess") as sub:
+             mock.patch.object(self.identity, "subprocess") as sub:
             sub.run.return_value.stdout = '"claude.exe","4242","Console","1","10.000 K"\r\n'
-            self.assertTrue(self.claims.alive(4242, "claude"))
+            self.assertTrue(self.identity.alive(4242, "claude"))
 
     def test_processo_assente(self):
         with mock.patch("sys.platform", "win32"), \
-             mock.patch.object(self.claims, "subprocess") as sub:
+             mock.patch.object(self.identity, "subprocess") as sub:
             sub.run.return_value.stdout = "INFO: No tasks are running which match the specified criteria.\r\n"
-            self.assertFalse(self.claims.alive(4242, "claude"))
+            self.assertFalse(self.identity.alive(4242, "claude"))
 
 
 class Artefatti(Base):
@@ -394,7 +454,7 @@ class Artefatti(Base):
                 "15k token": 15.0, "Una sessione... .": None, "a occhio": None}
         for testo, atteso in casi.items():
             with self.subTest(testo=testo):
-                self.assertEqual(self.render._costo_numerico(testo), atteso)
+                self.assertEqual(self.render_panels._costo_numerico(testo), atteso)
 
     def prepara_lavoro(self):
         """Un nodo rivendicato in una repo git, con un file di lavoro appena scritto."""
@@ -599,6 +659,20 @@ class Artefatti(Base):
 
 
 class Doctor(Base):
+    def test_doctor_regge_un_grafo_strutturalmente_rotto(self):
+        """L'attrezzo di bordo non puo' essere il primo a rompersi: su un grafo con
+        un arco verso un id inesistente deve stampare la diagnosi, non morire."""
+        self.popola()
+        dati = json.loads(self.ref.json_path.read_text(encoding="utf-8"))
+        dati["nodes"][1]["blockedBy"] = ["FANTASMA"]
+        self.ref.json_path.write_text(json.dumps(dati, ensure_ascii=False), encoding="utf-8")
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            self.doctor.show_doctor(self.ws)          # non deve sollevare
+        uscita = buffer.getvalue()
+        self.assertIn("FANTASMA", uscita)
+        self.assertIn("prova", uscita)                # nomina il grafo malato
+
     def test_fog_for_confine_di_parola(self):
         """fog_for deve usare confini di parola, non sottostringa: B1 ≠ B10."""
         self.popola()

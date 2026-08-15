@@ -46,6 +46,8 @@ STRINGS: dict[str, dict[str, str]] = {
                                "en": "{id} is on a branch that doesn't exist: {branch}"},
     "mutate.vocab_non_valido": {"it": "{id} ha {chiave}='{valore}', fuori da {ammessi}",
                                "en": "{id} has {chiave}='{valore}', outside {ammessi}"},
+    "model.nodo_inesistente": {"it": "{id} non esiste nel grafo", "en": "{id} does not exist in the graph"},
+    "model.ciclo": {"it": "ciclo di dipendenze su {id}", "en": "dependency cycle on {id}"},
     "mutate.dipendenza_inesistente": {"it": "{id} è bloccato da {dep}, che non esiste",
                                      "en": "{id} is blocked by {dep}, which doesn't exist"},
     "mutate.auto_dipendenza": {"it": "{id} dipende da se stesso", "en": "{id} depends on itself"},
@@ -78,7 +80,11 @@ STRINGS: dict[str, dict[str, str]] = {
                                 "  Fix it by hand, or delete it and run 'atlas install' again."},
 
     # --- store.py ---
-    "store.grafo_rotto": {"it": "{path} non è JSON valido ({dettaglio}).\n"
+    "store.lock_conteso": {"it": "il grafo è occupato da un altro processo e non si è liberato: "
+                                 "niente è stato scritto, riprova fra poco.",
+                          "en": "the graph is held by another process and did not free up: "
+                                "nothing was written, try again shortly."},
+    "store.grafo_rotto":{"it": "{path} non è JSON valido ({dettaglio}).\n"
                                 "  Il grafo non si può leggere: recuperalo da git, se il progetto lo versiona.",
                           "en": "{path} is not valid JSON ({dettaglio}).\n"
                                 "  The graph can't be read: restore it from git, if the project versions it."},

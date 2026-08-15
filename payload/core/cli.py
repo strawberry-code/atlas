@@ -95,8 +95,11 @@ def cmd_exec(ws: Workspace, args) -> int:
     except Exception as errore:                       # lo script e' codice altrui
         raise StateError(t("exec.morto", nome=script.name,
                             tipo=type(errore).__name__, errore=errore)) from errore
-    data = load(ref.json_path)
-    refresh(ref, data)
+    # Sotto lock come ogni altro percorso che rigenera: due script lanciati insieme,
+    # o uno script mentre un altro agente chiude un nodo, facevano atterrare artefatti
+    # costruiti su una lettura vecchia sopra quelli appena scritti.
+    with read_transaction(ref.json_path) as data:
+        refresh(ref, data)
     print(t("exec.applicato", nome=script.name, slug=ref.slug, n=len(data["nodes"])))
     report.show_status(ref, data)
     return 0
@@ -117,9 +120,18 @@ def cmd_doctor(ws: Workspace, args) -> int:
     print(t("doctor.versione", versione=howto.versione_motore()))
     print(t("doctor.grafi", grafi=", ".join(ws.slugs()) or t("doctor.nessuno")))
     skills = ws.project_root / ".claude" / "skills"
-    attese = [d.name for d in (ws.root / "skills").iterdir() if d.is_dir()]
+    # .atlas/skills sparisce con un'installazione interrotta o una cancellazione a
+    # mano, ed e' esattamente quando si lancia doctor: iterdir() su una cartella che
+    # non c'e' faceva morire la diagnosi prima di stamparla.
+    sorgente = ws.root / "skills"
+    attese = [d.name for d in sorgente.iterdir() if d.is_dir()] if sorgente.is_dir() else []
     mancanti = [s for s in attese if not (skills / s).exists()]
-    stato_skill = t("doctor.skill_ok") if not mancanti else t("doctor.skill_mancanti", elenco=", ".join(mancanti))
+    if not sorgente.is_dir():
+        stato_skill = t("doctor.skill_sorgente_assente", dir=sorgente)
+    elif mancanti:
+        stato_skill = t("doctor.skill_mancanti", elenco=", ".join(mancanti))
+    else:
+        stato_skill = t("doctor.skill_ok")
     print(t("doctor.skill", stato=stato_skill))
     hook = ws.project_root / ".claude" / "settings.json"
     contenuto_hook = hook.read_text(encoding="utf-8") if hook.is_file() else ""

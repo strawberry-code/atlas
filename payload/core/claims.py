@@ -1,71 +1,20 @@
-"""Protocollo del lucchetto: chi tiene un nodo, se e' ancora vivo, chi puo' chiuderlo.
+"""Protocollo del lucchetto: prendere un nodo, mollarlo, chiuderlo.
 
 Il claim e' un lucchetto, non un post-it. Chi lo prende ci lascia PID e id di sessione,
 e un lucchetto e' orfano quando quel processo non esiste piu': la liveness e' il criterio,
 il tempo trascorso e' solo un secondo segnale per la sessione viva ma abbandonata.
+Chi siamo e chi e' ancora vivo lo dice identity.py.
 """
 from __future__ import annotations
 
-import os
-import subprocess
-import sys
 from datetime import datetime, timedelta
 
 from . import docs, gitscan
-from .config import ENV_IDENTITY, Graph
+from .config import Graph
+from .identity import alive, e_mio, holder, identity, nota, session
 from .model import by_id, fingerprint, is_done, node_of, claimed
 from .store import CLAIMED, CLOSED, OPEN, StateError, load, transaction
 from .strings import t
-
-
-def session() -> tuple[int | None, str | None]:
-    """Identita' della sessione agente che ospita il comando, se c'e'."""
-    pid = os.environ.get("CLAUDE_PID")
-    return (int(pid) if pid and pid.isdigit() else None,
-            os.environ.get("CLAUDE_CODE_SESSION_ID"))
-
-
-def identity() -> str:
-    """Chi tiene davvero il lucchetto: sovrascrivibile via ATLAS_IDENTITY, altrimenti il PID.
-
-    I subagent di una stessa sessione Claude condividono lo stesso CLAUDE_PID: senza
-    un'identita' esplicita, il tetto di claim per sessione e i conflitti di chiusura
-    li tratterebbero come un solo attore anche quando lavorano nodi diversi in parallelo.
-    """
-    if sovrascritta := os.environ.get(ENV_IDENTITY):
-        return sovrascritta
-    pid, _ = session()
-    return str(pid) if pid else "?"
-
-
-def alive(pid: int | None, process_name: str = "claude") -> bool:
-    """Vero se il processo esiste ed e' ancora l'agente: copre il riuso del PID."""
-    if not pid:
-        return False
-    if sys.platform == "win32":
-        return _alive_windows(pid, process_name)
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True  # esiste ma non e' nostro: per noi e' vivo
-    out = subprocess.run(["ps", "-o", "comm=", "-p", str(pid)],
-                         capture_output=True, text=True).stdout
-    return process_name in out
-
-
-def _alive_windows(pid: int, process_name: str) -> bool:
-    """os.kill(pid, 0) su Windows non e' un probe: per segnali diversi da CTRL_C/CTRL_BREAK
-    la libc chiama TerminateProcess, quindi 'controllare' un pid lo ammazzerebbe davvero.
-    tasklist e' l'unica via sicura per sapere se un processo esiste ancora."""
-    out = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH", "/FO", "CSV"],
-                         capture_output=True, text=True).stdout
-    return process_name.lower() in out.lower()
-
-
-def holder(node: dict) -> dict:
-    return node.get("claim") or {}
 
 
 def held_since(node: dict) -> timedelta | None:
@@ -89,9 +38,13 @@ def claim_state(node: dict, agent: dict) -> str:
 
 
 def mine(data: dict) -> list[dict]:
-    me = identity()
-    return [n for n in data["nodes"]
-            if n["status"] == CLAIMED and holder(n).get("identity") == me]
+    """I nodi che teniamo noi. Con identita' ignota nessun nodo e' dimostrabilmente
+    nostro, quindi il tetto per sessione non scatta: e' il verso giusto in cui
+    sbagliare, perche' l'alternativa era attribuirci i nodi presi da chiunque altro
+    e bloccare un agente per colpa di un suo pari."""
+    if not nota(identity()):
+        return []
+    return [n for n in data["nodes"] if n["status"] == CLAIMED and e_mio(n)]
 
 
 def claim(ref: Graph, node_id: str, assignee: str | None = None, force: bool = False) -> dict:
@@ -100,7 +53,7 @@ def claim(ref: Graph, node_id: str, assignee: str | None = None, force: bool = F
     me = identity()
     with transaction(ref.json_path) as data:
         node = node_of(data, node_id)
-        if node["status"] == CLAIMED and holder(node).get("identity") == me:
+        if node["status"] == CLAIMED and e_mio(node):
             node["claim"]["heartbeat"] = datetime.now().astimezone().isoformat(timespec="seconds")
             return dict(node)
         index = by_id(data)
@@ -173,7 +126,7 @@ def close(ref: Graph, node_id: str, summary: str, force: bool = False,
             raise StateError(t("close.gia_chiuso", id=node_id))
         owner = holder(node).get("identity")
         owner_pid = holder(node).get("pid")
-        if node["status"] == CLAIMED and owner != identity() and alive(owner_pid, agent["process_name"]) and not force:
+        if node["status"] == CLAIMED and not e_mio(node) and alive(owner_pid, agent["process_name"]) and not force:
             raise StateError(t("close.altra_sessione", id=node_id, owner=owner))
         if not docs.answer_written(ref, node_id) and not force:
             raise StateError(t("close.risposta_vuota", file=ref.ticket_path(node_id).name))

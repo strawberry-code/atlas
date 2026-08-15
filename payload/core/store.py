@@ -28,8 +28,21 @@ if sys.platform == "win32":
     import msvcrt
 
     def _lock(fh) -> None:
+        """LK_LOCK non attende all'indefinito come flock: ritenta per dieci secondi
+        e poi solleva. Sotto contesa vera (un altro agente che chiude un nodo con
+        git lento) quei dieci secondi scadono, e un OSError nudo direbbe soltanto
+        'Permission denied' a chi si e' visto rifiutare la propria scrittura.
+        Si riprova una volta, poi si dice cosa e' successo e cosa fare.
+        """
         fh.seek(0)
-        msvcrt.locking(fh.fileno(), msvcrt.LK_LOCK, 1)
+        for tentativo in (1, 2):
+            try:
+                msvcrt.locking(fh.fileno(), msvcrt.LK_LOCK, 1)
+                return
+            except OSError as errore:
+                if tentativo == 2:
+                    raise StateError(t("store.lock_conteso")) from errore
+                fh.seek(0)
 
     def _unlock(fh) -> None:
         fh.seek(0)
@@ -125,8 +138,8 @@ def _sincronizza_cartella(cartella: Path) -> None:
         os.close(fd)
 
 
-def _scrivi_atomico(path: Path, testo: str) -> None:
-    """Sostituisce il grafo in un colpo solo: chi legge vede il vecchio o il nuovo.
+def scrivi_atomico(path: Path, testo: str) -> None:
+    """Sostituisce un file in un colpo solo: chi legge vede il vecchio o il nuovo.
 
     Riscrivere il file vivo (seek, write, truncate) lascia una finestra in cui un
     processo ucciso a meta' lascia sul disco un grafo troncato, oppure un grafo
@@ -146,7 +159,7 @@ def _scrivi_atomico(path: Path, testo: str) -> None:
 def write_new(path: Path, graph: dict) -> None:
     """Prima scrittura di un grafo: fuori da transaction perche' il file non esiste ancora."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    _scrivi_atomico(path, dumps(graph))
+    scrivi_atomico(path, dumps(graph))
 
 
 @contextmanager
@@ -161,7 +174,7 @@ def transaction(path: Path):
     with _sotto_lock(path):
         graph = load(path)
         yield graph
-        _scrivi_atomico(path, dumps(graph))
+        scrivi_atomico(path, dumps(graph))
 
 
 @contextmanager
