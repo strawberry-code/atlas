@@ -22,7 +22,7 @@ Also ask for the graph's **slug** (kebab-case, e.g. `epic-auth`) and its **title
 2. **Name the destination**: one or two lines saying where this lands once the graph is done. If it can't be drawn from the text, ask for it. Without a destination you can't decide what's out of scope.
 3. Identify the **branches**: 3-6 strands of work, each with a letter and a color. Branches exist to read the graph, not to organize execution.
 4. Derive the **nodes**. Each is sized for a single work session. A node that holds three independent decisions should be split; three nodes that all close with the same sentence should be merged.
-5. Wire the **dependencies**: a `blockedBy` edge exists when the second node isn't even formulable until the first has answered. A plain "comes later in time" is not a dependency.
+5. Wire the **dependencies**: a `blockedBy` edge exists when the second node isn't even formulable until the first has answered. A plain "comes later in time" is not a dependency. Make the **graph converge into a single final node**, usually a gate that verifies the destination: a terminal that doesn't flow into it is a strand whose outcome no one will collect, and `atlas doctor` flags it.
 6. **Show the structure to the user before writing anything** — id, title, type, mode, blocker — and ask for confirmation. This is where things get corrected, not after.
 
 ## Branch B — there's just an idea
@@ -93,7 +93,7 @@ atlas exec .atlas/scripts/001-first-draft.py
 atlas render --open
 ```
 
-`exec` writes the missing tickets, regenerates the map and the dashboard, and prints the frontier. Look at it together with the user: a graph with twenty nodes all up for grabs has no real dependencies, one with only a single node up for grabs is a list disguised as a graph.
+`exec` writes the missing tickets, regenerates the map and the dashboard, and prints the frontier. Look at it together with the user: a graph with twenty nodes all up for grabs has no real dependencies, one with only a single node up for grabs is a list disguised as a graph, and several terminal nodes are strands that don't flow into the final one.
 
 ## Each node's question
 

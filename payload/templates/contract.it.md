@@ -19,7 +19,7 @@ Se arrivi qui senza sapere niente di Atlas, `atlas how-to` è il punto di ingres
 
 Il claim è un lucchetto, non un promemoria: porta l'identità di chi rivendica (il PID di processo, o `ATLAS_IDENTITY` se impostata) e un battito che si rinnova ri-rivendicando lo stesso nodo. `claim`/`take` rifiutano se questa identità ne tiene già uno. Per lavorare su più nodi in parallelo con subagent che condividono lo stesso processo padre, ognuno imposta un'identità diversa tramite il flag `--identity` sui comandi che prendono il lucchetto (`claim`, `take`, `release`, `close`), oppure la variabile d'ambiente `ATLAS_IDENTITY`: altrimenti il tetto per sessione li conta come un solo attore. Il flag ha la precedenza sulla variabile, ed è quello che serve a un agente che lancia ogni comando da una shell nuova, perché lì un `export` non arriva alla chiamata dopo e il lucchetto tornerebbe a registrarsi sotto il PID del padre, cioè sotto la stessa identità dei suoi fratelli. Il rifiuto si scavalca con `--force`, che esiste per i casi imprevisti e non per la fretta.
 
-Un lucchetto è orfano quando il processo che l'ha preso non esiste più, o fermo quando il battito non si aggiorna da troppo tempo. `atlas doctor` segnala entrambi i casi, insieme ai nodi che nessuno richiede e alle dashboard non aggiornate: eseguilo prima di dichiarare un grafo finito.
+Un lucchetto è orfano quando il processo che l'ha preso non esiste più, o fermo quando il battito non si aggiorna da troppo tempo. `atlas doctor` segnala entrambi i casi, insieme ai terminali che non confluiscono nel nodo finale e alle dashboard non aggiornate: eseguilo prima di dichiarare un grafo finito.
 
 ### HITL e AFK
 

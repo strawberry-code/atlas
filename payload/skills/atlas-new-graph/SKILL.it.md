@@ -22,7 +22,7 @@ Chiedi anche lo **slug** del grafo (kebab-case, es. `epic-auth`) e il **titolo**
 2. **Nomina la destinazione**: una o due righe che dicono dove si arriva quando il grafo è finito. Se dal testo non si ricava, chiedila. Senza destinazione non si può decidere cosa sta fuori scopo.
 3. Individua i **rami**: 3-6 filoni di lavoro, ognuno con una lettera e un colore. I rami servono a leggere il grafo, non a organizzare l'esecuzione.
 4. Ricava i **nodi**. Ognuno è dimensionato su una sessione di lavoro sola. Un nodo che contiene tre decisioni indipendenti va spezzato; tre nodi che si chiudono con la stessa frase vanno fusi.
-5. Cabla le **dipendenze**: un arco `blockedBy` esiste quando il secondo nodo non è nemmeno formulabile finché il primo non ha risposto. Un semplice "viene prima nel tempo" non è una dipendenza.
+5. Cabla le **dipendenze**: un arco `blockedBy` esiste quando il secondo nodo non è nemmeno formulabile finché il primo non ha risposto. Un semplice "viene prima nel tempo" non è una dipendenza. Fai **convergere il grafo in un nodo finale unico**, di solito un cancello che verifica la destinazione: un terminale che non vi confluisce è un ramo il cui esito nessuno raccoglierà, e `atlas doctor` lo segnala.
 6. **Mostra la struttura all'utente prima di scrivere** — id, titolo, tipo, modo, blocker — e chiedi conferma. È qui che si correggono le cose, non dopo.
 
 ## Ramo B — c'è solo un'idea
@@ -93,7 +93,7 @@ atlas exec .atlas/scripts/001-primo-disegno.py
 atlas render --open
 ```
 
-`exec` scrive i ticket mancanti, rigenera la mappa e la dashboard, e stampa la frontiera. Guardala insieme all'utente: un grafo con venti nodi tutti prendibili non ha dipendenze vere, uno con un nodo solo prendibile è una lista travestita da grafo.
+`exec` scrive i ticket mancanti, rigenera la mappa e la dashboard, e stampa la frontiera. Guardala insieme all'utente: un grafo con venti nodi tutti prendibili non ha dipendenze vere, uno con un nodo solo prendibile è una lista travestita da grafo, e più nodi terminali sono rami che non confluiscono nel finale.
 
 ## La domanda di ogni nodo
 
