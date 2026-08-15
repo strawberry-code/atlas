@@ -108,9 +108,27 @@ STRINGS: dict[str, dict[str, str]] = {
     "update.sha_mismatch": {"it": "\n  sha256 non combacia (atteso {atteso}, trovato {trovato}): "
                                   "aggiornamento annullato.\n",
                            "en": "\n  sha256 mismatch (expected {atteso}, got {trovato}): update aborted.\n"},
+    "update.sha_assente": {"it": "\n  la release {versione} non pubblica 'atlas.sha256': senza impronta "
+                                 "non si sa cosa si sta installando, aggiornamento annullato.\n",
+                          "en": "\n  release {versione} publishes no 'atlas.sha256': without a checksum "
+                                "there is no telling what would be installed, update aborted.\n"},
+    "update.sha_illeggibile": {"it": "\n  l'impronta pubblicata non è uno sha256 leggibile: "
+                                     "aggiornamento annullato.\n",
+                              "en": "\n  the published checksum is not a readable sha256: update aborted.\n"},
+    "update.url_non_sicuro": {"it": "\n  la release rimanda a un indirizzo non cifrato ({url}): "
+                                    "aggiornamento annullato.\n",
+                             "en": "\n  the release points at a plaintext address ({url}): update aborted.\n"},
+    "update.troppo_grande": {"it": "\n  il download supera i {tetto} MB previsti: aggiornamento annullato.\n",
+                            "en": "\n  the download exceeds the expected {tetto} MB: update aborted.\n"},
     "update.fatto": {"it": "\n  atlas {attuale} → {ultima}  ({target})\n",
                     "en": "\n  atlas {attuale} → {ultima}  ({target})\n"},
-    "update.disponibile": {"it": "\n  è disponibile atlas {nuova} (hai {attuale}): esegui 'atlas update' per aggiornare\n",
+    "update.riallinea": {"it": "  skill, contratto e README dei progetti restano quelli della versione "
+                               "precedente: {n} progetti registrati si riallineano con 'atlas install <path>'.",
+                        "en": "  each project's skills, contract and README stay at the previous version: "
+                              "{n} registered projects realign with 'atlas install <path>'."},
+    "update.riallinea_riga": {"it": "    {slug}", "en": "    {slug}"},
+    "update.riallinea_altri": {"it": "    e altri {n}", "en": "    and {n} more"},
+    "update.disponibile":{"it": "\n  è disponibile atlas {nuova} (hai {attuale}): esegui 'atlas update' per aggiornare\n",
                           "en": "\n  atlas {nuova} is available (you have {attuale}): run 'atlas update' to upgrade\n"},
 
     # --- list_cmd.py ---
@@ -118,6 +136,9 @@ STRINGS: dict[str, dict[str, str]] = {
     "list.prune_niente": {"it": "\n  nessuna voce morta da rimuovere\n", "en": "\n  no dead entries to remove\n"},
     "list.vuoto": {"it": "\n  nessun progetto registrato. Installa con 'atlas install <path>'.\n",
                   "en": "\n  no registered projects. Install with 'atlas install <path>'.\n"},
+    "list.slug_ignoto": {"it": "\n  nessun progetto registrato come '{slug}'. Ci sono: {elenco}\n",
+                        "en": "\n  no project registered as '{slug}'. Available: {elenco}\n"},
+    "list.nessuno": {"it": "nessuno", "en": "none"},
     "list.scheda": {"it": "\n  {slug}\n  path      {path}\n  stato     {stato}\n\n"
                           "  I comandi del grafo si danno da dentro il progetto.\n",
                     "en": "\n  {slug}\n  path      {path}\n  status    {stato}\n\n"

@@ -10,6 +10,12 @@ from .strings import t
 def scheda_progetto(slug: str) -> int:
     """'atlas list <slug>': la scheda di un progetto solo."""
     path = registry.resolve(slug)
+    if path is None:
+        # Uno slug sbagliato e' un errore di battitura, non un guasto: prima usciva
+        # come AttributeError su None, cioe' un traceback per una lettera storta.
+        noti = ", ".join(sorted(registry.load()["projects"])) or t("list.nessuno")
+        print(t("list.slug_ignoto", slug=slug, elenco=noti))
+        return 1
     print(t("list.scheda", slug=slug, path=path, stato=registry.status_of(path)))
     return 0
 

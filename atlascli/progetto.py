@@ -40,7 +40,12 @@ def cmd_lang_progetto(progetto: Path, valore: str | None) -> int:
     installer = Installer(progetto, args, valore)
     installer.scrive_documenti()
     installer.contratto()
-    registry.set_language(valore, slug=registry.find_by_path(progetto))
+    # Solo se il progetto e' nel registro: con slug None, set_language cambierebbe
+    # il default di ogni installazione futura sulla macchina. Capita clonando un
+    # repo Atlas altrui, dove .atlas/config.json c'e' ma il registro e' per utente,
+    # e la lingua della propria macchina non c'entra con quella di quel progetto.
+    if noto := registry.find_by_path(progetto):
+        registry.set_language(valore, slug=noto)
     print(t("install.lingua_progetto", lingua=valore))
     return ridisegna(progetto)
 

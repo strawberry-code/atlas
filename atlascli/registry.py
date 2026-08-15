@@ -7,7 +7,9 @@ chi si chiama come e dove sta.
 from __future__ import annotations
 
 import json
+import os
 import re
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
@@ -48,9 +50,44 @@ def load() -> dict:
 
 
 def save(data: dict) -> None:
+    """Scrittura atomica del registro: temporaneo accanto, poi scambio.
+
+    Il registro elenca tutti i progetti Atlas della macchina, e lo riscrive anche
+    il controllo automatico degli aggiornamenti in coda a ogni comando. Con una
+    write_text diretta un processo ucciso a meta' lasciava un JSON troncato, e da
+    li' in poi install, list, lang e uninstall fallivano tutti insieme. Lo scambio
+    con os.replace e' atomico sullo stesso filesystem, quindi o si legge il registro
+    di prima o quello di dopo, mai un file a meta'.
+    """
     path = config_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    testo = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
+    tmp = tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=path.parent,
+                                      prefix=f".{path.name}.", delete=False)
+    try:
+        with tmp:
+            tmp.write(testo)
+            tmp.flush()
+            os.fsync(tmp.fileno())
+        os.replace(tmp.name, path)
+    except BaseException:
+        Path(tmp.name).unlink(missing_ok=True)
+        raise
+
+
+def aggiorna_cache(campi: dict) -> None:
+    """Scrive solo questi campi radice, rileggendo il registro all'ultimo momento.
+
+    La cache del controllo aggiornamenti si salva dopo una chiamata di rete che
+    puo' durare quindici secondi. Risalvare la copia letta prima della chiamata
+    riportava indietro tutto cio' che nel frattempo avevano scritto gli altri
+    comandi: un 'atlas install' lanciato in un'altra shell spariva dal registro
+    senza un errore da nessuna delle due parti. Qui si rilegge e si tocca solo
+    quel che ci riguarda, quindi l'unica cosa che si puo' perdere e' la cache.
+    """
+    data = load()
+    data.update(campi)
+    save(data)
 
 
 def language_for(slug: str | None = None) -> str:

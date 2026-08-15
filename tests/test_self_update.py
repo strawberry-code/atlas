@@ -78,6 +78,41 @@ class SelfUpdate(unittest.TestCase):
     def test_404_messaggio_pulito_senza_traceback(self):
         self.assertEqual(1, self_update.cmd_update(None))  # nessuna route registrata
 
+    def _pubblica_senza_impronta(self, tag: str, blob: bytes) -> None:
+        release = {"tag_name": tag, "assets": [
+            {"name": "atlas", "browser_download_url": f"{self.fixture.base_url}/asset/atlas"}]}
+        self.fixture.routes["/repos/strawberry-code/atlas/releases/latest"] = (
+            200, json.dumps(release).encode("utf-8"), "application/json")
+        self.fixture.routes["/asset/atlas"] = (200, blob, "application/octet-stream")
+
+    def test_release_senza_impronta_non_installa_niente(self):
+        """Una release pubblicata dimenticando atlas.sha256 non deve diventare un
+        aggiornamento cieco: prima passava, saltando la verifica in silenzio."""
+        self._pubblica_senza_impronta("v9.9.9", b"binario non verificabile\n")
+        self.assertEqual(1, self_update.cmd_update(None))
+        self.assertEqual(b"vecchia versione\n", self.target.read_bytes())
+
+    def test_impronta_illeggibile_non_installa_niente(self):
+        """Un proxy che risponde con una pagina di errore al posto dello sha256
+        produceva IndexError; ora e' un rifiuto motivato."""
+        self._pubblica("v9.9.9", b"nuova versione\n")
+        self.fixture.routes["/asset/atlas.sha256"] = (
+            200, b"<html>errore del proxy</html>", "text/html")
+        self.assertEqual(1, self_update.cmd_update(None))
+        self.assertEqual(b"vecchia versione\n", self.target.read_bytes())
+
+    def test_asset_su_http_esterno_rifiutato(self):
+        """L'indirizzo arriva dal JSON della release: in chiaro verso un host che non
+        e' la macchina stessa, chi sta sulla tratta sceglie cosa installiamo."""
+        self._pubblica("v9.9.9", b"nuova versione\n")
+        release = json.loads(
+            self.fixture.routes["/repos/strawberry-code/atlas/releases/latest"][1].decode("utf-8"))
+        release["assets"][0]["browser_download_url"] = "http://esempio.invalido/atlas"
+        self.fixture.routes["/repos/strawberry-code/atlas/releases/latest"] = (
+            200, json.dumps(release).encode("utf-8"), "application/json")
+        self.assertEqual(1, self_update.cmd_update(None))
+        self.assertEqual(b"vecchia versione\n", self.target.read_bytes())
+
 
 class CheckForUpdate(unittest.TestCase):
     def setUp(self):
@@ -116,6 +151,26 @@ class CheckForUpdate(unittest.TestCase):
         data = registry.load()
         self.assertIn("last_update_check", data)
         self.assertIn("latest_known_version", data)
+
+    def test_non_riporta_indietro_il_registro_scritto_nel_frattempo(self):
+        """Fra la lettura del registro e il suo salvataggio c'e' una chiamata di rete.
+        Un altro comando che registra un progetto in quella finestra non deve sparire:
+        prima veniva sovrascritto dalla copia letta prima della chiamata."""
+        self._pubblica_release("v9.9.9")
+        vero_get_json = self_update._get_json
+
+        def get_json_con_interferenza(url):
+            risposta = vero_get_json(url)
+            dati = registry.load()                 # l'altro comando, mentre la rete lavora
+            dati["projects"]["arrivato-dopo"] = {"path": "/tmp/arrivato-dopo"}
+            registry.save(dati)
+            return risposta
+
+        with mock.patch.object(self_update, "_get_json", get_json_con_interferenza):
+            self_update.check_for_update()
+        dopo = registry.load()
+        self.assertIn("arrivato-dopo", dopo["projects"], "il progetto registrato nel frattempo resta")
+        self.assertIn("last_update_check", dopo, "e la cache viene comunque aggiornata")
 
     def test_cache_fresca_non_chiama_rete(self):
         """Con cache fresca (< 24h), check_for_update() non chiama la rete."""
