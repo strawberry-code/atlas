@@ -90,6 +90,24 @@ def progress(graph: dict) -> tuple[int, int]:
     return sum(1 for n in graph["nodes"] if is_done(n)), len(graph["nodes"])
 
 
+def convergence(graph: dict) -> tuple[str | None, list[str]]:
+    """Il presunto nodo finale e i terminali che non vi confluiscono.
+
+    Terminale: nessuno lo aspetta, e non e' fuori scopo. Il finale e' il
+    terminale topologicamente piu' profondo (a parita', il primo nel grafo:
+    max e' stabile); gli altri terminali sono rami sciolti. Non e' una regola
+    del motore, un grafo che non converge resta valido: e' solo un segnale,
+    che doctor e dashboard mostrano come avviso.
+    """
+    depth = levels(graph)
+    terminali = [n["id"] for n in graph["nodes"]
+                 if n["status"] != DROPPED and not blocks(graph, n["id"])]
+    if len(terminali) < 2:
+        return (terminali[0] if terminali else None), []
+    end = max(terminali, key=lambda i: depth[i])
+    return end, [i for i in terminali if i != end]
+
+
 def downstream(graph: dict, node_id: str) -> set[str]:
     """Tutti i nodi che aspettano, direttamente o no, la chiusura di questo."""
     visti: set[str] = set()

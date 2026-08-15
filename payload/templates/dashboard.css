@@ -1,0 +1,481 @@
+/* Dashboard Atlas: glass cockpit. Un solo schermo pannellato in MFD: barra dei
+   readout in alto, strumenti in colonna, il grafo come display tattico centrale
+   navigabile. Simbologia monospace, cornici sottili, staffe angolari. Il toggle
+   non e' light/dark ma day/night, come su un avionico: NIGHT e' il default di
+   sistema scuro, DAY la variante ad alta luminosita'.
+   Risorsa neutra di lingua, letta raw da render.py (nessun .format: le graffe
+   CSS sono al sicuro). Nessuna risorsa remota: font di sistema e basta. */
+
+*{box-sizing:border-box}
+
+:root{
+  color-scheme:light;
+  /* DAY: pannello avionico ad alta luminosita' */
+  --bg:#d3d8db;
+  --pane:#e7eaec;
+  --pane-2:#dde1e4;
+  --ink:#111c22;
+  --muted:#46585f;
+  --faint:#7c8b91;
+  --border:rgba(17,28,34,.22);
+  --border-strong:rgba(17,28,34,.4);
+  --bracket:rgba(17,28,34,.55);
+  --gridline:rgba(17,28,34,.07);
+  --dots:rgba(17,28,34,.14);
+  --edge:#93a6b0;
+  --accent:#0e7490;
+  --accent-2:#047857;
+  --edge-in:#047857;
+  --edge-out:#be123c;
+  --scrim:rgba(17,28,34,.4);
+  --scanline:transparent;
+  --glowpane:none;
+  /* stati (validati su superficie chiara): bordo, riempimento, testo.
+     I riempimenti scalano col da-farsi: la frontiera satura, il chiuso quasi spento */
+  --st-frontier:#b45309;   --st-frontier-bg:rgba(180,83,9,.18);   --st-frontier-tx:#8a4a08;
+  --st-claimed:#1d4ed8;    --st-claimed-bg:rgba(29,78,216,.13);   --st-claimed-tx:#1e40af;
+  --st-closed:#047857;     --st-closed-bg:rgba(4,120,87,.07);     --st-closed-tx:#065f46;
+  --st-blocked:#8fa0aa;    --st-blocked-bg:rgba(17,28,34,.03);    --st-blocked-tx:#5c6f78;
+  --st-out-of-scope:#a8b6be; --st-out-of-scope-bg:transparent;    --st-out-of-scope-tx:#8b99a0;
+  --code-bg:#d8dde0;
+}
+
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    /* NIGHT: vetro scuro, simbologia al ciano */
+    --bg:#04070b;
+    --pane:#0a1119;
+    --pane-2:#070d13;
+    --ink:#d3e2e8;
+    --muted:#87a0aa;
+    --faint:#51666f;
+    --border:rgba(56,209,230,.16);
+    --border-strong:rgba(56,209,230,.4);
+    --bracket:rgba(56,209,230,.6);
+    --gridline:rgba(56,209,230,.05);
+    --dots:rgba(135,160,170,.1);
+    --edge:#2b3f4c;
+    --accent:#38d1e6;
+    --accent-2:#34d399;
+    --edge-in:#34d399;
+    --edge-out:#fb7185;
+    --scrim:rgba(2,5,9,.6);
+    --scanline:rgba(255,255,255,.02);
+    --glowpane:0 0 24px -10px rgba(56,209,230,.25);
+    /* stati (validati su superficie scura) */
+    --st-frontier:#d97706;   --st-frontier-bg:rgba(217,119,6,.26);  --st-frontier-tx:#fcd34d;
+    --st-claimed:#3b82f6;    --st-claimed-bg:rgba(59,130,246,.2);   --st-claimed-tx:#93c5fd;
+    --st-closed:#059669;     --st-closed-bg:rgba(5,150,105,.09);    --st-closed-tx:#6ee7b7;
+    --st-blocked:#33424f;    --st-blocked-bg:rgba(51,66,79,.16);    --st-blocked-tx:#7e939e;
+    --st-out-of-scope:#2c3a45; --st-out-of-scope-bg:transparent;    --st-out-of-scope-tx:#51666f;
+    --code-bg:#0c141c;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#04070b;
+  --pane:#0a1119;
+  --pane-2:#070d13;
+  --ink:#d3e2e8;
+  --muted:#87a0aa;
+  --faint:#51666f;
+  --border:rgba(56,209,230,.16);
+  --border-strong:rgba(56,209,230,.4);
+  --bracket:rgba(56,209,230,.6);
+  --gridline:rgba(56,209,230,.05);
+  --dots:rgba(135,160,170,.1);
+  --edge:#2b3f4c;
+  --accent:#38d1e6;
+  --accent-2:#34d399;
+  --edge-in:#34d399;
+  --edge-out:#fb7185;
+  --scrim:rgba(2,5,9,.6);
+  --scanline:rgba(255,255,255,.02);
+  --glowpane:0 0 24px -10px rgba(56,209,230,.25);
+  --st-frontier:#d97706;   --st-frontier-bg:rgba(217,119,6,.26);  --st-frontier-tx:#fcd34d;
+  --st-claimed:#3b82f6;    --st-claimed-bg:rgba(59,130,246,.2);   --st-claimed-tx:#93c5fd;
+  --st-closed:#059669;     --st-closed-bg:rgba(5,150,105,.09);    --st-closed-tx:#6ee7b7;
+  --st-blocked:#33424f;    --st-blocked-bg:rgba(51,66,79,.16);    --st-blocked-tx:#7e939e;
+  --st-out-of-scope:#2c3a45; --st-out-of-scope-bg:transparent;    --st-out-of-scope-tx:#51666f;
+  --code-bg:#0c141c;
+}
+
+html{scrollbar-color:var(--border-strong) transparent;height:100%}
+body{
+  margin:0;height:100vh;overflow:hidden;color:var(--ink);background:var(--bg);
+  display:grid;grid-template-rows:54px 1fr;grid-template-columns:332px 1fr;
+  grid-template-areas:"top top" "side map";
+  font:12.5px/1.5 ui-monospace,'SF Mono',SFMono-Regular,Menlo,Consolas,'Cascadia Mono',monospace;
+  transition:background-color .35s ease,color .35s ease;
+}
+/* velo da tubo catodico, solo NIGHT (--scanline e' transparent di giorno) */
+body::after{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:20;
+  background:repeating-linear-gradient(0deg,var(--scanline) 0 1px,transparent 1px 3px);
+}
+@media (max-width: 880px){
+  body{grid-template-rows:54px minmax(0,38vh) 1fr;grid-template-columns:minmax(0,1fr);
+    grid-template-areas:"top" "side" "map"}
+}
+
+/* ---------- staffe angolari: la firma dei pannelli MFD ---------- */
+.blocco,.ro,.sheet{position:relative}
+.blocco::before,.ro::before,.sheet::before{
+  content:"";position:absolute;top:-1px;left:-1px;width:11px;height:11px;
+  border-top:1.5px solid var(--bracket);border-left:1.5px solid var(--bracket);pointer-events:none}
+.blocco::after,.ro::after,.sheet::after{
+  content:"";position:absolute;bottom:-1px;right:-1px;width:11px;height:11px;
+  border-bottom:1.5px solid var(--bracket);border-right:1.5px solid var(--bracket);pointer-events:none}
+
+/* ---------- barra dei readout ---------- */
+.topbar{
+  grid-area:top;display:flex;align-items:center;gap:14px;min-width:0;
+  padding:0 14px;border-bottom:1px solid var(--border);background:var(--pane-2);z-index:3;
+}
+.mark{
+  flex:none;width:30px;height:30px;border:1px solid var(--border-strong);
+  display:grid;place-items:center;color:var(--accent);font-size:14px;
+  text-shadow:0 0 10px color-mix(in oklab,var(--accent) 70%,transparent);
+}
+.ident{min-width:0}
+h1{
+  margin:0;font-size:14px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.sub{margin:1px 0 0;color:var(--faint);font-size:10.5px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.sub code{color:var(--accent);background:none;padding:0}
+.spacer{flex:1}
+.readouts{display:flex;gap:10px;flex:none}
+@media (max-width: 720px){.readouts{display:none}}
+.ro{
+  display:flex;gap:8px;align-items:baseline;border:1px solid var(--border);
+  background:var(--pane);padding:4px 11px;
+  animation:rise .5s cubic-bezier(.22,1,.36,1) backwards;
+}
+.readouts .ro:nth-child(1){animation-delay:.08s}
+.readouts .ro:nth-child(2){animation-delay:.16s}
+.readouts .ro:nth-child(3){animation-delay:.24s}
+.ro label{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+.ro b{font-size:13px;color:var(--accent);font-variant-numeric:tabular-nums;
+  text-shadow:0 0 12px color-mix(in oklab,var(--accent) 55%,transparent)}
+
+.theme{
+  flex:none;height:32px;padding:0 10px;border:1px solid var(--border);
+  background:var(--pane);color:var(--muted);display:flex;gap:7px;align-items:center;
+  cursor:pointer;font:inherit;font-size:10px;letter-spacing:.14em;
+  transition:color .2s ease,border-color .2s ease;
+}
+.theme:hover{color:var(--ink);border-color:var(--border-strong)}
+.theme svg{width:15px;height:15px;overflow:visible}
+.theme .sun,.theme .moon{transform-origin:center;transition:opacity .3s ease,transform .45s cubic-bezier(.34,1.56,.64,1)}
+.theme::after{content:"DAY"}
+:root[data-theme="dark"] .theme .sun{opacity:0;transform:rotate(90deg) scale(.4)}
+:root[data-theme="dark"] .theme::after{content:"NGT"}
+:root:not([data-theme="dark"]) .theme .moon{opacity:0;transform:rotate(-90deg) scale(.4)}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .theme .sun{opacity:0;transform:rotate(90deg) scale(.4)}
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .theme .moon{opacity:1;transform:none}
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .theme::after{content:"NGT"}
+}
+
+/* ---------- colonna strumenti ---------- */
+.side{
+  grid-area:side;min-height:0;min-width:0;overflow-y:auto;background:var(--bg);
+  border-right:1px solid var(--border);padding:14px;
+  scrollbar-width:thin;scrollbar-color:var(--border-strong) transparent;
+  display:flex;flex-direction:column;gap:12px;z-index:2;
+}
+@media (max-width: 880px){.side{border-right:none;border-bottom:1px solid var(--border)}}
+.blocco{
+  background:linear-gradient(180deg,var(--pane),var(--pane-2));
+  border:1px solid var(--border);padding:13px 14px;box-shadow:var(--glowpane);
+  animation:rise .55s cubic-bezier(.22,1,.36,1) backwards;
+}
+.side .blocco:nth-child(1){animation-delay:.05s}
+.side .blocco:nth-child(2){animation-delay:.11s}
+.side .blocco:nth-child(3){animation-delay:.17s}
+.side .blocco:nth-child(4){animation-delay:.23s}
+.side .blocco:nth-child(5){animation-delay:.29s}
+.side .blocco:nth-child(6){animation-delay:.35s}
+@keyframes rise{from{opacity:0;transform:translateY(12px)}}
+h2{
+  margin:0 0 9px;font-size:9.5px;font-weight:700;letter-spacing:.16em;
+  color:var(--muted);text-transform:uppercase;display:flex;align-items:center;gap:7px}
+h2::before{content:"";width:6px;height:6px;background:var(--accent);flex:none;
+  box-shadow:0 0 8px color-mix(in oklab,var(--accent) 70%,transparent)}
+ul{margin:0;padding:0;list-style:none}
+li{padding:4px 6px;margin:0 -6px;color:var(--muted);font-size:11.5px;
+  display:flex;gap:8px;align-items:baseline;transition:background-color .15s ease}
+li[data-node]{cursor:pointer}
+li[data-node]:hover,li[data-branch]:hover{background:var(--code-bg)}
+li[data-node]:hover b{color:var(--accent)}
+li b{color:var(--ink);font-weight:700;font-size:11px;transition:color .15s ease}
+.tag{margin-left:auto;font-size:9.5px;color:var(--faint);white-space:nowrap;
+  max-width:45%;overflow:hidden;text-overflow:ellipsis;flex:none}
+.dot{width:8px;height:8px;flex:none;display:inline-block;align-self:center}
+
+/* annunciatore: il grafo non converge nel nodo finale */
+.blocco.caution{border-color:color-mix(in oklab,var(--st-frontier) 45%,var(--border))}
+.blocco.caution::before,.blocco.caution::after{border-color:var(--st-frontier)}
+.blocco.caution h2{color:var(--st-frontier-tx)}
+.blocco.caution h2::before{background:var(--st-frontier);
+  box-shadow:0 0 8px color-mix(in oklab,var(--st-frontier) 70%,transparent);
+  animation:retblink 2.8s ease-in-out infinite}
+.blocco.caution p{margin:0;font-size:11px;line-height:1.6;color:var(--muted)}
+.blocco.caution [data-node]{color:var(--ink);font-weight:700;cursor:pointer;
+  transition:color .15s ease}
+.blocco.caution [data-node]:hover{color:var(--accent)}
+
+/* strumento di avanzamento: anello con corona di tacche */
+.ring-wrap{display:flex;align-items:center;gap:14px}
+.ring{width:92px;height:92px;flex:none;transform:rotate(-90deg)}
+.ring-ticks{fill:none;stroke:var(--border-strong);stroke-width:3;stroke-dasharray:.5 2.5}
+.ring-bg{fill:none;stroke:var(--code-bg);stroke-width:9}
+.ring-fg{fill:none;stroke:url(#ringgrad);stroke-width:9;
+  stroke-dasharray:var(--p) 100;
+  animation:ringfill 1.3s cubic-bezier(.22,1,.36,1) .25s backwards}
+@keyframes ringfill{from{stroke-dasharray:0 100}}
+.rg-a{stop-color:var(--accent)}
+.rg-b{stop-color:var(--accent-2)}
+.pct{font-size:26px;font-weight:700;letter-spacing:-.02em;display:block;
+  font-variant-numeric:tabular-nums;color:var(--accent);
+  text-shadow:0 0 16px color-mix(in oklab,var(--accent) 50%,transparent)}
+.frac{font-size:10.5px;color:var(--faint);display:block;margin-top:1px}
+.dest{margin:10px 0 0;color:var(--muted);font-size:11px;line-height:1.55}
+
+/* costo: numero-eroe */
+.pct-line{margin:0;font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink)}
+.pct-line span{font-size:10.5px;font-weight:400;color:var(--faint);margin-left:7px}
+.nota{margin:4px 0 0;color:var(--faint);font-size:10px}
+
+.blocco-chiusi ul{max-height:170px;overflow-y:auto;scrollbar-width:thin;
+  scrollbar-color:var(--border-strong) transparent}
+
+.firma{margin-top:auto;padding:8px 2px 0;color:var(--faint);font-size:9.5px;line-height:1.5}
+
+/* ---------- display tattico ---------- */
+.map{grid-area:map;position:relative;min-width:0;min-height:0;overflow:hidden;background:var(--bg)}
+.viewport{
+  position:absolute;inset:0;overflow:auto;scrollbar-width:thin;
+  scrollbar-color:var(--border-strong) transparent;
+  background-image:
+    linear-gradient(var(--gridline) 1px,transparent 1px),
+    linear-gradient(90deg,var(--gridline) 1px,transparent 1px),
+    radial-gradient(var(--dots) 1px,transparent 1px);
+  background-size:132px 132px,132px 132px,22px 22px;
+  cursor:grab;
+}
+.viewport.trascina{cursor:grabbing;user-select:none}
+.viewport svg{display:block;margin:64px 26px 46px}
+
+/* simbologia flottante sul display */
+.legend{
+  position:absolute;top:12px;left:14px;right:64px;z-index:2;display:flex;flex-wrap:wrap;
+  gap:7px;align-items:center;pointer-events:none;
+}
+.legend .chip{
+  pointer-events:auto;display:flex;gap:6px;align-items:center;font:inherit;
+  font-size:10px;letter-spacing:.06em;color:var(--muted);
+  background:color-mix(in srgb,var(--pane) 86%,transparent);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  border:1px solid var(--border);padding:4px 10px;cursor:pointer;
+  transition:color .18s ease,border-color .18s ease,opacity .25s ease;
+  animation:rise .5s cubic-bezier(.22,1,.36,1) .4s backwards;
+}
+.legend .chip:hover{color:var(--ink);border-color:var(--border-strong)}
+.legend .chip.on{border-color:var(--accent);color:var(--ink);
+  box-shadow:0 0 0 1px var(--accent),0 0 16px -4px var(--accent)}
+body[data-filter] .legend .chip:not(.on){opacity:.4}
+.legend .chip i{width:8px;height:8px;flex:none}
+.chip.st-frontier i{background:var(--st-frontier-bg);border:1.5px solid var(--st-frontier)}
+.chip.st-claimed i{background:var(--st-claimed-bg);border:1.5px solid var(--st-claimed)}
+.chip.st-closed i{background:var(--st-closed-bg);border:1.5px solid var(--st-closed)}
+.chip.st-blocked i{background:var(--st-blocked-bg);border:1.5px solid var(--st-blocked)}
+.chip.st-out-of-scope i{background:var(--st-out-of-scope-bg);border:1.5px dashed var(--st-out-of-scope)}
+.chip.st-frontier{color:var(--st-frontier-tx)}
+.chip.st-claimed{color:var(--st-claimed-tx)}
+.chip.st-closed{color:var(--st-closed-tx)}
+
+/* comandi di zoom + suggerimento */
+.zoom{position:absolute;right:14px;bottom:14px;z-index:2;display:flex;flex-direction:column;gap:5px}
+.zoom button{
+  width:32px;height:32px;border:1px solid var(--border);
+  background:color-mix(in srgb,var(--pane) 92%,transparent);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  color:var(--muted);font:inherit;font-size:14px;line-height:1;cursor:pointer;
+  display:grid;place-items:center;transition:color .15s ease,border-color .15s ease;
+}
+.zoom button:hover{color:var(--accent);border-color:var(--border-strong)}
+.hint{
+  position:absolute;left:14px;bottom:12px;z-index:2;color:var(--faint);font-size:9.5px;
+  max-width:62%;pointer-events:none;letter-spacing:.03em;
+}
+
+/* ---------- i track del display ---------- */
+.nid{font:700 11px ui-monospace,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.03em}
+.nbadge{font:9.5px ui-monospace,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;fill:var(--faint)}
+.ntt{font:11.5px ui-monospace,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;fill:var(--ink)}
+.ndp{font:9.5px ui-monospace,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;fill:var(--faint)}
+
+.n{cursor:pointer;transform-box:fill-box;transform-origin:center;
+  transition:opacity .18s ease,transform .18s ease;
+  animation:pop .5s cubic-bezier(.22,1,.36,1) calc(.3s + var(--d,0s)) backwards}
+@keyframes pop{from{opacity:0;transform:translateY(10px)}}
+.n:hover{transform:translateY(-2px)}
+.n rect.card{transition:stroke-width .18s ease,filter .18s ease}
+.n:hover rect.card{stroke-width:2.2}
+/* gerarchia a colpo d'occhio: la frontiera preme, il chiuso arretra */
+.st-frontier rect.card{stroke-width:2}
+.st-closed{opacity:.72}
+.st-closed .ntt{fill:var(--muted)}
+
+.st-frontier rect.card{fill:var(--st-frontier-bg);stroke:var(--st-frontier)}
+.st-claimed rect.card{fill:var(--st-claimed-bg);stroke:var(--st-claimed)}
+.st-closed rect.card{fill:var(--st-closed-bg);stroke:var(--st-closed)}
+.st-blocked rect.card{fill:var(--st-blocked-bg);stroke:var(--st-blocked)}
+.st-out-of-scope rect.card{fill:var(--st-out-of-scope-bg);stroke:var(--st-out-of-scope)}
+.st-frontier .nid{fill:var(--st-frontier-tx)}
+.st-claimed .nid{fill:var(--st-claimed-tx)}
+.st-closed .nid{fill:var(--st-closed-tx)}
+.st-blocked .nid{fill:var(--st-blocked-tx)}
+.st-out-of-scope .nid{fill:var(--st-out-of-scope-tx)}
+.st-out-of-scope .ntt{fill:var(--faint)}
+
+/* frontiera = bersaglio prioritario: alone e staffe di aggancio che respirano */
+.st-frontier rect.card{
+  animation:halo 2.8s ease-in-out infinite;
+  filter:drop-shadow(0 0 0px transparent)}
+@keyframes halo{
+  50%{filter:drop-shadow(0 0 13px color-mix(in oklab,var(--st-frontier) 60%,transparent))}
+}
+.ret{fill:none;stroke:var(--st-frontier);stroke-width:1.5;
+  animation:retblink 2.8s ease-in-out infinite}
+@keyframes retblink{0%,100%{opacity:.35}50%{opacity:1}}
+.n:hover rect.card,.n:hover .ret{animation:none;opacity:1}
+
+/* vettori: si tracciano all'apertura; quelli che nutrono la frontiera scorrono */
+path.edge{stroke:var(--edge);fill:none;
+  transition:opacity .18s ease,stroke .18s ease,stroke-width .18s ease;
+  stroke-dasharray:1 0;
+  animation:draw .8s ease calc(.45s + var(--d,0s)) backwards}
+@keyframes draw{from{stroke-dashoffset:1;opacity:0}60%{opacity:1}to{stroke-dashoffset:0}}
+path.edge.feed{
+  stroke:color-mix(in oklab,var(--st-frontier) 55%,var(--edge));
+  stroke-dasharray:.1 .035;
+  animation:draw .8s ease calc(.45s + var(--d,0s)) backwards,
+            flow 1.8s linear calc(1.25s + var(--d,0s)) infinite}
+@keyframes flow{to{stroke-dashoffset:-.27}}
+circle.port{fill:var(--edge);transition:fill .18s ease,opacity .18s ease}
+.tip{fill:var(--edge)}
+.tip-in{fill:var(--edge-in)}
+.tip-out{fill:var(--edge-out)}
+svg:has(.n:hover) .n{opacity:.3}
+svg:has(.n:hover) .n:hover{opacity:1}
+svg:has(.n:hover) path.edge{opacity:.12}
+svg:has(.n:hover) circle.port{opacity:.12}
+
+/* filtro per stato dal chip di simbologia */
+body[data-filter="frontier"] .n:not(.st-frontier),
+body[data-filter="claimed"] .n:not(.st-claimed),
+body[data-filter="closed"] .n:not(.st-closed),
+body[data-filter="blocked"] .n:not(.st-blocked),
+body[data-filter="out-of-scope"] .n:not(.st-out-of-scope){opacity:.13}
+body[data-filter] path.edge{opacity:.25}
+
+/* dal pannello alla carta: il quadratino del titolo prende il colore dello
+   stato, e passare il mouse sul blocco (o sul suo chip di simbologia) accende
+   sulla carta i soli track di quello stato */
+.blocco[data-hl="frontier"] h2::before{background:var(--st-frontier);
+  box-shadow:0 0 8px color-mix(in oklab,var(--st-frontier) 70%,transparent)}
+.blocco[data-hl="claimed"] h2::before{background:var(--st-claimed);
+  box-shadow:0 0 8px color-mix(in oklab,var(--st-claimed) 70%,transparent)}
+.blocco[data-hl="closed"] h2::before{background:var(--st-closed);
+  box-shadow:0 0 8px color-mix(in oklab,var(--st-closed) 70%,transparent)}
+.blocco[data-hl]:hover{border-color:var(--border-strong)}
+.side:has([data-hl="frontier"]:hover) ~ .map .n:not(.st-frontier),
+.map:has(.chip.st-frontier:hover) .n:not(.st-frontier){opacity:.13}
+.side:has([data-hl="claimed"]:hover) ~ .map .n:not(.st-claimed),
+.map:has(.chip.st-claimed:hover) .n:not(.st-claimed){opacity:.13}
+.side:has([data-hl="closed"]:hover) ~ .map .n:not(.st-closed),
+.map:has(.chip.st-closed:hover) .n:not(.st-closed){opacity:.13}
+.map:has(.chip.st-blocked:hover) .n:not(.st-blocked){opacity:.13}
+.map:has(.chip.st-out-of-scope:hover) .n:not(.st-out-of-scope){opacity:.13}
+.side:has([data-hl]:hover) ~ .map :is(path.edge,circle.port),
+.map:has(.legend .chip:hover) :is(path.edge,circle.port){opacity:.25}
+
+/* dalla riga alla carta: il mouse su una voce dei pannelli (o su un id citato
+   nell'annunciatore) mette a fuoco quel track e i suoi vettori; le regole
+   per-nodo stanno nello stile generato */
+body:has(.side [data-node]:hover) .map .n{opacity:.25}
+body:has(.side [data-node]:hover) .map :is(path.edge,circle.port){opacity:.12}
+
+a{text-decoration:none;color:inherit}
+
+/* ---------- scheda del ticket ---------- */
+.scrim{position:fixed;inset:0;background:var(--scrim);backdrop-filter:blur(3px);
+  -webkit-backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:opacity .3s ease;z-index:8}
+body.sheet-open .scrim{opacity:1;pointer-events:auto}
+.sheet{
+  position:fixed;top:10px;right:10px;bottom:10px;width:min(480px,94vw);z-index:9;
+  background:linear-gradient(180deg,var(--pane),var(--pane-2));
+  border:1px solid var(--border-strong);
+  box-shadow:-24px 0 60px -24px rgba(0,0,0,.5),var(--glowpane);
+  display:flex;flex-direction:column;
+  transform:translateX(calc(100% + 50px));
+  transition:transform .42s cubic-bezier(.32,.72,.24,1);
+}
+body.sheet-open .sheet{transform:none}
+.sheet-head{position:relative;padding:18px 22px 13px;border-bottom:1px solid var(--border)}
+.sheet-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 36px 10px 0;min-height:20px}
+.schip{display:inline-flex;align-items:center;gap:5px;font-size:9.5px;letter-spacing:.06em;
+  padding:3px 8px;border:1px solid var(--border);color:var(--muted);background:var(--pane-2)}
+.schip.state{border-color:color-mix(in oklab,var(--sc) 55%,transparent);
+  color:var(--sc);background:color-mix(in oklab,var(--sc) 10%,transparent)}
+.schip .bdot{width:7px;height:7px;display:inline-block}
+.sheet-close{position:absolute;top:14px;right:14px;width:30px;height:30px;
+  border:1px solid var(--border);background:var(--pane);color:var(--muted);cursor:pointer;
+  font-size:13px;line-height:1;display:grid;place-items:center;
+  transition:color .15s ease,transform .15s ease}
+.sheet-close:hover{color:var(--ink);transform:rotate(90deg)}
+.sheet-title{margin:0;font-size:14.5px;font-weight:700;letter-spacing:.01em;
+  text-transform:none;color:var(--ink);display:block}
+.sheet-title .sid{color:var(--accent);font-size:13px;margin-right:8px;
+  text-shadow:0 0 12px color-mix(in oklab,var(--accent) 50%,transparent)}
+.sheet-question{margin:6px 0 0;color:var(--muted);font-size:11px;line-height:1.5;font-style:italic}
+.sheet-body{flex:1;overflow-y:auto;padding:16px 22px 22px;scrollbar-width:thin;
+  scrollbar-color:var(--border-strong) transparent}
+.sheet-foot{padding:11px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end}
+.sheet-foot a{color:var(--accent);font-size:11px;letter-spacing:.04em}
+.sheet-foot a:hover{text-decoration:underline}
+.sheet-empty{color:var(--faint);font-style:italic}
+
+/* markdown renderizzato nella scheda: qui si legge, quindi sans */
+.md{font:13.5px/1.65 ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  color:var(--ink)}
+.md h1,.md h2,.md h3,.md h4{margin:20px 0 8px;line-height:1.3;
+  color:var(--ink);text-transform:none;font-weight:650;letter-spacing:0;display:block}
+.md h2::before{display:none}
+.md h1{font-size:16px}.md h2{font-size:14.5px}.md h3{font-size:13.5px}.md h4{font-size:12.5px}
+.md h1:first-child,.md h2:first-child{margin-top:0}
+.md p{margin:8px 0}
+.md ul,.md ol{margin:8px 0;padding-left:22px}
+.md ul{list-style:disc}
+.md ol{list-style:decimal}
+.md li{display:list-item;padding:2px 0;margin:0;color:var(--ink);font-size:13.5px}
+.md blockquote{margin:10px 0;padding:2px 14px;border-left:2px solid var(--accent);
+  color:var(--muted);background:color-mix(in oklab,var(--accent) 5%,transparent)}
+.md code{background:var(--code-bg);padding:1px 5px;font-size:12px;
+  font-family:ui-monospace,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace}
+.md pre{background:var(--code-bg);border:1px solid var(--border);
+  padding:12px 14px;overflow-x:auto;scrollbar-width:thin}
+.md pre code{background:none;padding:0;font-size:12px;line-height:1.55}
+.md a{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
+.md hr{border:none;border-top:1px solid var(--border);margin:16px 0}
+.md input[type="checkbox"]{accent-color:var(--accent);margin-right:6px}
+
+/* ---------- quiete per chi la chiede ---------- */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation:none !important;transition:none !important}
+}

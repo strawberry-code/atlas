@@ -1,23 +1,27 @@
-"""Il grafo disegnato in SVG: layout topologico, archi, card dei nodi.
+"""Il display tattico: layout topologico e track dei nodi, assemblati in SVG.
 
-Spezzato da render.py perche' qui c'e' una sola responsabilita', il disegno
-del grafo, mentre render.py assembla la pagina (pannelli laterali, header,
-footer). Nessuna dipendenza esterna e nessuna risorsa remota: niente rete e
-niente javascript, l'evidenziazione al passaggio del mouse e' pura CSS
-:has() sull'id del nodo (vedi hover_css).
+Spezzato da render.py perche' qui c'e' una sola responsabilita', il disegno del
+grafo, mentre render.py assembla la plancia attorno; gli archi e le loro regole
+di hover stanno in render_edges.py. Nessuna risorsa remota.
+I colori di stato non sono attributi SVG ma classi CSS (st-<stato>, vedi
+dashboard.css): e' cio' che fa funzionare il night/day mode su un file gia'
+generato. Ogni nodo porta data-node, che il JavaScript della pagina usa per
+aprire la scheda; l'href resta come ripiego per chi naviga senza script.
 """
 from __future__ import annotations
 
 from html import escape
 
-from . import theme
+from . import render_edges, theme
 from .strings import t
-from .theme import STATE, state_of
+from .theme import STATE, css_class, state_of
 
-W, H, GAP_X, GAP_Y, PAD = 236, 92, 26, 48, 24
+W, H, GAP_X, GAP_Y, PAD = 236, 92, 30, 54, 24
+# ritardi dell'animazione d'ingresso: una riga topologica dopo l'altra
+DELAY_ROW, DELAY_COL = 0.1, 0.03
 
 
-def wrap(text: str, limit: int = 30, lines: int = 3) -> list[str]:
+def wrap(text: str, limit: int = 27, lines: int = 3) -> list[str]:
     """Spezza per parola: tagliare a meta' parola rende i titoli illeggibili."""
     righe, corrente = [], ""
     for parola in text.split():
@@ -37,7 +41,8 @@ def wrap(text: str, limit: int = 30, lines: int = 3) -> list[str]:
 
 
 def layout(data: dict, depth: dict[str, int]) -> dict[str, tuple[float, float]]:
-    """Una riga per livello topologico, ogni riga centrata sulla piu' affollata."""
+    """Una riga per livello topologico, ogni riga centrata sulla piu' affollata:
+    l'albero resta simmetrico e il tronco delle dipendenze si legge al centro."""
     ordine, righe, pos = list(data["branches"]), {}, {}
     for node in data["nodes"]:
         righe.setdefault(depth[node["id"]], []).append(node)
@@ -54,84 +59,23 @@ def layout(data: dict, depth: dict[str, int]) -> dict[str, tuple[float, float]]:
     return pos
 
 
-def _slots(ids: list[str], pos: dict, box_x: float) -> dict[str, float]:
-    """Distribuisce i punti di aggancio equidistanti sul bordo di un box, ordinati
-    per la x del nodo collegato: cosi' due o piu' archi che condividono lo stesso
-    bordo (piu' input o piu' output sullo stesso nodo) non si sovrappongono mai.
-    """
-    if not ids:
-        return {}
-    if len(ids) == 1:
-        return {ids[0]: box_x + W / 2}
-    ordinati = sorted(ids, key=lambda i: pos[i][0])
-    margine = W * 0.16
-    utile = W - 2 * margine
-    return {i: box_x + margine + utile * k / (len(ordinati) - 1) for k, i in enumerate(ordinati)}
+def _delay(x: float, y: float) -> str:
+    riga = (y - PAD) / (H + GAP_Y)
+    colonna = (x - PAD) / (W + GAP_X)
+    return f"{riga * DELAY_ROW + colonna * DELAY_COL:.2f}s"
 
 
-def edges(data: dict, pos: dict) -> str:
-    """Bezier verticale dal bordo basso del blocker al bordo alto del bloccato.
-
-    data-from/data-to reggono l'evidenziazione al passaggio del mouse (vedi
-    hover_css): nessun javascript, solo selettori CSS :has() sull'id del nodo.
-    I punti di uscita/entrata sui bordi condivisi passano da _slots, non dal
-    centro del box, per non far accavallare gli archi quando un nodo ha piu'
-    di un input o un output.
-    """
-    deps_per_nodo = {
-        node["id"]: [d for d in node["blockedBy"] if d in pos]
-        for node in data["nodes"] if node["id"] in pos
-    }
-    uscenti: dict[str, list[str]] = {}
-    for nid, deps in deps_per_nodo.items():
-        for dep in deps:
-            uscenti.setdefault(dep, []).append(nid)
-
-    punti_uscita = {i: _slots(uscenti.get(i, []), pos, x) for i, (x, _) in pos.items()}
-    punti_entrata = {nid: _slots(deps, pos, pos[nid][0]) for nid, deps in deps_per_nodo.items()}
-
-    out = []
-    for nid, deps in deps_per_nodo.items():
-        ey = pos[nid][1]
-        for dep in deps:
-            sy = pos[dep][1] + H
-            sx, ex = punti_uscita[dep][nid], punti_entrata[nid][dep]
-            gap = ey - sy
-            mid = sy + gap / 2
-            piede = min(14, gap / 3)  # tratto retto finale: orientamento del marker inequivocabile
-            out.append(
-                f'<path class="edge" data-from="{dep}" data-to="{nid}" '
-                f'd="M{sx},{sy} C{sx},{mid} {ex},{mid} {ex},{ey - piede} L{ex},{ey}" fill="none" '
-                f'stroke="{theme.EDGE}" stroke-width="1.4" marker-end="url(#tip)"/>'
-            )
-    return "".join(out)
-
-
-def hover_css(ids: list[str]) -> str:
-    """Una coppia di regole per nodo: attivano archi entranti/uscenti al passaggio
-    del mouse su quel nodo. Generata qui perche' dipende dagli id del grafo,
-    a differenza del resto del tema che e' statico (vedi theme.CSS).
-    """
-    return "".join(
-        f'svg:has(#node-{i}:hover) path[data-to="{i}"]{{stroke:#16a34a;stroke-width:2.2;'
-        f'opacity:1;marker-end:url(#tip-in)}}'
-        f'svg:has(#node-{i}:hover) path[data-from="{i}"]{{stroke:#dc2626;stroke-width:2.2;'
-        f'opacity:1;marker-end:url(#tip-out)}}'
-        for i in ids
+def _reticolo(x: float, y: float) -> str:
+    """Quattro staffe angolari attorno a un track di frontiera: il bersaglio
+    prioritario del display, quello su cui conviene agganciarsi adesso."""
+    b, s = 5, 11  # sbalzo dal bordo e lunghezza del braccio
+    angoli = (
+        f'M{x - b},{y + s - b} V{y - b} H{x + s - b}',
+        f'M{x + W - s + b},{y - b} H{x + W + b} V{y + s - b}',
+        f'M{x + W + b},{y + H - s + b} V{y + H + b} H{x + W - s + b}',
+        f'M{x + s - b},{y + H + b} H{x - b} V{y + H - s + b}',
     )
-
-
-def _badge(x: float, y: float, testo: str) -> str:
-    """Pillola destra-allineata per 'type · mode': larghezza dal conteggio caratteri,
-    perche' e' monospace e non serve misurare il testo per davvero.
-    """
-    larghezza = len(testo) * 6.1 + 16
-    bx = x + W - 14 - larghezza
-    return (
-        f'<rect x="{bx:.1f}" y="{y - 10}" width="{larghezza:.1f}" height="15" rx="7.5" fill="#eef2f6"/>'
-        f'<text class="nbadge" x="{bx + larghezza / 2:.1f}" y="{y + 1}" text-anchor="middle" '
-        f'fill="{theme.MUTED}">{escape(testo)}</text>'
-    )
+    return "".join(f'<path class="ret" d="{d}"/>' for d in angoli)
 
 
 def boxes(data: dict, pos: dict, front: set[str]) -> str:
@@ -140,52 +84,46 @@ def boxes(data: dict, pos: dict, front: set[str]) -> str:
         if node["id"] not in pos:
             continue
         x, y = pos[node["id"]]
-        bordo, sfondo, testo, glifo, _, dash = STATE[state_of(node, front)]
-        ramo = data["branches"][node["branch"]].get("color", theme.EDGE)
+        stato = state_of(node, front)
+        dash = STATE[stato][2]
+        ramo = data["branches"][node["branch"]].get("color", theme.BRANCH_FALLBACK)
         tratto = f' stroke-dasharray="{dash}"' if dash else ""
         deps = ", ".join(node["blockedBy"]) or t("render.libero")
-        righe = wrap(node["title"])
         titolo = "".join(
-            f'<text class="ntt" x="{x + 16}" y="{y + 41 + i * 16}" fill="{theme.INK}">{escape(r)}</text>'
-            for i, r in enumerate(righe) if r
+            f'<text class="ntt" x="{x + 16}" y="{y + 42 + i * 15}">{escape(r)}</text>'
+            for i, r in enumerate(wrap(node["title"])) if r
         )
-        tipo_modo = f'{node["type"]} · {node["mode"]}'
+        tipo_modo = f'{node["type"]}·{node["mode"]}'
+        reticolo = _reticolo(x, y) if stato == "frontier" else ""
         out.append(
-            f'<a href="tickets/{node["id"]}.md"><g class="n" id="node-{node["id"]}">'
+            f'<a href="tickets/{node["id"]}.md" data-node="{node["id"]}">'
+            f'<g class="n {css_class(stato)}" id="node-{node["id"]}" '
+            f'data-branch="{escape(node["branch"])}" style="--d:{_delay(x, y)}">'
             f'<title>{escape(node["title"])} — {escape(node["question"])}</title>'
-            f'<rect class="card" x="{x}" y="{y}" width="{W}" height="{H}" rx="9" '
-            f'fill="{sfondo}" stroke="{bordo}" stroke-width="1.3"{tratto}/>'
-            f'<rect x="{x}" y="{y + 10}" width="4" height="{H - 20}" rx="2" fill="{ramo}"/>'
-            f'<text class="nid" x="{x + 16}" y="{y + 21}" fill="{testo}">{glifo} {node["id"]}</text>'
-            f'{_badge(x, y + 21, tipo_modo)}'
+            f'<rect class="card" x="{x}" y="{y}" width="{W}" height="{H}" rx="3" '
+            f'stroke-width="1.2"{tratto}/>'
+            f'<rect x="{x}" y="{y}" width="3" height="{H}" fill="{ramo}"/>'
+            f'{reticolo}'
+            f'<text class="nid" x="{x + 16}" y="{y + 21}">{STATE[stato][0]} {node["id"]}</text>'
+            f'<text class="nbadge" x="{x + W - 12}" y="{y + 21}" text-anchor="end">{escape(tipo_modo)}</text>'
             f'{titolo}'
-            f'<text class="ndp" x="{x + 16}" y="{y + H - 12}" fill="{theme.FAINT}">← {escape(deps)}</text>'
+            f'<text class="ndp" x="{x + 16}" y="{y + H - 11}">← {escape(deps)}</text>'
             f'</g></a>'
         )
     return "".join(out)
 
 
-def _markers() -> str:
-    def marker(nome: str, colore: str) -> str:
-        return (
-            f'<marker id="{nome}" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" '
-            f'markerHeight="8" orient="auto"><path d="M0,1 L7,4 L0,7 z" fill="{colore}"/></marker>'
-        )
-    return marker("tip", theme.EDGE) + marker("tip-in", "#16a34a") + marker("tip-out", "#dc2626")
-
-
 def canvas(data: dict, depth: dict[str, int], front_ids: set[str]) -> str:
-    """Stile dinamico + <svg> completo, pronti da inserire nella pagina."""
+    """Stile dinamico + <svg> completo, pronti da inserire nella plancia."""
     pos = layout(data, depth)
     larghezza = max((x + W for x, _ in pos.values()), default=600) + PAD
     altezza = max((y + H for _, y in pos.values()), default=200) + PAD
     ids = [n["id"] for n in data["nodes"] if n["id"] in pos]
     return (
-        f'<style>{hover_css(ids)}</style>'
-        '<div class="wrap"><div class="canvas">'
+        f'<style>{render_edges.hover_css(ids)}{render_edges.branch_css(list(data["branches"]))}</style>'
         f'<svg viewBox="0 0 {larghezza} {altezza}" width="{larghezza}" height="{altezza}" '
         'xmlns="http://www.w3.org/2000/svg">'
-        f'<defs>{_markers()}</defs>'
-        f'{boxes(data, pos, front_ids)}{edges(data, pos)}'
-        '</svg></div></div>'
+        f'<defs>{render_edges.markers()}</defs>'
+        f'{boxes(data, pos, front_ids)}{render_edges.edges(data, pos, front_ids)}'
+        '</svg>'
     )

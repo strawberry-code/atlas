@@ -5,7 +5,7 @@ from datetime import datetime
 
 from . import claims, docs, gitscan
 from .config import ConfigError, Graph, Workspace
-from .model import blocks, by_id, claimed, is_done
+from .model import by_id, claimed, convergence, is_done
 from .report import ETICHETTA
 from .store import load
 from .strings import t
@@ -15,9 +15,11 @@ def doctor_avvisi(data: dict, ref: Graph, agente: dict) -> list[str]:
     """Avvisi sulla salute di un grafo: non bloccano niente, segnalano soltanto."""
     avvisi = []
 
-    foglie = [n["id"] for n in data["nodes"] if not is_done(n) and not blocks(data, n["id"])]
-    if len(foglie) > 1:
-        avvisi.append(t("doctor.nodi_pendenti", elenco=", ".join(foglie)))
+    # A grafo finito la non-convergenza non ha piu' niente da dire, e ripetuta
+    # a ogni esecuzione insegnerebbe solo a ignorare gli avvisi.
+    end, sciolti = convergence(data)
+    if sciolti and not all(is_done(n) for n in data["nodes"]):
+        avvisi.append(t("doctor.non_converge", end=end, elenco=", ".join(sciolti)))
 
     for nodo in claimed(data):
         stato = claims.claim_state(nodo, agente)

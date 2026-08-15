@@ -1,0 +1,123 @@
+"""I vettori del display tattico: archi tra i track, porte, marker, hover.
+
+Spezzato da render_svg.py, che disegna i track e assembla il canvas: qui vive
+solo cio' che collega i nodi. Le costanti geometriche (W, H, PAD, ...) restano
+in render_svg.py, che le possiede insieme al layout: questo modulo le importa.
+"""
+from __future__ import annotations
+
+import re
+
+# le chiavi di ramo sono dati liberi ma finiscono in un selettore: una chiave
+# fuori da questo alfabeto semplicemente non genera la sua regola di hover
+_CHIAVE_SICURA = re.compile(r"^[\w-]+$")
+
+
+def _slots(ids: list[str], pos: dict, box_x: float, larghezza: float) -> dict[str, float]:
+    """Distribuisce i punti di aggancio equidistanti sul bordo di un box, ordinati
+    per la x del nodo collegato: cosi' due o piu' archi che condividono lo stesso
+    bordo (piu' input o piu' output sullo stesso nodo) non si sovrappongono mai.
+    """
+    if not ids:
+        return {}
+    if len(ids) == 1:
+        return {ids[0]: box_x + larghezza / 2}
+    ordinati = sorted(ids, key=lambda i: pos[i][0])
+    margine = larghezza * 0.16
+    utile = larghezza - 2 * margine
+    return {i: box_x + margine + utile * k / (len(ordinati) - 1) for k, i in enumerate(ordinati)}
+
+
+def edges(data: dict, pos: dict, front_ids: set[str]) -> str:
+    """Bezier verticale dal bordo basso del blocker al bordo alto del bloccato,
+    con una porta di aggancio (cerchietto) a ogni estremo.
+
+    data-from/data-to reggono l'evidenziazione al passaggio del mouse (vedi
+    hover_css). pathLength=1 normalizza la lunghezza, cosi' il CSS anima il
+    tratto che si disegna con una sola coppia dasharray/dashoffset uguale per
+    tutti. Gli archi che entrano in un nodo di frontiera portano la classe
+    feed: sono quelli che il CSS fa scorrere, il lavoro che alimenta il fronte.
+    """
+    from .render_svg import DELAY_ROW, GAP_Y, H, PAD, W
+
+    deps_per_nodo = {
+        node["id"]: [d for d in node["blockedBy"] if d in pos]
+        for node in data["nodes"] if node["id"] in pos
+    }
+    uscenti: dict[str, list[str]] = {}
+    for nid, deps in deps_per_nodo.items():
+        for dep in deps:
+            uscenti.setdefault(dep, []).append(nid)
+
+    punti_uscita = {i: _slots(uscenti.get(i, []), pos, x, W) for i, (x, _) in pos.items()}
+    punti_entrata = {nid: _slots(deps, pos, pos[nid][0], W) for nid, deps in deps_per_nodo.items()}
+
+    out = []
+    for nid, deps in deps_per_nodo.items():
+        ey = pos[nid][1]
+        for dep in deps:
+            sy = pos[dep][1] + H
+            sx, ex = punti_uscita[dep][nid], punti_entrata[nid][dep]
+            gap = ey - sy
+            mid = sy + gap / 2
+            piede = min(14, gap / 3)  # tratto retto finale: orientamento del marker inequivocabile
+            ritardo = (ey - PAD) / (H + GAP_Y) * DELAY_ROW
+            classe = "edge feed" if nid in front_ids else "edge"
+            out.append(
+                f'<path class="{classe}" data-from="{dep}" data-to="{nid}" pathLength="1" '
+                f'style="--d:{ritardo:.2f}s" '
+                f'd="M{sx},{sy} C{sx},{mid} {ex},{mid} {ex},{ey - piede} L{ex},{ey}" '
+                f'stroke-width="1.3" marker-end="url(#tip)"/>'
+                f'<circle class="port" data-from="{dep}" data-to="{nid}" cx="{sx}" cy="{sy}" r="2.6"/>'
+            )
+    return "".join(out)
+
+
+def hover_css(ids: list[str]) -> str:
+    """Le regole per nodo: attivano archi e porte entranti/uscenti al passaggio
+    del mouse sul nodo stesso o sulla sua riga nei pannelli laterali, e in quel
+    secondo caso accendono anche il track sulla carta. Generate qui perche'
+    dipendono dagli id del grafo, a differenza del tema statico (dashboard.css).
+    Path e porta vogliono regole separate: un fill su una bezier aperta la
+    trasforma in un nastro pieno, quindi il path prende solo lo stroke.
+    """
+    out = []
+    for i in ids:
+        nodo = f'svg:has(#node-{i}:hover)'                       # mouse sul track
+        riga = f'body:has(.side [data-node="{i}"]:hover)'        # mouse sulla riga del pannello
+        out.append(
+            f'{nodo} path[data-to="{i}"],{riga} path[data-to="{i}"]{{stroke:var(--edge-in);'
+            f'stroke-width:2.2;opacity:1;marker-end:url(#tip-in)}}'
+            f'{nodo} path[data-from="{i}"],{riga} path[data-from="{i}"]{{stroke:var(--edge-out);'
+            f'stroke-width:2.2;opacity:1;marker-end:url(#tip-out)}}'
+            f'{nodo} circle[data-to="{i}"],{riga} circle[data-to="{i}"]{{fill:var(--edge-in);opacity:1}}'
+            f'{nodo} circle[data-from="{i}"],{riga} circle[data-from="{i}"]{{fill:var(--edge-out);opacity:1}}'
+            f'{riga} #node-{i}{{opacity:1}}'
+            f'{riga} #node-{i} rect.card{{stroke-width:2.2}}'
+        )
+    return "".join(out)
+
+
+def branch_css(keys: list[str]) -> str:
+    """Una regola per ramo: il mouse sulla riga del pannello rami accende sulla
+    carta i soli track di quel ramo. Generata qui perche' i rami, come gli id,
+    sono dati del grafo; il resto del tema e' statico (dashboard.css)."""
+    out = []
+    for k in keys:
+        if not _CHIAVE_SICURA.match(k):
+            continue
+        sel = f'body:has(.side li[data-branch="{k}"]:hover)'
+        out.append(
+            f'{sel} .map .n:not([data-branch="{k}"]){{opacity:.13}}'
+            f'{sel} .map :is(path.edge,circle.port){{opacity:.25}}'
+        )
+    return "".join(out)
+
+
+def markers() -> str:
+    def marker(nome: str) -> str:
+        return (
+            f'<marker id="{nome}" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" '
+            f'markerHeight="7" orient="auto"><path class="{nome}" d="M0,1 L7,4 L0,7 z"/></marker>'
+        )
+    return marker("tip") + marker("tip-in") + marker("tip-out")

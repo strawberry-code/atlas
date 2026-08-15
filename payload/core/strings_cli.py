@@ -82,10 +82,12 @@ STRINGS: dict[str, dict[str, str]] = {
     "doctor.git": {"it": "  git      {presente} · commit alla chiusura: {commit}\n",
                    "en": "  git      {presente} · commit on close: {commit}\n"},
     "doctor.grafo_titolo": {"it": "  {slug}:", "en": "  {slug}:"},
-    "doctor.nodi_pendenti": {"it": "nodi che non bloccano nient'altro, nemmeno un cancello finale: {elenco}. "
-                                    "Controlla che non siano stati dimenticati.",
-                             "en": "nodes that block nothing else, not even a final gate: {elenco}. "
-                                   "Check they weren't forgotten."},
+    "doctor.non_converge": {"it": "terminali che non confluiscono nel finale {end}: {elenco}. Un grafo "
+                                   "di solito converge in un nodo end unico: agganciali con uno script "
+                                   "di mutazione, o mettili fuori scopo.",
+                            "en": "terminal nodes that don't flow into the final {end}: {elenco}. A graph "
+                                  "usually converges into a single end node: link them with a mutation "
+                                  "script, or drop them out of scope."},
     "doctor.lucchetto_fermo": {"it": "{id} è rivendicato ma {stato}", "en": "{id} is claimed but {stato}"},
     "doctor.dashboard_stantia": {"it": "la dashboard è più vecchia dell'ultima modifica al grafo: esegui 'atlas render'",
                                  "en": "the dashboard is older than the last change to the graph: run 'atlas render'"},

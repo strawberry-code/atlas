@@ -136,6 +136,23 @@ class Forma(Base):
         self.assertEqual(2, self.model.residual_path(data, "F01"))
         self.assertEqual(0, self.model.residual_path(data, "F03"))
 
+    def test_convergence_trova_finale_e_rami_sciolti(self):
+        data = self.popola()
+        self.assertEqual(("F03", []), self.model.convergence(data))
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.unlink(g, "F03", blocked_by="F02")
+        data = self.store.load(self.ref.json_path)
+        self.assertEqual(("F02", ["F03"]), self.model.convergence(data))
+
+    def test_convergence_ignora_i_fuori_scopo(self):
+        """Un ramo messo fuori scopo e' stato tagliato apposta: non e' sciolto."""
+        self.popola()
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.unlink(g, "F03", blocked_by="F02")
+            self.mutate.drop(g, "F03", "ramo morto")
+        data = self.store.load(self.ref.json_path)
+        self.assertEqual(("F02", []), self.model.convergence(data))
+
     def test_ranked_frontier_ordina_per_impatto(self):
         self.popola()
         with self.mutate.editing(self.ref) as g:
@@ -324,12 +341,16 @@ class Artefatti(Base):
         self.assertEqual("scritto a mano", self.ref.ticket_path("F01").read_text(encoding="utf-8"))
 
     def test_dashboard_autoconsistente(self):
+        """Autoconsistente = si apre da disco senza rete: script e stile viaggiano
+        inline, i ticket incorporati come JSON, e nessun tag carica da fuori."""
         self.popola()
         self.render_tutto()
         html = self.ref.dashboard_path.read_text(encoding="utf-8")
-        self.assertNotIn("<script", html)
         self.assertNotIn("<link", html)
+        self.assertNotIn(" src=", html)
+        self.assertNotIn('href="http', html)   # gli xmlns SVG contengono http://, i tag che caricano no
         self.assertIn('charset="utf-8"', html)
+        self.assertIn('id="atlas-data"', html)
         self.assertEqual(3, html.count('class="card"'))
         for url in ("cdn", "googleapis", "unpkg"):
             self.assertNotIn(url, html)
@@ -337,6 +358,17 @@ class Artefatti(Base):
     def test_dashboard_regge_un_grafo_vuoto(self):
         self.render_tutto()
         self.assertIn("<svg", self.ref.dashboard_path.read_text(encoding="utf-8"))
+
+    def test_dashboard_avvisa_se_il_grafo_non_converge(self):
+        self.popola()
+        self.render_tutto()
+        self.assertNotIn('class="blocco caution"', self.ref.dashboard_path.read_text(encoding="utf-8"))
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.unlink(g, "F03", blocked_by="F02")
+        self.render_tutto()
+        html = self.ref.dashboard_path.read_text(encoding="utf-8")
+        self.assertIn('class="blocco caution"', html)
+        self.assertIn('<b data-node="F03">F03</b>', html)
 
     def test_dashboard_mostra_il_costo_dichiarato(self):
         self.popola()
@@ -634,21 +666,28 @@ class Doctor(Base):
         avvisi = self.doctor.doctor_avvisi(data, self.ref, self.ws.config["agent"])
         self.assertTrue(any("F01" in a and "prodotto.txt" in a for a in avvisi))
 
-    def test_nodi_pendenti_avvisati_finche_restano_aperti(self):
-        """L'avviso serve a scovare un nodo dimenticato: a grafo finito non ha piu' niente
-        da dire, e ripetuto a ogni esecuzione insegna solo a ignorarlo."""
+    def test_non_convergenza_avvisata_finche_il_grafo_vive(self):
+        """L'avviso serve a scovare un ramo che non confluisce nel finale: a grafo
+        finito non ha piu' niente da dire, e ripetuto insegna solo a ignorarlo."""
         self.popola()
         with self.mutate.editing(self.ref) as g:
-            self.mutate.unlink(g, "F03", blocked_by="F02")   # due foglie aperte: F02 e F03
+            self.mutate.unlink(g, "F03", blocked_by="F02")   # due terminali: F02 (finale) e F03
         avvisi = self.doctor.doctor_avvisi(self.store.load(self.ref.json_path), self.ref, self.ws.config["agent"])
         self.assertTrue([a for a in avvisi if "F02" in a and "F03" in a])
 
-        for nodo_id in ("F01", "F02", "F03"):
+        # chiudere il ramo sciolto non lo aggancia: finche' il grafo vive, resta segnalato
+        self.rispondi("F03")
+        self.claims.claim(self.ref, "F03")
+        _, _ = self.claims.close(self.ref, "F03", "fatto")
+        avvisi = self.doctor.doctor_avvisi(self.store.load(self.ref.json_path), self.ref, self.ws.config["agent"])
+        self.assertTrue([a for a in avvisi if "F03" in a])
+
+        for nodo_id in ("F01", "F02"):
             self.rispondi(nodo_id)
             self.claims.claim(self.ref, nodo_id)
             _, _ = self.claims.close(self.ref, nodo_id, "fatto")
         avvisi = self.doctor.doctor_avvisi(self.store.load(self.ref.json_path), self.ref, self.ws.config["agent"])
-        self.assertFalse([a for a in avvisi if "F02" in a and "F03" in a])
+        self.assertFalse([a for a in avvisi if "F03" in a])
 
     def test_falso_positivo_sparisce_se_contenuto_non_cambia_in_git(self):
         """Quando la repo e' git, un file toccato ma non modificato nel contenuto

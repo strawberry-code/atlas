@@ -170,7 +170,8 @@ def main() -> int:
                                 .read_text(encoding="utf-8"))["nodes"]) == 0, "i due grafi restano isolati")
 
         html = (radice / "graphs" / "epic-test" / "dashboard.html").read_text(encoding="utf-8")
-        verifica("<script" not in html and "cdn" not in html, "dashboard senza script né risorse remote")
+        verifica(" src=" not in html and "<link" not in html and "cdn" not in html,
+                 "dashboard senza risorse remote: stile, script e ticket viaggiano inline")
         verifica("è" in html and "Ã" not in html, "accenti resi bene nella dashboard")
 
         elenco = globale(target, "list", env=env).stdout
