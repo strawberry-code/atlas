@@ -125,11 +125,15 @@
   var svg = vp.querySelector("svg");
   var baseW = parseFloat(svg.getAttribute("width")) || 600;
   var baseH = parseFloat(svg.getAttribute("height")) || 200;
-  var zoomLevel = 1;
+  var zoomLevel = 1;    // scala disegnata in questo istante
+  var zoomVoluto = 1;   // scala verso cui si sta andando
+  var ancoraX = 0, ancoraY = 0;   // punto del viewport che deve restare fermo
+  var rafZoom = 0;
   var trascinato = false;
 
+  function limita(z) { return Math.min(2.5, Math.max(0.25, z)); }
+
   function applicaZoom(z, cx, cy) {
-    z = Math.min(2.5, Math.max(0.25, z));
     var k = z / zoomLevel;
     var sx = (vp.scrollLeft + cx) * k - cx;
     var sy = (vp.scrollTop + cy) * k - cy;
@@ -139,8 +143,33 @@
     vp.scrollLeft = sx;
     vp.scrollTop = sy;
   }
+  /* Lo zoom non salta al valore nuovo: si avvicina, e la strada che copre
+     dipende dal tempo passato, non dal numero di frame. Legarla al frame
+     renderebbe la corsa doppia su uno schermo a 120 Hz rispetto a uno a 60.
+     Cosi' una raffica di eventi della rotella, che un trackpad produce a
+     decine per un solo movimento del dito, diventa una corsa continua invece
+     di una scalinata. */
+  var zoomTs = 0;
+  function passoZoom(ts) {
+    var dt = zoomTs ? Math.min(ts - zoomTs, 100) : 16;   // una scheda tornata in primo piano
+    zoomTs = ts;
+    var nuovo = zoomLevel + (zoomVoluto - zoomLevel) * (1 - Math.exp(-dt / 70));
+    if (Math.abs(zoomVoluto - nuovo) < .002) nuovo = zoomVoluto;   // o non arriva mai
+    applicaZoom(nuovo, ancoraX, ancoraY);
+    if (nuovo === zoomVoluto) { rafZoom = 0; zoomTs = 0; return; }
+    rafZoom = requestAnimationFrame(passoZoom);
+  }
+  function verso(z, cx, cy) {
+    zoomVoluto = limita(z);
+    ancoraX = cx;
+    ancoraY = cy;
+    if (quiete) return applicaZoom(zoomVoluto, cx, cy);   // chi ha chiesto quiete arriva subito
+    if (!rafZoom) rafZoom = requestAnimationFrame(passoZoom);
+  }
   function adatta() {
-    applicaZoom(Math.min((vp.clientWidth - 52) / baseW, (vp.clientHeight - 130) / baseH, 1), 0, 0);
+    if (rafZoom) { cancelAnimationFrame(rafZoom); rafZoom = 0; zoomTs = 0; }
+    zoomVoluto = limita(Math.min((vp.clientWidth - 52) / baseW, (vp.clientHeight - 130) / baseH, 1));
+    applicaZoom(zoomVoluto, 0, 0);   // inquadrare tutto e' un salto voluto, non una corsa
     vp.scrollLeft = 0;
     vp.scrollTop = 0;
   }
@@ -148,14 +177,20 @@
     b.addEventListener("click", function () {
       if (b.dataset.zoom === "fit") return adatta();
       var k = b.dataset.zoom === "in" ? 1.25 : 0.8;
-      applicaZoom(zoomLevel * k, vp.clientWidth / 2, vp.clientHeight / 2);
+      verso(zoomVoluto * k, vp.clientWidth / 2, vp.clientHeight / 2);
     });
   });
   vp.addEventListener("wheel", function (e) {
     if (!e.ctrlKey && !e.metaKey) return;       // la rotella nuda scorre e basta
     e.preventDefault();
+    /* deltaY arriva in pixel dal trackpad e in righe dal mouse a scatti: senza
+       normalizzarlo, e senza legare la scala a quanto vale, lo stesso gesto
+       ingrandisce di una frazione su un dispositivo e di cinque volte sull'altro. */
+    var d = e.deltaMode === 1 ? e.deltaY * 16
+      : e.deltaMode === 2 ? e.deltaY * vp.clientHeight : e.deltaY;
+    d = Math.max(-120, Math.min(120, d));       // un colpo secco non teletrasporta
     var r = vp.getBoundingClientRect();
-    applicaZoom(zoomLevel * (e.deltaY < 0 ? 1.12 : 0.89), e.clientX - r.left, e.clientY - r.top);
+    verso(zoomVoluto * Math.exp(-d * .0022), e.clientX - r.left, e.clientY - r.top);
   }, { passive: false });
   vp.addEventListener("pointerdown", function (e) {
     if (e.pointerType !== "mouse" || e.button !== 0) return;   // il tocco scorre gia' da solo
