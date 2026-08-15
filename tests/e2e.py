@@ -320,6 +320,28 @@ def verifica_uninstall() -> None:
         shutil.rmtree(atlas_home, ignore_errors=True)
 
 
+def variante_zipapp(origine: Path) -> bytes:
+    """Lo stesso eseguibile, funzionante, ma coi membri a offset diversi.
+
+    Pubblicare come 'versione nuova' una copia identica del binario e' una prova
+    compiacente: lo zip che sostituisce quello in esecuzione ha gli stessi offset,
+    quindi zipimport continua a leggere anche se il file e' cambiato sotto. Con
+    una versione vera gli offset non combaciano, e ogni import differito dopo lo
+    scambio muore con 'bad local file header'. Qui si aggiunge un membro in testa,
+    che sposta tutto il resto: e' la differenza minima che rende la prova onesta.
+    """
+    import io, zipfile  # noqa: E401  (solo per questa prova)
+    dati = origine.read_bytes()
+    inizio = dati.index(b"PK\x03\x04")
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(dati[inizio:])) as sorgente:
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as nuovo:
+            nuovo.writestr("zavorra.txt", "x" * 4096)
+            for voce in sorgente.infolist():
+                nuovo.writestr(voce, sorgente.read(voce.filename))
+    return dati[:inizio] + buffer.getvalue()
+
+
 def verifica_update_riallinea_i_progetti() -> None:
     """'atlas update' rimette in pari i progetti registrati, col binario vero.
 
@@ -336,7 +358,7 @@ def verifica_update_riallinea_i_progetti() -> None:
     binario = sandbox / "atlas"
     shutil.copyfile(CLI, binario)
     binario.chmod(0o755)
-    blob = binario.read_bytes()
+    blob = variante_zipapp(CLI)     # 'versione nuova' vera: stesso codice, altro layout
     fixture = Fixture({})
     fixture.start()
     try:

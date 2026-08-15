@@ -17,7 +17,11 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import registry
+# riallinea si importa qui, in testa, e non dove serve: ogni import differito che
+# cade dopo os.replace muore, perche' atlas e' uno zipapp e zipimport tiene gli
+# offset del file che stiamo sostituendo. Il codice che gira dopo lo scambio
+# dev'essere gia' tutto in memoria prima di scambiare.
+from . import registry, riallinea
 from .strings import t
 from .version import current_version
 
@@ -165,7 +169,6 @@ def cmd_update(args) -> int:
         # da una versione che ancora non li riallineava arriva sempre qui, e senza
         # questo passaggio non avrebbe piu' nessuna occasione di rimetterli in pari.
         if not getattr(args, "no_projects", False):
-            from . import riallinea
             riallinea.riallinea(Path(sys.argv[0]).resolve(), solo_indietro=True)
         return 0
 
@@ -211,13 +214,9 @@ def cmd_update(args) -> int:
         raise
 
     print(t("update.fatto", attuale=attuale, ultima=ultima, target=target))
-    # L'import sta qui e non in testa: riallinea importa install_cmd, che tira
-    # dentro il payload delle skill, e 'atlas update' non ha motivo di pagarlo
-    # quando non c'e' niente da aggiornare.
     if getattr(args, "no_projects", False):
         _ricorda_riallineamento()
     else:
-        from . import riallinea
         riallinea.riallinea(target)
     return 0
 

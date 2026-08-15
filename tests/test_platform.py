@@ -256,3 +256,29 @@ class Catalogo(unittest.TestCase):
     def test_ogni_voce_ha_entrambe_le_lingue(self):
         monche = sorted(k for k, v in atlascli_strings.STRINGS.items() if set(v) != {"it", "en"})
         self.assertEqual([], monche, f"voci senza tutte e due le lingue: {monche}")
+
+
+class ImportDopoLoScambio(unittest.TestCase):
+    """self_update.py non puo' avere import differiti: sostituisce l'eseguibile.
+
+    atlas e' uno zipapp, e zipimport tiene gli offset del file che ha aperto
+    all'avvio. Appena os.replace mette al suo posto un archivio diverso, ogni
+    import che non sia gia' avvenuto muore con 'bad local file header', e muore
+    nel punto peggiore: ad aggiornamento riuscito, dopo aver detto che era andato
+    bene. E' costato un rilascio: la prova e2e pubblicava come versione nuova una
+    copia identica del binario, che avendo gli stessi offset non rompeva niente.
+    """
+
+    def test_self_update_importa_tutto_prima(self):
+        import ast
+        sorgente = (ROOT / "atlascli" / "self_update.py").read_text(encoding="utf-8")
+        albero = ast.parse(sorgente)
+        differiti = [
+            f"riga {nodo.lineno}"
+            for funzione in ast.walk(albero)
+            if isinstance(funzione, (ast.FunctionDef, ast.AsyncFunctionDef))
+            for nodo in ast.walk(funzione)
+            if isinstance(nodo, (ast.Import, ast.ImportFrom))
+        ]
+        self.assertEqual([], differiti,
+                         f"import dentro una funzione di self_update.py: {differiti}")
