@@ -205,18 +205,24 @@ def cmd_update(args) -> int:
         raise
 
     print(t("update.fatto", attuale=attuale, ultima=ultima, target=target))
-    _ricorda_riallineamento()
+    # L'import sta qui e non in testa: riallinea importa install_cmd, che tira
+    # dentro il payload delle skill, e 'atlas update' non ha motivo di pagarlo
+    # quando non c'e' niente da aggiornare.
+    if getattr(args, "no_projects", False):
+        _ricorda_riallineamento()
+    else:
+        from . import riallinea
+        riallinea.riallinea(target)
     return 0
 
 
 def _ricorda_riallineamento() -> None:
-    """Dopo l'aggiornamento, dice quali progetti restano indietro e con che comando.
+    """Con --no-projects, dice quali progetti restano indietro e con che comando.
 
     Il binario nuovo rigenera da se' ticket, mappa e dashboard alla prima occasione,
-    ma skill, CONTRACT.md e il blocco in CLAUDE.md sono file veri dentro il progetto
-    e nessun comando li tocca da solo. Senza questo promemoria l'unico modo di
-    saperlo e' ricordarsene, e i progetti restano con le istruzioni della versione
-    di prima mentre il motore ne applica un'altra.
+    ma skill, CONTRACT.md e il blocco in CLAUDE.md sono file veri dentro il progetto.
+    Chi sceglie di non farli toccare dall'aggiornamento deve almeno sapere quali
+    sono rimasti alla versione di prima, e con che comando si rimettono in pari.
     """
     progetti = sorted(registry.load()["projects"])
     if not progetti:

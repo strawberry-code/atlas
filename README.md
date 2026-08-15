@@ -53,12 +53,13 @@ Only the project's own data lands in `.atlas/`: `config.json`, the graphs, the m
 ```bash
 atlas list                           # registered projects and their state
 atlas list my-project                # the card for just one
-atlas update                         # updates atlas itself to the latest version
+atlas update                         # updates atlas and realigns the registered projects
+atlas update --no-projects           # updates only the executable, projects stay behind
 atlas lang en                        # content language of this project
 atlas lang --global en               # default for future projects
 ```
 
-There's no command to update a project's engine, because a project has no engine: you update `atlas` and every project uses the new version. Reinstalling (`atlas install .`) only regenerates skills and contract, or cleans up a project coming from an earlier version.
+A project's engine never gets updated, because a project has none: it lives in the executable, and the moment `atlas` changes version every project uses the new one. What stays behind are the real files written inside the project, namely the skills, `CONTRACT.md`, `README.md`, and the block in `CLAUDE.md`: those are what `atlas update` brings back in line, walking the registry project by project once the executable has been replaced. Anything no longer on disk is skipped and reported; a project that fails on its own account doesn't stop the others. Realigning refreshes what a project has, it doesn't add what it never had: installed without the hook or without the `CLAUDE.md` block, it stays that way. With `--no-projects` only the executable is updated, and projects are brought back in line by hand with `atlas install <path>`.
 
 Switching an existing project's language regenerates `SKILL.md`, `CONTRACT.md`, and every dashboard: a `map.md` already written in the old language is left untouched (its headings no longer match), so that graph stays as it was until you update it by hand, while new tickets follow the current language.
 

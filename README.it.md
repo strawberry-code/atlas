@@ -53,12 +53,13 @@ In `.atlas/` finiscono solo i dati del progetto: `config.json`, i grafi, gli scr
 ```bash
 atlas list                           # progetti registrati e il loro stato
 atlas list mio-progetto              # la scheda di uno solo
-atlas update                         # aggiorna atlas stesso all'ultima versione
+atlas update                         # aggiorna atlas e riallinea i progetti registrati
+atlas update --no-projects           # aggiorna solo l'eseguibile, i progetti restano indietro
 atlas lang en                        # lingua dei contenuti di questo progetto
 atlas lang --global en               # default per i progetti futuri
 ```
 
-Non esiste un comando per aggiornare il motore di un progetto, perché il motore in un progetto non c'è: aggiorni `atlas` e ogni progetto usa la versione nuova. Reinstallare (`atlas install .`) serve solo a rigenerare skill e contratto, oppure a ripulire un progetto che veniva da una versione precedente.
+Il motore di un progetto non si aggiorna, perché in un progetto non c'è: vive nell'eseguibile, e appena `atlas` cambia versione ogni progetto usa quella nuova. Restano indietro i file veri scritti dentro il progetto, cioè skill, `CONTRACT.md`, `README.md` e il blocco in `CLAUDE.md`: quelli li rimette in pari `atlas update`, che dopo aver sostituito l'eseguibile ripassa i progetti del registro uno per uno. Chi non c'è più sul disco viene saltato e detto; chi resta indietro per un errore suo non ferma gli altri. Il riallineamento rinfresca quel che il progetto ha, non aggiunge quel che non ha mai avuto: senza hook o senza blocco in `CLAUDE.md` si resta senza. Con `--no-projects` si aggiorna il solo eseguibile, e i progetti si rimettono in pari a mano con `atlas install <path>`.
 
 Cambiare lingua a un progetto esistente rigenera `SKILL.md`, `CONTRACT.md` e ogni dashboard: un `map.md` già scritto nella vecchia lingua non viene toccato (le sue intestazioni non combaciano più), quel grafo resta com'era finché non lo si aggiorna a mano, mentre i ticket nuovi seguono la lingua corrente.
 
@@ -67,6 +68,7 @@ Cambiare lingua a un progetto esistente rigenera `SKILL.md`, `CONTRACT.md` e ogn
 I comandi del grafo valgono da dentro il progetto, che `atlas` trova da solo risalendo le cartelle:
 
 ```bash
+atlas how-to                         # il briefing completo: contratto, comandi, mutazioni, skill, path
 atlas status                         # frontiera, lucchetti, avanzamento
 atlas next                           # frontiera ordinata per impatto, come suggerimento
 atlas take F01                       # rivendica e stampa il contesto in un solo passo

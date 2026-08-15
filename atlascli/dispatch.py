@@ -63,7 +63,8 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("uninstall", help=t("help.uninstall"))
     p.add_argument("path", nargs="?", default=".", help=t("opt.path"))
 
-    sub.add_parser("update", help=t("help.update"))
+    p = sub.add_parser("update", help=t("help.update"))
+    p.add_argument("--no-projects", action="store_true", help=t("opt.no_projects"))
 
     p = sub.add_parser("list", help=t("help.list"))
     p.add_argument("slug", nargs="?", help=t("opt.list_slug"))

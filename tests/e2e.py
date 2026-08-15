@@ -3,11 +3,13 @@
 
 Verifica quel che i test unitari non toccano, cioe' l'eseguibile visto da fuori:
 merge degli hook, symlink delle skill, blocco in CLAUDE.md, idempotenza, il
-registro globale, la migrazione da una versione precedente, l'uninstall, e il
-ciclo di un nodo dal claim alla chiusura.
+registro globale, la migrazione da una versione precedente, l'uninstall, il
+riallineamento dei progetti dopo un aggiornamento, e il ciclo di un nodo dal
+claim alla chiusura.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
@@ -318,6 +320,63 @@ def verifica_uninstall() -> None:
         shutil.rmtree(atlas_home, ignore_errors=True)
 
 
+def verifica_update_riallinea_i_progetti() -> None:
+    """'atlas update' rimette in pari i progetti registrati, col binario vero.
+
+    I test unitari coprono la stessa logica sui moduli sorgente; qui si prova
+    l'eseguibile impacchettato, perche' e' quello che riallinea davvero: la
+    versione nuova viene invocata come sottoprocesso, e se il pacchetto non
+    contenesse il modulo, o l'invocazione sbagliasse strada, i test unitari non
+    se ne accorgerebbero. Il 'binario nuovo' pubblicato dal fixture e' dist/atlas
+    stesso, quindi l'aggiornamento e' vero dal download all'impronta.
+    """
+    from tests.httpfixture import Fixture
+
+    sandbox = Path(tempfile.mkdtemp())
+    binario = sandbox / "atlas"
+    shutil.copyfile(CLI, binario)
+    binario.chmod(0o755)
+    blob = binario.read_bytes()
+    fixture = Fixture({})
+    fixture.start()
+    try:
+        release = {"tag_name": "v9.9.9", "assets": [
+            {"name": "atlas", "browser_download_url": f"{fixture.base_url}/asset/atlas"},
+            {"name": "atlas.sha256", "browser_download_url": f"{fixture.base_url}/asset/atlas.sha256"}]}
+        fixture.routes["/repos/strawberry-code/atlas/releases/latest"] = (
+            200, json.dumps(release).encode("utf-8"), "application/json")
+        fixture.routes["/asset/atlas"] = (200, blob, "application/octet-stream")
+        fixture.routes["/asset/atlas.sha256"] = (
+            200, f"{hashlib.sha256(blob).hexdigest()}  atlas\n".encode("utf-8"), "text/plain")
+        env = dict(os.environ, ATLAS_CONFIG=str(sandbox / "registro.json"),
+                   ATLAS_UPDATE_BASE_URL=fixture.base_url)
+
+        def atlas(*args):
+            return subprocess.run([sys.executable, str(binario), *args], env=env,
+                                  capture_output=True, text=True)
+
+        for nome in ("alfa", "beta"):
+            (sandbox / nome).mkdir()
+            atlas("install", str(sandbox / nome), "--yes")
+        (sandbox / "sparito").mkdir()
+        atlas("install", str(sandbox / "sparito"), "--yes")
+        shutil.rmtree(sandbox / "sparito")          # registrato, ma non piu' sul disco
+        for nome in ("alfa", "beta"):
+            (sandbox / nome / ".atlas" / "CONTRACT.md").write_text("MANOMESSO\n", encoding="utf-8")
+        (sandbox / "beta" / "CLAUDE.md").unlink()   # beta senza blocco: non deve tornare
+
+        esito = atlas("update")
+        verifica(esito.returncode == 0, "update: riesce anche con un progetto sparito nel registro")
+        verifica((sandbox / "alfa" / ".atlas" / "CONTRACT.md").read_text(encoding="utf-8") != "MANOMESSO\n",
+                 "update: il contratto dei progetti torna quello della versione nuova")
+        verifica("sparito" in esito.stdout, "update: il progetto sparito viene nominato, non taciuto")
+        verifica(not (sandbox / "beta" / "CLAUDE.md").exists(),
+                 "update: non rimette il blocco a chi non lo aveva")
+    finally:
+        fixture.stop()
+        shutil.rmtree(sandbox, ignore_errors=True)
+
+
 def verifica_file_rotti() -> None:
     """Un JSON malformato deve diventare un messaggio, e non deve murare il progetto.
 
@@ -498,6 +557,7 @@ if __name__ == "__main__":
     verifica_install_in_inglese()
     verifica_migrazione_dal_motore_a_sorgenti()
     verifica_uninstall()
+    verifica_update_riallinea_i_progetti()
     verifica_file_rotti()
     verifica_hook_una_volta_sola()
     verifica_uscita_non_utf8()

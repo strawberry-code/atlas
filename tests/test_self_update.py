@@ -15,6 +15,7 @@ import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -24,7 +25,11 @@ from atlascli import registry, self_update  # noqa: E402
 from tests.httpfixture import Fixture  # noqa: E402
 
 
-class SelfUpdate(unittest.TestCase):
+class Infrastruttura:
+    """setUp, tearDown e fixture condivisi. Non e' un TestCase: ereditare da uno
+    farebbe rieseguire i suoi test in ogni classe figlia, allungando la suite
+    senza provare niente di nuovo."""
+
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
         self.target = self.tmp / "atlas"
@@ -35,11 +40,21 @@ class SelfUpdate(unittest.TestCase):
         self.fixture = Fixture({})
         self.fixture.start()
         os.environ["ATLAS_UPDATE_BASE_URL"] = self.fixture.base_url
+        # Il registro sotto test dev'essere di questa cartella, non quello vero
+        # della macchina. Finche' l'update lo leggeva soltanto la differenza non
+        # si vedeva; da quando riallinea i progetti, la suite andrebbe a
+        # installare dentro i progetti veri di chi la esegue.
+        self._config = os.environ.get("ATLAS_CONFIG")
+        os.environ["ATLAS_CONFIG"] = str(self.tmp / "atlas.json")
 
     def tearDown(self):
         self.fixture.stop()
         sys.argv[0] = self._argv0
         os.environ.pop("ATLAS_UPDATE_BASE_URL", None)
+        if self._config is None:
+            os.environ.pop("ATLAS_CONFIG", None)
+        else:
+            os.environ["ATLAS_CONFIG"] = self._config
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def _pubblica(self, tag: str, blob: bytes, sha_giusto: bool = True) -> None:
@@ -58,6 +73,8 @@ class SelfUpdate(unittest.TestCase):
         self.fixture.routes["/asset/atlas.sha256"] = (
             200, f"{digest}  atlas\n".encode("utf-8"), "text/plain")
 
+
+class SelfUpdate(Infrastruttura, unittest.TestCase):
     def test_nessuna_versione_nuova_non_scarica_nulla(self):
         self._pubblica("v0.0.0-dev", b"qualsiasi")
         self.assertEqual(0, self_update.cmd_update(None))
@@ -236,6 +253,90 @@ class CheckForUpdate(unittest.TestCase):
             200, b"{ malformed json", "application/json")
         risultato = self_update.check_for_update()
         self.assertIsNone(risultato)
+
+
+class Riallineamento(Infrastruttura, unittest.TestCase):
+    """'atlas update' rimette in pari i progetti registrati.
+
+    Il binario pubblicato dal fixture e' uno script vero che scrive quali
+    argomenti ha ricevuto: cosi' il test dimostra anche che a riallineare e'
+    l'eseguibile nuovo, e non questo processo, che porta ancora il payload
+    della versione appena sostituita.
+    """
+
+    SONDA = ("#!/usr/bin/env python3\n"
+             "import pathlib, sys\n"
+             "pathlib.Path(sys.argv[2], 'RIALLINEATO').write_text(' '.join(sys.argv[1:]), encoding='utf-8')\n"
+             ).encode("utf-8")
+
+    def _progetto(self, nome: str, *, hook: bool = False, claude_md: bool = False) -> Path:
+        target = self.tmp / nome
+        (target / ".atlas").mkdir(parents=True)
+        (target / ".atlas" / "config.json").write_text('{"project": "x"}', encoding="utf-8")
+        if hook:
+            (target / ".claude").mkdir(exist_ok=True)
+            (target / ".claude" / "settings.json").write_text(
+                json.dumps({"hooks": {"SessionEnd": [{"hooks": [{"command": "atlas render --all"}]}]}}),
+                encoding="utf-8")
+        if claude_md:
+            (target / "CLAUDE.md").write_text("# x\n<!-- atlas:begin -->\nc\n<!-- atlas:end -->\n",
+                                              encoding="utf-8")
+        registry.register(target, slug=nome, yes=True)
+        return target
+
+    def _aggiorna(self, no_projects: bool = False) -> int:
+        self._pubblica("v9.9.9", self.SONDA)
+        return self_update.cmd_update(SimpleNamespace(no_projects=no_projects))
+
+    def test_ogni_progetto_registrato_viene_riallineato(self):
+        uno, due = self._progetto("uno"), self._progetto("due")
+        self.assertEqual(0, self._aggiorna())
+        for target in (uno, due):
+            with self.subTest(target=target.name):
+                self.assertTrue((target / "RIALLINEATO").is_file())
+                # il path arriva dal registro, che lo tiene risolto (su macOS /var e' un symlink)
+                self.assertIn(f"install {target.resolve()} --yes",
+                              (target / "RIALLINEATO").read_text(encoding="utf-8"))
+
+    def test_progetto_sparito_dal_disco_viene_saltato_senza_fermare_gli_altri(self):
+        registry.register(self.tmp / "fantasma", slug="fantasma", yes=True)
+        vivo = self._progetto("vivo")
+        self.assertEqual(0, self._aggiorna())
+        self.assertTrue((vivo / "RIALLINEATO").is_file())
+
+    def test_cartella_senza_config_viene_saltata(self):
+        """Restare con .atlas/ dopo un uninstall non fa di una cartella un progetto."""
+        orfano = self.tmp / "orfano"
+        (orfano / ".atlas").mkdir(parents=True)
+        registry.register(orfano, slug="orfano", yes=True)
+        self.assertEqual(0, self._aggiorna())
+        self.assertFalse((orfano / "RIALLINEATO").exists())
+
+    def test_riallineare_non_aggiunge_quel_che_il_progetto_non_aveva(self):
+        """Chi era installato senza hook o senza blocco in CLAUDE.md non se li
+        ritrova comparire adesso: l'update rinfresca, non reinstalla scelte."""
+        nudo = self._progetto("nudo")
+        completo = self._progetto("completo", hook=True, claude_md=True)
+        self.assertEqual(0, self._aggiorna())
+        argomenti = (nudo / "RIALLINEATO").read_text(encoding="utf-8")
+        self.assertIn("--no-hooks", argomenti)
+        self.assertIn("--no-claude-md", argomenti)
+        argomenti = (completo / "RIALLINEATO").read_text(encoding="utf-8")
+        self.assertNotIn("--no-hooks", argomenti)
+        self.assertNotIn("--no-claude-md", argomenti)
+
+    def test_no_projects_aggiorna_solo_l_eseguibile(self):
+        solo = self._progetto("solo")
+        self.assertEqual(0, self._aggiorna(no_projects=True))
+        self.assertEqual(self.SONDA, self.target.read_bytes())
+        self.assertFalse((solo / "RIALLINEATO").exists())
+
+    def test_settings_illeggibile_non_ferma_il_riallineamento(self):
+        rotto = self._progetto("rotto")
+        (rotto / ".claude").mkdir(exist_ok=True)
+        (rotto / ".claude" / "settings.json").write_text("{ non json", encoding="utf-8")
+        self.assertEqual(0, self._aggiorna())
+        self.assertIn("--no-hooks", (rotto / "RIALLINEATO").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
