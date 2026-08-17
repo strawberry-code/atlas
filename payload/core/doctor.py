@@ -5,28 +5,11 @@ from datetime import datetime
 
 from . import claims, docs, gitscan
 from .config import ConfigError, Graph, Workspace
-from .model import by_id, claimed, is_done
+from .model import by_id, claimed, is_done, istante
 from .report import ETICHETTA
 from .store import StateError, load
 from .strings import t
 from .topology import convergence
-
-
-def _istante(testo: str) -> datetime | None:
-    """Un timestamp del grafo reso confrontabile, o None se non si legge.
-
-    closedAt lo scrive il motore in ISO col fuso, ma il grafo e' un file di testo
-    versionato: dentro ci finiscono anche date scritte a mano ('ieri', oppure un
-    '2026-01-02' senza fuso come quello di meta.updated). La prima faceva morire
-    doctor con ValueError, la seconda con TypeError sul confronto fra un istante
-    con fuso e uno senza. Qui una data senza fuso si legge come ora locale, e
-    quel che resta illeggibile vale come 'non lo so', che per un avviso basta.
-    """
-    try:
-        letto = datetime.fromisoformat(testo)
-    except (ValueError, TypeError):
-        return None
-    return letto if letto.tzinfo else letto.astimezone()
 
 
 def doctor_avvisi(data: dict, ref: Graph, agente: dict) -> list[str]:
@@ -72,7 +55,7 @@ def doctor_avvisi(data: dict, ref: Graph, agente: dict) -> list[str]:
                 tocchi.append(a)
             elif result is None:
                 # Fallback all'mtime: il file e' stato scritto dopo la chiusura.
-                soglia = _istante(chiuso)
+                soglia = istante(chiuso)
                 if soglia is None:
                     continue        # senza un istante leggibile non c'e' confronto da fare
                 if datetime.fromtimestamp((ref.workspace.project_root / a).stat().st_mtime).astimezone() > soglia:

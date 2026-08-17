@@ -31,6 +31,18 @@ STRINGS: dict[str, dict[str, str]] = {
                                           "  dichiarali con --artefatti",
                                     "en": "artifacts not deduced: several nodes are in progress at once,\n"
                                           "  declare them with --artefatti"},
+    "close.artifacts_finestra_condivisa": {"it": "artefatti non dedotti: {altro} è stato chiuso o rilasciato\n"
+                                                 "  mentre questo nodo era in lavorazione, e i file dedotti\n"
+                                                 "  sarebbero anche i suoi. Dichiarali con --artefatti",
+                                           "en": "artifacts not deduced: {altro} was closed or released while\n"
+                                                 "  this node was in progress, so the deduced files would be\n"
+                                                 "  its files too. Declare them with --artefatti"},
+    "close.artifacts_presa_illeggibile": {"it": "artefatti non dedotti: l'istante di presa di {id} non si legge\n"
+                                                "  ('{at}'). Correggilo in graph.json oppure dichiara i file\n"
+                                                "  con --artefatti",
+                                          "en": "artifacts not deduced: the claim timestamp of {id} is unreadable\n"
+                                                "  ('{at}'). Fix it in graph.json or declare the files with\n"
+                                                "  --artefatti"},
     "close.premessa_scaduta": {"it": "{id} è cambiato da quando l'hai preso.\n"
                                      "  La tua risposta potrebbe poggiare su una premessa che non c'è più:\n"
                                      "  rileggi il nodo con 'atlas show {id}' e richiudi, oppure usa --force\n"

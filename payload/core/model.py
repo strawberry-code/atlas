@@ -7,9 +7,28 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from datetime import datetime
 
 from .store import CLAIMED, CLOSED, DROPPED, OPEN, StateError
 from .strings import t
+
+
+def istante(testo: str | None) -> datetime | None:
+    """Un timestamp del grafo reso confrontabile, o None se non si legge.
+
+    closedAt lo scrive il motore in ISO col fuso, ma il grafo e' un file di testo
+    versionato: dentro ci finiscono anche date scritte a mano ('ieri', oppure un
+    '2026-01-02' senza fuso come quello di meta.updated). La prima faceva morire
+    doctor con ValueError, la seconda con TypeError sul confronto fra un istante
+    con fuso e uno senza. Qui una data senza fuso si legge come ora locale, e
+    quel che resta illeggibile vale come 'non lo so': tocca a chi chiama decidere
+    cosa fare di quel non-so.
+    """
+    try:
+        letto = datetime.fromisoformat(testo)
+    except (ValueError, TypeError):
+        return None
+    return letto if letto.tzinfo else letto.astimezone()
 
 
 def by_id(graph: dict) -> dict[str, dict]:

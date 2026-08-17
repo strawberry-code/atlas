@@ -236,6 +236,12 @@ def dispatch(ws: Workspace, args) -> int:
         print(t("close.fatto", id=node["id"]))
         if avviso:
             print(f"  {avviso}")
+        # Solo quando li ha dedotti il motore: chi passa --artefatti sa gia' cosa ha
+        # scritto, chi non lo passa scopre l'attribuzione qui invece che rileggendo
+        # il grafo giorni dopo.
+        if args.artefatti is None and node.get("artifacts"):
+            print(t("close.artefatti_dedotti", n=len(node["artifacts"]),
+                    elenco=", ".join(node["artifacts"])))
         with read_transaction(ref.json_path) as data:
             refresh(ref, data)
         report.show_status(ref, data)      # stampare non vuole il lock: data e' gia' in memoria

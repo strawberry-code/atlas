@@ -111,6 +111,8 @@ STRINGS: dict[str, dict[str, str]] = {
     # --- dispatch ---
     "use.attivo": {"it": "  grafo attivo: {slug}", "en": "  active graph: {slug}"},
     "close.fatto": {"it": "  {id} chiuso · riga aggiunta in map.md", "en": "  {id} closed · line added to map.md"},
+    "close.artefatti_dedotti": {"it": "  artefatti dedotti da git ({n}): {elenco}",
+                                "en": "  artifacts deduced from git ({n}): {elenco}"},
     "claim.fatto": {"it": "  {id} rivendicato · ticket in {path}", "en": "  {id} claimed · ticket at {path}"},
     "release.fatto": {"it": "  {id} tornato alla frontiera", "en": "  {id} back on the frontier"},
     "fog.fatto": {"it": "  appuntato nella nebbia", "en": "  noted in the fog"},

@@ -538,6 +538,96 @@ class Artefatti(Base):
         self.assertIsNotNone(avviso, "deve esserci avviso quando altri nodi sono rivendicati")
         self.assertIn("--artefatti", avviso)
 
+    def sgancia(self, node_id: str, blocked_by: str):
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.unlink(g, node_id, blocked_by=blocked_by)
+
+    def altra_sessione(self, azione):
+        """Esegue azione() con un'altra identita', come farebbe un altro agente."""
+        os.environ["ATLAS_IDENTITY"] = "esecutore-2"
+        try:
+            return azione()
+        finally:
+            os.environ.pop("ATLAS_IDENTITY", None)
+
+    def test_artifacts_non_dedotti_se_un_altro_nodo_chiude_dentro_la_finestra(self):
+        """Il difetto di #19: l'altra sessione prende, lavora e chiude DENTRO la finestra.
+
+        All'istante della chiusura di F01 c'e' un solo nodo rivendicato, quindi il
+        controllo sincrono passa; ma i file dedotti da git includono anche quelli
+        prodotti e gia' chiusi da F02."""
+        self.prepara_lavoro()                       # claim di F01, poi un file scritto
+        self.sgancia("F02", "F01")
+        self.rispondi("F02")
+        self.altra_sessione(lambda: self.claims.claim(self.ref, "F02"))
+        (self.tmp / "roba-altrui.txt").write_text("output2", encoding="utf-8")
+        self.altra_sessione(lambda: self.claims.close(self.ref, "F02", "fatto da un altro"))
+        node, avviso = self.claims.close(self.ref, "F01", "fatto")
+        self.assertEqual([], node["artifacts"], "il lavoro di F02 non va intestato a F01")
+        self.assertIsNotNone(avviso, "la deduzione saltata va dichiarata")
+        self.assertIn("F02", avviso, "l'avviso deve nominare il nodo che ha condiviso la finestra")
+
+    def test_artifacts_dedotti_se_l_altra_chiusura_precede_la_presa(self):
+        """Il caso sequenziale, che deve restare dedotto: chiudo F02, poi prendo F01."""
+        self.popola()
+        self.sgancia("F02", "F01")
+        self.rispondi("F01")
+        self.rispondi("F02")
+        self.git_init()
+        self.altra_sessione(lambda: self.claims.claim(self.ref, "F02"))
+        self.altra_sessione(lambda: self.claims.close(self.ref, "F02", "fatto prima"))
+        # I timestamp del grafo hanno la risoluzione del secondo: senza spostare
+        # indietro la chiusura, in un test che gira in millisecondi la presa di F01
+        # cadrebbe nello stesso secondo e il confronto direbbe 'finestra condivisa'
+        # per un caso che condiviso non e'.
+        with self.store.transaction(self.ref.json_path) as data:
+            prima = datetime.now().astimezone() - timedelta(minutes=1)
+            self.model.node_of(data, "F02")["closedAt"] = prima.isoformat(timespec="seconds")
+        self.claims.claim(self.ref, "F01")
+        (self.tmp / "prodotto.txt").write_text("output", encoding="utf-8")
+        node, avviso = self.claims.close(self.ref, "F01", "fatto")
+        self.assertIn("prodotto.txt", node["artifacts"], "una chiusura precedente non sporca la finestra")
+        self.assertIsNone(avviso)
+
+    def test_artifacts_non_dedotti_se_un_altro_nodo_e_rilasciato_dentro_la_finestra(self):
+        """Un rilascio motivato dentro la finestra vale come una chiusura: l'altra
+        sessione ha lavorato, e i suoi file sono nel working tree."""
+        self.prepara_lavoro()
+        self.sgancia("F02", "F01")
+        self.altra_sessione(lambda: self.claims.claim(self.ref, "F02"))
+        self.altra_sessione(lambda: self.claims.release(self.ref, "F02", reason="cambio piano"))
+        node, avviso = self.claims.close(self.ref, "F01", "fatto")
+        self.assertEqual([], node["artifacts"])
+        self.assertIn("F02", avviso)
+
+    def test_artifacts_non_dedotti_con_istante_di_presa_illeggibile(self):
+        """Un claim.at scritto a mano non deve far morire close, ne' dedurre alla cieca."""
+        self.prepara_lavoro()
+        with self.store.transaction(self.ref.json_path) as data:
+            self.model.node_of(data, "F01")["claim"]["at"] = "ieri"
+        node, avviso = self.claims.close(self.ref, "F01", "fatto", force=True)
+        self.assertEqual([], node["artifacts"])
+        self.assertIn("ieri", avviso)
+
+    def test_close_stampa_i_file_dedotti(self):
+        """Chi chiude vede subito cosa gli e' stato intestato, invece di scoprirlo
+        rileggendo il grafo. Con --artefatti espliciti l'elenco non si ripete."""
+        from core import cli
+        self.prepara_lavoro()
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            self.assertEqual(0, cli.main(["close", "F01", "-s", "fatto"]))
+        uscita = buffer.getvalue()
+        self.assertIn("prodotto.txt", uscita)
+        self.assertIn("artefatti dedotti", uscita)
+
+        self.rispondi("F02")
+        self.claims.claim(self.ref, "F02")
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            self.assertEqual(0, cli.main(["close", "F02", "-s", "fatto", "--artefatti", "mio.txt"]))
+        self.assertNotIn("artefatti dedotti", buffer.getvalue())
+
     def test_i_markdown_generati_non_hanno_il_bom(self):
         """Ticket e mappa.md vanno scritti in UTF-8 puro, senza BOM."""
         self.popola()

@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from . import docs, gitscan
 from .config import Graph
 from .identity import alive, e_mio, holder, identity, nota, session
-from .model import by_id, fingerprint, is_done, node_of, claimed
+from .model import by_id, fingerprint, is_done, istante, node_of, claimed
 from .store import CLAIMED, CLOSED, OPEN, StateError, load, transaction
 from .strings import t
 
@@ -90,6 +90,34 @@ def release(ref: Graph, node_id: str, reason: str | None = None) -> dict:
         return dict(node)
 
 
+def _condiviso(data: dict, node_id: str, da: datetime) -> str | None:
+    """Chi altro ha chiuso o rilasciato un nodo mentre questo era in lavorazione.
+
+    Il controllo sui nodi rivendicati guarda l'istante della chiusura, la deduzione
+    guarda la finestra dalla presa in poi: fra i due c'e' spazio per una sessione che
+    prende, lavora e chiude tutta dentro la finestra altrui, e il suo lavoro finirebbe
+    negli artefatti di chi chiude dopo. Qui si guarda la finestra intera.
+
+    Un timestamp illeggibile (il grafo e' un file versionato, ci finiscono date
+    scritte a mano) vale come 'non lo so', e un non-so vale come collisione: meglio
+    un campo vuoto e dichiarato di uno pieno di file altrui. Il messaggio nomina il
+    nodo, cosi' chi legge sa quale timestamp riparare.
+    """
+    for nodo in data["nodes"]:
+        if nodo["id"] == node_id or not nodo.get("closedAt"):
+            continue
+        chiuso = istante(nodo["closedAt"])
+        if chiuso is None or chiuso >= da:
+            return nodo["id"]
+    for rilascio in data.get("releases", []):
+        if rilascio.get("id") == node_id:
+            continue
+        mollato = istante(rilascio.get("at"))
+        if mollato is None or mollato >= da:
+            return rilascio.get("id") or "?"
+    return None
+
+
 def _artefatti(ref: Graph, node_id: str) -> tuple[list[str] | None, str | None]:
     """Cosa ha toccato la sessione secondo git, piu' l'eventuale avviso di rinuncia.
 
@@ -106,6 +134,14 @@ def _artefatti(ref: Graph, node_id: str) -> tuple[list[str] | None, str | None]:
     if [n for n in claimed(data) if n["id"] != node_id]:
         return None, t("close.artifacts_non_dedotti")
     preso = holder(node_of(data, node_id)).get("at")
+    # Senza presa non c'e' finestra da guardare: la deduzione e' gia' su tutto il
+    # working tree e restringerla al lavoro di questa sessione non e' possibile.
+    if preso:
+        inizio = istante(preso)
+        if inizio is None:
+            return None, t("close.artifacts_presa_illeggibile", id=node_id, at=preso)
+        if altro := _condiviso(data, node_id, inizio):
+            return None, t("close.artifacts_finestra_condivisa", altro=altro)
     return gitscan.touched(ref.workspace.project_root, preso) or None, None
 
 
