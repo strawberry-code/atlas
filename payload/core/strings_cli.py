@@ -10,6 +10,13 @@ STRINGS: dict[str, dict[str, str]] = {
     "parser.description": {"it": "Harness di task a grafo.", "en": "Graph-based task harness."},
     "opt.graph": {"it": "slug del grafo, se non è quello attivo",
                   "en": "graph slug, if not the active one"},
+    "parser.slug_al_posto_del_comando": {
+        "it": "\n'{slug}' è un grafo di questo progetto, non un comando.\n"
+              "Il grafo si indica con -g: 'atlas render -g {slug}',\n"
+              "oppure si rende attivo una volta sola: 'atlas use {slug}'.",
+        "en": "\n'{slug}' is a graph of this project, not a command.\n"
+              "Pick the graph with -g: 'atlas render -g {slug}',\n"
+              "or make it the active one once: 'atlas use {slug}'."},
     "help.status": {"it": "frontiera, lucchetti, avanzamento", "en": "frontier, locks, progress"},
     "help.next": {"it": "la frontiera ordinata per impatto", "en": "the frontier ranked by impact"},
     "help.graphs": {"it": "i grafi di questo progetto", "en": "the graphs in this project"},

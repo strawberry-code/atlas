@@ -44,9 +44,12 @@ COMANDI = {"install": install_cmd.cmd_install, "uninstall": install_cmd.cmd_unin
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="atlas", description=t("parser.description"),
-                                     epilog=t("parser.epilog"),
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    # Il parser del motore, non quello nudo di argparse: e' quello che su 'atlas
+    # <slug> render' spiega come si sceglie un grafo invece di elencare i comandi.
+    from core.cli import Parser, aggiungi_comandi
+    parser = Parser(prog="atlas", description=t("parser.description"),
+                    epilog=t("parser.epilog"),
+                    formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     p = sub.add_parser("install", help=t("help.install"))
@@ -75,7 +78,6 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--global", dest="globale", action="store_true", help=t("opt.lang_globale"))
 
     # I comandi del grafo nello stesso elenco: un help solo, nessun passthrough.
-    from core.cli import aggiungi_comandi
     aggiungi_comandi(sub)
     parser.add_argument("-g", "--graph", dest="graph", help=t("opt.graph_attivo"))
     return parser

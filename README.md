@@ -129,8 +129,11 @@ One per epic, isolated.
 ```bash
 atlas new other-epic -t "Title" -d "Where it lands."
 atlas graphs
-atlas use other-epic       # or -g <slug>, or ATLAS_GRAPH=<slug>
+atlas use other-epic       # makes a graph active, once
+atlas render -g other-epic # or pick it on the single command
 ```
+
+The slug does not go where the command goes: `atlas other-epic render` doesn't exist. `-g/--graph` works both before and after the command (`atlas -g other-epic render` and `atlas render -g other-epic` are the same thing), and `ATLAS_GRAPH=<slug>` does the same for the whole shell.
 
 ## The two skills
 

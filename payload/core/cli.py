@@ -198,13 +198,56 @@ def _identity(p: argparse.ArgumentParser) -> None:
     p.add_argument("--identity", default=None, help=t("help.identity"))
 
 
+def _grafo(p: argparse.ArgumentParser) -> None:
+    """-g/--graph accettato anche DOPO il sottocomando.
+
+    Sul parser radice il flag esiste da sempre, ma li' va scritto prima del comando,
+    cioe' nel punto in cui nessuno lo cerca: 'atlas render -g piano' rispondeva
+    'unrecognized arguments: -g piano', che e' il modo peggiore di sbagliare, perche'
+    il flag e' quello giusto e l'errore non dice dov'e' il problema. SUPPRESS e'
+    obbligatorio: con un default normale il sottocomando riscriverebbe nel namespace
+    il proprio None, cancellando il valore gia' letto dal parser radice.
+    """
+    p.add_argument("-g", "--graph", default=argparse.SUPPRESS, help=t("opt.graph"))
+
+
 COMANDI = ("status", "next", "graphs", "use", "show", "brief", "claim", "take", "release",
            "close", "fog", "assign", "unassign", "whoami", "render", "new", "new-script",
            "exec", "validate", "doctor", "how-to")
 
 
+class Parser(argparse.ArgumentParser):
+    """Il parser radice, che su un comando sconosciuto guarda se era uno slug.
+
+    'atlas <slug> render' e' il primo tentativo di chi conosce altri strumenti, e
+    l'elenco dei comandi validi che argparse stampa non dice da nessuna parte come
+    si sceglie un grafo: due persone davanti allo stesso schermo non ne sono uscite.
+    Il suggerimento si aggiunge solo se quel token e' davvero un grafo di questo
+    progetto, cosi' chi ha semplicemente sbagliato a digitare non legge un consiglio
+    che non c'entra.
+    """
+
+    def parse_args(self, args=None, namespace=None):
+        self._token = list(sys.argv[1:] if args is None else args)
+        return super().parse_args(args, namespace)
+
+    def error(self, message: str) -> None:
+        primo = next((a for a in getattr(self, "_token", []) if not a.startswith("-")), None)
+        if primo and primo in _slug_noti():
+            message = f"{message}\n{t('parser.slug_al_posto_del_comando', slug=primo)}"
+        super().error(message)
+
+
+def _slug_noti() -> list[str]:
+    """I grafi del progetto sotto la cwd, o niente se qui non c'e' un progetto."""
+    try:
+        return workspace().slugs()
+    except ConfigError:
+        return []
+
+
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="atlas", description=t("parser.description"))
+    parser = Parser(prog="atlas", description=t("parser.description"))
     aggiungi_comandi(parser.add_subparsers(dest="cmd", required=True))
     parser.add_argument("-g", "--graph", help=t("opt.graph"))
     return parser
@@ -217,48 +260,48 @@ def aggiungi_comandi(sub) -> None:
     compagnia, e i due elenchi devono comparire in un help solo: un utente non deve
     sapere che dentro c'e' un motore e attorno c'e' un gestore.
     """
-    sub.add_parser("status", help=t("help.status"))
-    sub.add_parser("next", help=t("help.next"))
+    _grafo(sub.add_parser("status", help=t("help.status")))
+    _grafo(sub.add_parser("next", help=t("help.next")))
     sub.add_parser("graphs", help=t("help.graphs"))
     p = sub.add_parser("use", help=t("help.use")); p.add_argument("slug")
-    p = sub.add_parser("show", help=t("help.show")); p.add_argument("node")
-    p = sub.add_parser("brief", help=t("help.brief")); p.add_argument("node")
+    p = sub.add_parser("show", help=t("help.show")); p.add_argument("node"); _grafo(p)
+    p = sub.add_parser("brief", help=t("help.brief")); p.add_argument("node"); _grafo(p)
 
     p = sub.add_parser("claim", help=t("help.claim"))
     p.add_argument("node"); p.add_argument("-a", "--assignee"); p.add_argument("--force", action="store_true")
-    _identity(p)
+    _identity(p); _grafo(p)
     p = sub.add_parser("take", help=t("help.take"))
     p.add_argument("node"); p.add_argument("-a", "--assignee"); p.add_argument("--force", action="store_true")
-    _identity(p)
+    _identity(p); _grafo(p)
     p = sub.add_parser("release", help=t("help.release")); p.add_argument("node")
-    p.add_argument("-r", "--ragione", default=None); _identity(p)
+    p.add_argument("-r", "--ragione", default=None); _identity(p); _grafo(p)
     p = sub.add_parser("close", help=t("help.close"))
     p.add_argument("node"); p.add_argument("-s", "--sintesi", required=True)
     p.add_argument("-t", "--tipo", default=None); p.add_argument("--force", action="store_true")
     p.add_argument("-c", "--costo", default=None)
-    p.add_argument("--artefatti", nargs="*", default=None); _identity(p)
+    p.add_argument("--artefatti", nargs="*", default=None); _identity(p); _grafo(p)
     p = sub.add_parser("amend", help=t("help.amend"))
     p.add_argument("node"); p.add_argument("--artefatti", nargs="*", default=None)
     p.add_argument("-c", "--costo", default=None); p.add_argument("-s", "--sintesi", default=None)
-    _identity(p)
+    _identity(p); _grafo(p)
     p = sub.add_parser("fog", help=t("help.fog"))
     p.add_argument("riga", nargs="?", default=None)
     p.add_argument("--for", dest="destinatario", default=None)
-    p.add_argument("--list", dest="elenca", action="store_true")
+    p.add_argument("--list", dest="elenca", action="store_true"); _grafo(p)
     p = sub.add_parser("assign", help=t("help.assign"))
     p.add_argument("nome", nargs="?", default=None, help=t("help.assign_nome"))
     p.add_argument("nodi", nargs="*", default=[], help=t("help.assign_nodi"))
     p.add_argument("-b", "--branch", default=None, help=t("help.assign_branch"))
-    p.add_argument("--me", action="store_true", help=t("help.assign_me"))
+    p.add_argument("--me", action="store_true", help=t("help.assign_me")); _grafo(p)
     p = sub.add_parser("unassign", help=t("help.unassign"))
     p.add_argument("nodi", nargs="*", default=[], help=t("help.assign_nodi"))
-    p.add_argument("-b", "--branch", default=None, help=t("help.assign_branch"))
+    p.add_argument("-b", "--branch", default=None, help=t("help.assign_branch")); _grafo(p)
     p = sub.add_parser("whoami", help=t("help.whoami"))
     p.add_argument("nome", nargs="?", default=None, help=t("help.whoami_nome"))
     p.add_argument("--clear", dest="dimentica", action="store_true", help=t("help.whoami_clear"))
     p = sub.add_parser("render", help=t("help.render"))
     p.add_argument("--open", dest="aprila", action="store_true")
-    p.add_argument("--all", dest="tutti", action="store_true", help=t("help.render_all"))
+    p.add_argument("--all", dest="tutti", action="store_true", help=t("help.render_all")); _grafo(p)
 
     p = sub.add_parser("new", help=t("help.new"))
     p.add_argument("slug"); p.add_argument("-t", "--title", required=True)

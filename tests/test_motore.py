@@ -968,6 +968,41 @@ class Assegnazioni(Base):
         self.assertNotIn("</script", isola, "l'isola non si lascia chiudere dal dato")
 
 
+class ScegliereIlGrafo(Base):
+    """Due persone davanti allo stesso schermo non sono riuscite a dare un render:
+    scrivevano 'atlas piano render' o 'atlas render -g piano', e nessuna delle due
+    funzionava. Il flag esiste da sempre, ma solo prima del sottocomando."""
+
+    def test_il_flag_vale_anche_dopo_il_sottocomando(self):
+        from core import cli
+        parser = cli.build_parser()
+        for argv in (["-g", "prova", "render"], ["render", "-g", "prova"],
+                     ["-g", "prova", "status"], ["status", "-g", "prova"],
+                     ["assign", "marco", "F01", "-g", "prova"]):
+            with self.subTest(argv=argv):
+                self.assertEqual("prova", parser.parse_args(argv).graph)
+        self.assertIsNone(parser.parse_args(["render"]).graph,
+                          "senza flag resta il grafo attivo, non una stringa vuota")
+
+    def test_lo_slug_al_posto_del_comando_spiega_come_si_fa(self):
+        from core import cli
+        parser = cli.build_parser()
+        errori = io.StringIO()
+        with contextlib.redirect_stderr(errori), self.assertRaises(SystemExit):
+            parser.parse_args(["prova", "render"])
+        uscita = errori.getvalue()
+        self.assertIn("-g prova", uscita)
+        self.assertIn("atlas use prova", uscita)
+
+    def test_un_refuso_non_riceve_il_consiglio_sbagliato(self):
+        from core import cli
+        parser = cli.build_parser()
+        errori = io.StringIO()
+        with contextlib.redirect_stderr(errori), self.assertRaises(SystemExit):
+            parser.parse_args(["rendr"])
+        self.assertNotIn("atlas use", errori.getvalue(), "'rendr' non è un grafo: niente consiglio")
+
+
 class Nebbia(Base):
     """Il caso di #21: 'fog --for X' anteponeva il prefisso anche a chi lo aveva gia'
     scritto nel testo, e in mappa restava per sempre 'per X: per X: ...'."""

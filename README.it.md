@@ -127,8 +127,11 @@ Uno per epic, isolati.
 ```bash
 atlas new altro-epic -t "Titolo" -d "Dove si arriva."
 atlas graphs
-atlas use altro-epic       # oppure -g <slug>, oppure ATLAS_GRAPH=<slug>
+atlas use altro-epic       # rende attivo un grafo, una volta sola
+atlas render -g altro-epic # oppure si sceglie sul singolo comando
 ```
+
+Lo slug non si scrive al posto del comando: `atlas altro-epic render` non esiste. `-g/--graph` vale sia prima sia dopo il comando (`atlas -g altro-epic render` e `atlas render -g altro-epic` sono la stessa cosa), e `ATLAS_GRAPH=<slug>` fa lo stesso per tutta la shell.
 
 ## Le due skill
 
