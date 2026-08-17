@@ -15,7 +15,7 @@ from pathlib import Path
 
 from . import claims, docs, doctor, howto, mutate, render as dash, report, strings
 from .config import ENV_IDENTITY, ConfigError, Workspace, workspace
-from .model import node_of
+from .model import fog_line, node_of
 from .mutate import editing, validate
 from .store import StateError, load, read_transaction, transaction
 from .strings import t
@@ -280,10 +280,14 @@ def dispatch(ws: Workspace, args) -> int:
             return 0
         if not args.riga:
             raise StateError(t("fog.riga_mancante"))
-        riga = t("fog.per", id=args.destinatario, riga=args.riga) if args.destinatario else args.riga
+        riga, ripetuto = args.riga, False
+        if args.destinatario:
+            riga, ripetuto = fog_line(args.destinatario, args.riga)
         with transaction(ref.json_path) as data:
             data["fog"].append(riga)
         print(t("fog.fatto"))
+        if ripetuto:
+            print(t("fog.prefisso_ripetuto", id=args.destinatario))
     elif args.cmd == "show":
         report.show_node(ref, load(ref.json_path), args.node)
         return 0

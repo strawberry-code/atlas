@@ -114,3 +114,32 @@ def fog_for(graph: dict, node_id: str) -> list[str]:
     strutturato scritto da 'fog --for' sia la menzione nel testo libero."""
     confine = re.compile(rf"(?<![0-9A-Za-z_-]){re.escape(node_id)}(?![0-9A-Za-z_-])")
     return [voce for voce in graph.get("fog", []) if confine.search(voce)]
+
+
+def fog_line(node_id: str, riga: str) -> tuple[str, bool]:
+    """La voce indirizzata a un nodo, con il prefisso scritto una volta sola.
+
+    'fog --for X' antepone da se' 'per X: ', e chi scrive la nebbia tende a
+    ripetere lo stesso prefisso nel testo: su un grafo reale sono uscite 14 voci
+    su 57 con 'per X: per X: ...', scritte in sessioni diverse. E' quel che
+    l'interfaccia induce, quindi si assorbe qui invece di chiederlo a chi scrive.
+
+    Il prefisso da riconoscere si ricava dal catalogo, cosi' la guardia segue la
+    lingua del progetto invece di inseguire l'italiano a mano; i due punti restano
+    opzionali perche' chi scrive a mano li omette quanto li mette. Il confine dopo
+    l'id e' lo stesso di fog_for e per la stessa ragione: con --for B1 una voce che
+    dice 'per B10' non e' il prefisso di questo nodo. Una riga fatta di solo
+    prefisso non lascia testo e non viene toccata: e' una voce vuota, e il
+    comportamento resta quello di prima.
+
+    Torna la riga finale e se il prefisso c'era gia', perche' riscrivere il testo
+    di chi chiama e' un gesto da dichiarare, non da fare in silenzio."""
+    testa, _, coda = t("fog.per", id=node_id, riga="").partition(node_id)
+    apertura = rf"{re.escape(testa.strip())}\s+" if testa.strip() else ""
+    separatore = rf"\s*(?:{re.escape(coda.strip())})?" if coda.strip() else ""
+    gia_scritto = re.compile(
+        rf"^\s*{apertura}{re.escape(node_id)}(?![0-9A-Za-z_-]){separatore}\s*", re.IGNORECASE)
+    resto = gia_scritto.sub("", riga, count=1)
+    if resto != riga and resto.strip():
+        return t("fog.per", id=node_id, riga=resto), True
+    return t("fog.per", id=node_id, riga=riga), False

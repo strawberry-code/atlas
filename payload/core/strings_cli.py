@@ -121,6 +121,8 @@ STRINGS: dict[str, dict[str, str]] = {
     "release.fatto": {"it": "  {id} tornato alla frontiera", "en": "  {id} back on the frontier"},
     "fog.fatto": {"it": "  appuntato nella nebbia", "en": "  noted in the fog"},
     "fog.per": {"it": "per {id}: {riga}", "en": "for {id}: {riga}"},
+    "fog.prefisso_ripetuto": {"it": "  il prefisso per {id} era già nel testo: scritto una volta sola",
+                              "en": "  the prefix for {id} was already in the text: written only once"},
     "fog.riga_mancante": {"it": "una voce di nebbia richiede del testo: 'atlas fog \"...\"'",
                           "en": "a fog entry needs some text: 'atlas fog \"...\"'"},
 

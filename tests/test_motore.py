@@ -818,6 +818,68 @@ class Artefatti(Base):
         self.assertIn('⬤ N2', dash_corretta, "Dashboard corretta: N2 è in lavorazione (il fix chiude la finestra)")
 
 
+class Nebbia(Base):
+    """Il caso di #21: 'fog --for X' anteponeva il prefisso anche a chi lo aveva gia'
+    scritto nel testo, e in mappa restava per sempre 'per X: per X: ...'."""
+
+    def test_il_prefisso_gia_scritto_non_viene_raddoppiato(self):
+        casi = [
+            ("per F02: il conto è incompleto", "per F02: il conto è incompleto", True),
+            ("per F02 il conto è incompleto", "per F02: il conto è incompleto", True),
+            ("  Per   F02  :  spazi e maiuscola", "per F02: spazi e maiuscola", True),
+            ("il conto è incompleto", "per F02: il conto è incompleto", False),
+        ]
+        for scritto, atteso, ripetuto_atteso in casi:
+            with self.subTest(scritto=scritto):
+                riga, ripetuto = self.model.fog_line("F02", scritto)
+                self.assertEqual(atteso, riga)
+                self.assertEqual(ripetuto_atteso, ripetuto)
+
+    def test_il_prefisso_di_un_altro_nodo_resta_nel_testo(self):
+        """'per F03:' dentro una voce indirizzata a F02 e' contenuto, non un doppione."""
+        riga, ripetuto = self.model.fog_line("F02", "per F03: parla di un altro")
+        self.assertEqual("per F02: per F03: parla di un altro", riga)
+        self.assertFalse(ripetuto)
+
+    def test_il_confine_di_parola_vale_anche_nel_prefisso(self):
+        """Come fog_for: con --for B1 una voce che dice 'per B10' non e' il prefisso di
+        questo nodo. Senza confine la guardia mangiava lo zero e lasciava '0: ...'."""
+        riga, ripetuto = self.model.fog_line("B1", "per B10: nodo diverso")
+        self.assertEqual("per B1: per B10: nodo diverso", riga)
+        self.assertFalse(ripetuto)
+
+    def test_la_guardia_segue_la_lingua_del_progetto(self):
+        self.strings.set_language("en")
+        try:
+            riga, ripetuto = self.model.fog_line("F02", "for F02: already prefixed")
+            self.assertEqual("for F02: already prefixed", riga)
+            self.assertTrue(ripetuto)
+        finally:
+            self.strings.set_language("it")
+
+    def test_una_riga_di_solo_prefisso_resta_com_era(self):
+        """Nessun testo residuo: e' una voce vuota, non un prefisso da normalizzare."""
+        riga, ripetuto = self.model.fog_line("F02", "per F02:")
+        self.assertEqual("per F02: per F02:", riga)
+        self.assertFalse(ripetuto)
+
+    def test_il_comando_scrive_una_riga_sola_e_lo_dice(self):
+        from core import cli
+        self.popola()
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            self.assertEqual(0, cli.main(["fog", "per F02: il conto è incompleto", "--for", "F02"]))
+        self.assertEqual(["per F02: il conto è incompleto"], self.store.load(self.ref.json_path)["fog"])
+        self.assertIn("una volta sola", buffer.getvalue())
+
+    def test_senza_destinatario_il_testo_resta_intatto(self):
+        from core import cli
+        self.popola()
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(0, cli.main(["fog", "per F02: scritto a mano"]))
+        self.assertEqual(["per F02: scritto a mano"], self.store.load(self.ref.json_path)["fog"])
+
+
 class Doctor(Base):
     def test_doctor_regge_un_grafo_strutturalmente_rotto(self):
         """L'attrezzo di bordo non puo' essere il primo a rompersi: su un grafo con
