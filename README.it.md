@@ -74,6 +74,7 @@ atlas next                           # frontiera ordinata per impatto, come sugg
 atlas take F01                       # rivendica e stampa il contesto in un solo passo
 # lavori, poi scrivi la sezione Risposta in .atlas/graphs/<slug>/tickets/F01.md
 atlas close F01 -s "sintesi in una riga"
+atlas amend F01 --artefatti src/a.py # corregge la contabilità di un nodo già chiuso
 atlas render --open                  # dashboard
 atlas doctor                         # controllo di salute: nodi dimenticati, lucchetti fermi, dashboard stantia
 ```

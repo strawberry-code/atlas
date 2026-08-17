@@ -628,6 +628,76 @@ class Artefatti(Base):
             self.assertEqual(0, cli.main(["close", "F02", "-s", "fatto", "--artefatti", "mio.txt"]))
         self.assertNotIn("artefatti dedotti", buffer.getvalue())
 
+    def test_amend_corregge_gli_artefatti_senza_toccare_la_chiusura(self):
+        """Il caso di #20: la deduzione ha intestato file altrui, si riscrive la lista.
+
+        closedAt e closedBy restano quelli veri, altrimenti il controllo di doctor
+        sulle scritture postume misurerebbe dall'istante sbagliato."""
+        self.prepara_lavoro()
+        chiuso, _ = self.claims.close(self.ref, "F01", "la sintesi buona")
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.amend(g, "F01", artifacts=["solo-mio.txt"])
+        node = self.model.node_of(self.store.load(self.ref.json_path), "F01")
+        self.assertEqual(["solo-mio.txt"], node["artifacts"])
+        self.assertEqual(chiuso["closedAt"], node["closedAt"])
+        self.assertEqual(chiuso["closedBy"], node["closedBy"])
+        self.assertEqual("la sintesi buona", node["answer"], "la sintesi non passata resta")
+        self.assertEqual(self.store.CLOSED, node["status"])
+        self.assertEqual([["artifacts"]], [a["fields"] for a in node["amendments"]])
+
+    def test_amend_registra_ogni_correzione_con_chi_e_quando(self):
+        self.prepara_lavoro()
+        self.claims.close(self.ref, "F01", "prima sintesi")
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.amend(g, "F01", artifacts=["a.txt"])
+        os.environ["ATLAS_IDENTITY"] = "chi-corregge"
+        try:
+            with self.mutate.editing(self.ref) as g:
+                self.mutate.amend(g, "F01", cost="due ore", summary="sintesi corretta")
+        finally:
+            os.environ.pop("ATLAS_IDENTITY", None)
+        node = self.model.node_of(self.store.load(self.ref.json_path), "F01")
+        self.assertEqual("sintesi corretta", node["answer"])
+        self.assertEqual("due ore", node["cost"])
+        self.assertEqual([["artifacts"], ["answer", "cost"]], [a["fields"] for a in node["amendments"]])
+        self.assertEqual("chi-corregge", node["amendments"][-1]["by"])
+        self.assertIsNotNone(self.model.istante(node["amendments"][-1]["at"]))
+
+    def test_amend_rifiuta_un_nodo_non_chiuso(self):
+        self.prepara_lavoro()
+        with self.assertRaises(self.store.StateError) as caso:
+            with self.mutate.editing(self.ref) as g:
+                self.mutate.amend(g, "F01", artifacts=["a.txt"])
+        self.assertIn("close", str(caso.exception), "l'errore deve dire dove si scrive la contabilità")
+
+    def test_amend_senza_campi_rifiuta(self):
+        self.prepara_lavoro()
+        self.claims.close(self.ref, "F01", "fatto")
+        with self.assertRaises(self.store.StateError):
+            with self.mutate.editing(self.ref) as g:
+                self.mutate.amend(g, "F01")
+
+    def test_amend_dalla_cli(self):
+        from core import cli
+        self.prepara_lavoro()
+        self.claims.close(self.ref, "F01", "fatto")
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            self.assertEqual(0, cli.main(["amend", "F01", "--artefatti", "solo-mio.txt"]))
+        self.assertIn("corretto", buffer.getvalue())
+        node = self.model.node_of(self.store.load(self.ref.json_path), "F01")
+        self.assertEqual(["solo-mio.txt"], node["artifacts"])
+
+    def test_amend_svuota_il_campo_con_artefatti_senza_argomenti(self):
+        """La stessa convenzione di close: --artefatti nudo dichiara 'nessuno'."""
+        from core import cli
+        self.prepara_lavoro()
+        self.claims.close(self.ref, "F01", "fatto")
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(0, cli.main(["amend", "F01", "--artefatti"]))
+        node = self.model.node_of(self.store.load(self.ref.json_path), "F01")
+        self.assertEqual([], node["artifacts"])
+
     def test_i_markdown_generati_non_hanno_il_bom(self):
         """Ticket e mappa.md vanno scritti in UTF-8 puro, senza BOM."""
         self.popola()

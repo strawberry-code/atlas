@@ -74,6 +74,7 @@ atlas next                           # frontier ranked by impact, as a suggestio
 atlas take F01                       # claims it and prints its context in one step
 # work it, then write the Answer section in .atlas/graphs/<slug>/tickets/F01.md
 atlas close F01 -s "one-line summary"
+atlas amend F01 --artefatti src/a.py # fixes the bookkeeping of an already closed node
 atlas render --open                  # dashboard
 atlas doctor                         # health check: dangling nodes, stale locks, stale dashboard
 ```

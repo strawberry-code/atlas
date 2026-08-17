@@ -1,73 +1,18 @@
 """L'unico modo lecito di cambiare la forma di un grafo: codice, non editing a mano.
 
-Uno script apre una sola transazione, muta quanto vuole e alla chiusura il grafo
-viene validato: se la forma non regge, il file non viene toccato affatto. Cosi' gli
-script in .atlas/scripts/ diventano la storia delle modifiche, rileggibile in diff.
+Qui c'e' il vocabolario dei gesti; la transazione dentro cui girano, l'handle che
+ricevono e la validazione finale stanno in editor.py. I nomi si re-importano qui
+perche' uno script scrive 'from core import mutate' e da li' chiama tutto, senza
+dover sapere che il meccanismo abita altrove.
 """
 from __future__ import annotations
 
-from contextlib import contextmanager
-from datetime import datetime
-
 from .config import Graph, Workspace
-from .model import by_id, node_of
-from .topology import levels
-from .store import OPEN, DROPPED, SCHEMA_VERSION, StateError, transaction, write_new
+from .editor import Editor, editing, now, validate    # noqa: F401  (superficie per gli script)
+from .identity import identity
+from .model import by_id, is_done
+from .store import OPEN, DROPPED, SCHEMA_VERSION, StateError, write_new
 from .strings import t
-
-
-def now() -> str:
-    return datetime.now().astimezone().isoformat(timespec="seconds")
-
-
-class Editor:
-    """Handle su un grafo aperto in scrittura. E' l'oggetto che riceve run(g)."""
-
-    def __init__(self, ref: Graph, data: dict, vocab: dict):
-        self.ref, self.data, self.vocab = ref, data, vocab
-
-    @property
-    def slug(self) -> str:
-        return self.ref.slug
-
-    def node(self, node_id: str) -> dict:
-        return node_of(self.data, node_id)
-
-    def ids(self) -> list[str]:
-        return [n["id"] for n in self.data["nodes"]]
-
-
-def validate(data: dict, vocab: dict) -> None:
-    """Id unici, archi risolti, vocabolario rispettato, nessun ciclo."""
-    seen: set[str] = set()
-    for node in data["nodes"]:
-        if node["id"] in seen:
-            raise StateError(t("mutate.id_duplicato", id=node["id"]))
-        seen.add(node["id"])
-    for node in data["nodes"]:
-        if node["branch"] not in data["branches"]:
-            raise StateError(t("mutate.ramo_inesistente", id=node["id"], branch=node["branch"]))
-        for key, allowed in (("type", vocab["types"]), ("mode", vocab["modes"]),
-                             ("status", vocab["statuses"])):
-            if node[key] not in allowed:
-                raise StateError(t("mutate.vocab_non_valido", id=node["id"],
-                                   chiave=key, valore=node[key], ammessi=allowed))
-        for dep in node["blockedBy"]:
-            if dep not in seen:
-                raise StateError(t("mutate.dipendenza_inesistente", id=node["id"], dep=dep))
-            if dep == node["id"]:
-                raise StateError(t("mutate.auto_dipendenza", id=node["id"]))
-    levels(data)  # solleva sui cicli
-
-
-@contextmanager
-def editing(ref: Graph, vocab: dict | None = None):
-    """Transazione unica per tutta la durata di uno script di mutazione."""
-    with transaction(ref.json_path) as data:
-        editor = Editor(ref, data, vocab or ref.workspace.config["vocab"])
-        yield editor
-        validate(data, editor.vocab)
-        data["meta"]["updated"] = now()[:10]
 
 
 # --- struttura -------------------------------------------------------------
@@ -128,6 +73,38 @@ def drop(g: Editor, node_id: str, reason: str) -> dict:
     node = g.node(node_id)
     node.update(status=DROPPED, assignee=None, claim=None, answer=reason)
     g.data["outOfScope"].append(f"**{node['title']}** ({node_id}): {reason}")
+    return node
+
+
+def amend(g: Editor, node_id: str, artifacts: list[str] | None = None,
+          cost: str | None = None, summary: str | None = None) -> dict:
+    """Corregge la contabilita' di un nodo gia' chiuso: artefatti, costo, sintesi.
+
+    La deduzione automatica degli artefatti sbaglia in una classe di casi nota, e
+    chi se ne accorge lo fa rileggendo la chiusura appena fatta: senza questa via
+    il dato sbagliato resta li', e con lui gli avvisi che doctor ne ricava.
+
+    Tocca solo i campi passati e lascia stare stato, closedAt e closedBy: e' una
+    riga di contabilita' riscritta, non una chiusura rifatta, e doctor deve
+    continuare a misurare le scritture postume dall'istante vero della chiusura.
+    La correzione resta scritta nel nodo, cosi' chi rilegge sa che quel campo e'
+    stato messo a mano e non dedotto.
+    """
+    node = g.node(node_id)
+    if not is_done(node):
+        raise StateError(t("mutate.amend_non_chiuso", id=node_id, stato=node["status"]))
+    cambiati = {}
+    if artifacts is not None:
+        cambiati["artifacts"] = list(artifacts)
+    if cost is not None:
+        cambiati["cost"] = cost
+    if summary is not None:
+        cambiati["answer"] = summary
+    if not cambiati:
+        raise StateError(t("mutate.amend_senza_campi", id=node_id))
+    node.update(cambiati)
+    node.setdefault("amendments", []).append(
+        {"at": now(), "by": identity(), "fields": sorted(cambiati)})
     return node
 
 

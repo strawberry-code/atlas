@@ -62,6 +62,14 @@ STRINGS: dict[str, dict[str, str]] = {
     "model.ciclo": {"it": "ciclo di dipendenze su {id}", "en": "dependency cycle on {id}"},
     "mutate.dipendenza_inesistente": {"it": "{id} è bloccato da {dep}, che non esiste",
                                      "en": "{id} is blocked by {dep}, which doesn't exist"},
+    "mutate.amend_non_chiuso": {"it": "{id} non è chiuso: sta a '{stato}'.\n"
+                                      "  Su un nodo ancora aperto la contabilità la scrive 'atlas close'.",
+                                "en": "{id} is not closed: it's at '{stato}'.\n"
+                                      "  On a node still open the bookkeeping is written by 'atlas close'."},
+    "mutate.amend_senza_campi": {"it": "niente da correggere su {id}: passa almeno uno fra\n"
+                                       "  --artefatti, --costo e --sintesi",
+                                 "en": "nothing to fix on {id}: pass at least one of\n"
+                                       "  --artefatti, --costo and --sintesi"},
     "mutate.auto_dipendenza": {"it": "{id} dipende da se stesso", "en": "{id} depends on itself"},
     "mutate.ramo_esiste": {"it": "il ramo {chiave} esiste già", "en": "branch {chiave} already exists"},
     "mutate.nodo_esiste": {"it": "{id} esiste già", "en": "{id} already exists"},

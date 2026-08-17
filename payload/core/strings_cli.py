@@ -22,6 +22,8 @@ STRINGS: dict[str, dict[str, str]] = {
                   "en": "claims a node and prints its context right away"},
     "help.release": {"it": "restituisce un nodo alla frontiera", "en": "returns a node to the frontier"},
     "help.close": {"it": "chiude un nodo con la sua sintesi", "en": "closes a node with its summary"},
+    "help.amend": {"it": "corregge artefatti, costo o sintesi di un nodo già chiuso",
+                   "en": "fixes artifacts, cost or summary of an already closed node"},
     "help.identity": {"it": "identità che tiene il lucchetto, vince su ATLAS_IDENTITY",
                       "en": "identity holding the lock, overrides ATLAS_IDENTITY"},
     "help.render_all": {"it": "rigenera tutti i grafi del progetto, non solo quello attivo",
@@ -111,6 +113,8 @@ STRINGS: dict[str, dict[str, str]] = {
     # --- dispatch ---
     "use.attivo": {"it": "  grafo attivo: {slug}", "en": "  active graph: {slug}"},
     "close.fatto": {"it": "  {id} chiuso · riga aggiunta in map.md", "en": "  {id} closed · line added to map.md"},
+    "amend.fatto": {"it": "  {id} corretto · campi riscritti a mano: {campi}",
+                    "en": "  {id} amended · fields rewritten by hand: {campi}"},
     "close.artefatti_dedotti": {"it": "  artefatti dedotti da git ({n}): {elenco}",
                                 "en": "  artifacts deduced from git ({n}): {elenco}"},
     "claim.fatto": {"it": "  {id} rivendicato · ticket in {path}", "en": "  {id} claimed · ticket at {path}"},

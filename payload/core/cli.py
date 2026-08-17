@@ -191,6 +191,10 @@ def aggiungi_comandi(sub) -> None:
     p.add_argument("-t", "--tipo", default=None); p.add_argument("--force", action="store_true")
     p.add_argument("-c", "--costo", default=None)
     p.add_argument("--artefatti", nargs="*", default=None); _identity(p)
+    p = sub.add_parser("amend", help=t("help.amend"))
+    p.add_argument("node"); p.add_argument("--artefatti", nargs="*", default=None)
+    p.add_argument("-c", "--costo", default=None); p.add_argument("-s", "--sintesi", default=None)
+    _identity(p)
     p = sub.add_parser("fog", help=t("help.fog"))
     p.add_argument("riga", nargs="?", default=None)
     p.add_argument("--for", dest="destinatario", default=None)
@@ -246,6 +250,16 @@ def dispatch(ws: Workspace, args) -> int:
             refresh(ref, data)
         report.show_status(ref, data)      # stampare non vuole il lock: data e' gia' in memoria
         commit(ws, ref, node, args.tipo or ws.config["git"]["commit_type"])
+        return 0
+
+    if args.cmd == "amend":
+        with mutate.editing(ref) as g:
+            node = mutate.amend(g, args.node, artifacts=args.artefatti,
+                                cost=args.costo, summary=args.sintesi)
+            corretti = node["amendments"][-1]["fields"]
+        with read_transaction(ref.json_path) as data:
+            refresh(ref, data)
+        print(t("amend.fatto", id=args.node, campi=", ".join(corretti)))
         return 0
 
     if args.cmd == "take":

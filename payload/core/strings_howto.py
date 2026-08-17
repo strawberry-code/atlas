@@ -67,6 +67,8 @@ STRINGS: dict[str, dict[str, str]] = {
     "howto.mutate.unlink": {"it": "toglie una dipendenza", "en": "removes a dependency"},
     "howto.mutate.drop": {"it": "fuori scopo: il nodo esce dal percorso ma sblocca chi lo aspettava",
                           "en": "out of scope: the node leaves the path but still unblocks whoever waited for it"},
+    "howto.mutate.amend": {"it": "corregge artefatti, costo e sintesi di un nodo già chiuso, senza toccare la chiusura",
+                           "en": "fixes artifacts, cost and summary of an already closed node, leaving the closure alone"},
     "howto.mutate.reopen": {"it": "riporta un nodo chiuso allo stato aperto, senza risposta",
                             "en": "brings a closed node back to open, with no answer"},
     "howto.mutate.fog_add": {"it": "appunta una riga in nebbia da dentro uno script",
