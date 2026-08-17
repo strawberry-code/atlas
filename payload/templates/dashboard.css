@@ -161,8 +161,10 @@ h2::before{content:"";width:6px;height:6px;background:var(--accent);flex:none}
 ul{margin:0;padding:0;list-style:none}
 li{padding:4px 6px;margin:0 -6px;color:var(--muted);font-size:11.5px;
   display:flex;gap:8px;align-items:baseline;transition:background-color .15s ease}
-li[data-node]{cursor:pointer}
-li[data-node]:hover,li[data-branch]:hover{background:var(--code-bg)}
+li[data-node],li[data-owner]{cursor:pointer}
+li[data-node]:hover,li[data-branch]:hover,li[data-owner]:hover{background:var(--code-bg)}
+li[data-owner].on{background:var(--code-bg);box-shadow:inset 2px 0 0 var(--accent)}
+li[data-owner].on b{color:var(--accent)}
 li[data-node]:hover b{color:var(--accent)}
 li b{color:var(--ink);font-weight:700;font-size:11px;transition:color .15s ease}
 .tag{margin-left:auto;font-size:9.5px;color:var(--faint);white-space:nowrap;
@@ -236,7 +238,13 @@ li b{color:var(--ink);font-weight:700;font-size:11px;transition:color .15s ease}
 }
 .legend .chip:hover{color:var(--ink);border-color:var(--border-strong)}
 .legend .chip.on{border-color:var(--accent);color:var(--ink)}
-body[data-filter] .legend .chip:not(.on){opacity:.5}
+/* Il filtro di stato attenua i chip di stato, quello per persona i suoi: sono due
+   assi indipendenti e possono essere accesi insieme. */
+body[data-filter] .legend .chip[data-state]:not(.on){opacity:.5}
+body[data-owner] .legend .chip[data-owner]:not(.on){opacity:.5}
+.legend .chip.who{letter-spacing:.02em;text-transform:none}
+.legend .chip.who b{color:var(--ink);font-weight:600}
+.legend .chip.who.none{font-style:italic}
 .legend .chip i{width:8px;height:8px;flex:none}
 .chip.st-frontier i{background:var(--st-frontier-bg);border:1.5px solid var(--st-frontier)}
 .chip.st-claimed i{background:var(--st-claimed-bg);border:1.5px solid var(--st-claimed)}

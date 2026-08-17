@@ -14,6 +14,7 @@ from html import escape
 
 from . import theme
 from .config import Graph
+from .model import owner_of
 from .strings import t
 from .theme import ORDER, STATE, state_of
 
@@ -44,6 +45,7 @@ def data_island(ref: Graph, data: dict, front_ids: set[str]) -> str:
             "branchLabel": ramo["label"],
             "branchColor": ramo.get("color", theme.BRANCH_FALLBACK),
             "cost": n.get("cost") or "",
+            "owner": owner_of(n) or "",
             "md": _ticket_md(ref, n["id"]),
         }
     stati = {s: {"glyph": STATE[s][0], "label": t(STATE[s][1])} for s in ORDER}
@@ -54,7 +56,8 @@ def data_island(ref: Graph, data: dict, front_ids: set[str]) -> str:
 def sheet() -> str:
     return (
         '<div class="scrim"></div>'
-        f'<aside class="sheet" role="dialog" aria-modal="true" data-empty="{escape(t("render.sheet_vuoto"))}">'
+        f'<aside class="sheet" role="dialog" aria-modal="true" data-empty="{escape(t("render.sheet_vuoto"))}"'
+        f' data-owner-label="{escape(t("render.sheet_assegnato"))}">'
         '<header class="sheet-head"><div class="sheet-chips"></div>'
         f'<button type="button" class="sheet-close" aria-label="{escape(t("render.sheet_chiudi"))}">✕</button>'
         '<h2 class="sheet-title"></h2><p class="sheet-question"></p></header>'

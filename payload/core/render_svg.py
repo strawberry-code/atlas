@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from html import escape
 
-from . import render_edges, theme
+from . import render_edges, render_owners, theme
 from .strings import t
 from .theme import STATE, css_class, state_of
 
@@ -57,7 +57,7 @@ def layout(data: dict, depth: dict[str, int]) -> dict[str, tuple[float, float]]:
     return pos
 
 
-def boxes(data: dict, pos: dict, front: set[str]) -> str:
+def boxes(data: dict, pos: dict, front: set[str], gruppi: dict[str, int]) -> str:
     out = []
     for node in data["nodes"]:
         if node["id"] not in pos:
@@ -76,7 +76,8 @@ def boxes(data: dict, pos: dict, front: set[str]) -> str:
         out.append(
             f'<a href="tickets/{node["id"]}.md" data-node="{node["id"]}">'
             f'<g class="n {css_class(stato)}" id="node-{node["id"]}" '
-            f'data-branch="{escape(node["branch"])}">'
+            f'data-branch="{escape(node["branch"])}" '
+            f'data-owner="{render_owners.gruppo(node, gruppi)}">'
             f'<title>{escape(node["title"])} — {escape(node["question"])}</title>'
             f'<rect class="card" x="{x}" y="{y}" width="{W}" height="{H}" rx="3" '
             f'stroke-width="1.2"{tratto}/>'
@@ -90,17 +91,19 @@ def boxes(data: dict, pos: dict, front: set[str]) -> str:
     return "".join(out)
 
 
-def canvas(data: dict, depth: dict[str, int], front_ids: set[str]) -> str:
+def canvas(data: dict, depth: dict[str, int], front_ids: set[str],
+           gruppi: dict[str, int]) -> str:
     """Stile dinamico + <svg> completo, pronti da inserire nella pagina."""
     pos = layout(data, depth)
     larghezza = max((x + W for x, _ in pos.values()), default=600) + PAD
     altezza = max((y + H for _, y in pos.values()), default=200) + PAD
     ids = [n["id"] for n in data["nodes"] if n["id"] in pos]
     return (
-        f'<style>{render_edges.hover_css(ids)}{render_edges.branch_css(list(data["branches"]))}</style>'
+        f'<style>{render_edges.hover_css(ids)}{render_edges.branch_css(list(data["branches"]))}'
+        f'{render_owners.css(gruppi)}</style>'
         f'<svg viewBox="0 0 {larghezza} {altezza}" width="{larghezza}" height="{altezza}" '
         'xmlns="http://www.w3.org/2000/svg">'
         f'<defs>{render_edges.markers()}</defs>'
-        f'{boxes(data, pos, front_ids)}{render_edges.edges(data, pos, front_ids)}'
+        f'{boxes(data, pos, front_ids, gruppi)}{render_edges.edges(data, pos, front_ids)}'
         '</svg>'
     )

@@ -144,6 +144,51 @@ def cmd_doctor(ws: Workspace, args) -> int:
     return 0
 
 
+def cmd_whoami(ws: Workspace, args) -> int:
+    """Legge o scrive il nome di chi lavora da questa copia del progetto."""
+    if args.dimentica:
+        ws.whoami_file.unlink(missing_ok=True)
+        print(t("whoami.dimenticato"))
+        return 0
+    if args.nome:
+        nome = mutate.nome_persona(args.nome)
+        ws.whoami_file.write_text(f"{nome}\n", encoding="utf-8")
+        print(t("whoami.scritto", nome=nome, path=ws.whoami_file))
+        return 0
+    chi = ws.whoami()
+    print(t("whoami.sono", nome=chi) if chi else t("whoami.nessuno"))
+    return 0
+
+
+def cmd_assegna(ws: Workspace, ref, args) -> None:
+    """assign e unassign: stessi bersagli, due versi.
+
+    Con --me il primo posizionale non e' piu' un nome ma un nodo: senza questo
+    spostamento 'assign --me F02' assegnerebbe zero nodi a una persona di nome F02.
+    """
+    nome = None
+    if args.cmd == "assign":
+        if args.me:
+            if args.nome:
+                args.nodi = [args.nome, *args.nodi]
+            nome = ws.whoami()
+            if not nome:
+                raise StateError(t("assign.senza_whoami"))
+        elif not args.nome:
+            raise StateError(t("assign.senza_nome"))
+        else:
+            nome = args.nome
+    with mutate.editing(ref) as g:
+        cambiati = (mutate.assign(g, nome, args.nodi, args.branch) if nome
+                    else mutate.unassign(g, args.nodi, args.branch))
+    if not cambiati:
+        print(t("assign.gia_cosi", nome=nome) if nome else t("unassign.gia_liberi"))
+        return
+    elenco = ", ".join(cambiati)
+    print(t("assign.fatto", nome=nome, elenco=elenco) if nome
+          else t("unassign.fatto", elenco=elenco))
+
+
 def _identity(p: argparse.ArgumentParser) -> None:
     """Il flag comune ai comandi che prendono o mollano il lucchetto.
 
@@ -154,7 +199,8 @@ def _identity(p: argparse.ArgumentParser) -> None:
 
 
 COMANDI = ("status", "next", "graphs", "use", "show", "brief", "claim", "take", "release",
-           "close", "fog", "render", "new", "new-script", "exec", "validate", "doctor", "how-to")
+           "close", "fog", "assign", "unassign", "whoami", "render", "new", "new-script",
+           "exec", "validate", "doctor", "how-to")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -199,6 +245,17 @@ def aggiungi_comandi(sub) -> None:
     p.add_argument("riga", nargs="?", default=None)
     p.add_argument("--for", dest="destinatario", default=None)
     p.add_argument("--list", dest="elenca", action="store_true")
+    p = sub.add_parser("assign", help=t("help.assign"))
+    p.add_argument("nome", nargs="?", default=None, help=t("help.assign_nome"))
+    p.add_argument("nodi", nargs="*", default=[], help=t("help.assign_nodi"))
+    p.add_argument("-b", "--branch", default=None, help=t("help.assign_branch"))
+    p.add_argument("--me", action="store_true", help=t("help.assign_me"))
+    p = sub.add_parser("unassign", help=t("help.unassign"))
+    p.add_argument("nodi", nargs="*", default=[], help=t("help.assign_nodi"))
+    p.add_argument("-b", "--branch", default=None, help=t("help.assign_branch"))
+    p = sub.add_parser("whoami", help=t("help.whoami"))
+    p.add_argument("nome", nargs="?", default=None, help=t("help.whoami_nome"))
+    p.add_argument("--clear", dest="dimentica", action="store_true", help=t("help.whoami_clear"))
     p = sub.add_parser("render", help=t("help.render"))
     p.add_argument("--open", dest="aprila", action="store_true")
     p.add_argument("--all", dest="tutti", action="store_true", help=t("help.render_all"))
@@ -215,9 +272,12 @@ def aggiungi_comandi(sub) -> None:
 
 
 def dispatch(ws: Workspace, args) -> int:
-    if args.cmd in ("new", "new-script", "exec", "validate", "doctor", "graphs", "use", "how-to"):
+    if args.cmd in ("new", "new-script", "exec", "validate", "doctor", "graphs", "use",
+                    "how-to", "whoami"):
         if args.cmd == "graphs":
             report.show_graphs(ws); return 0
+        if args.cmd == "whoami":
+            return cmd_whoami(ws, args)
         if args.cmd == "how-to":
             howto.show(ws, build_parser().format_help()); return 0
         if args.cmd == "use":
@@ -288,6 +348,8 @@ def dispatch(ws: Workspace, args) -> int:
         print(t("fog.fatto"))
         if ripetuto:
             print(t("fog.prefisso_ripetuto", id=args.destinatario))
+    elif args.cmd in ("assign", "unassign"):
+        cmd_assegna(ws, ref, args)
     elif args.cmd == "show":
         report.show_node(ref, load(ref.json_path), args.node)
         return 0
@@ -309,7 +371,7 @@ def dispatch(ws: Workspace, args) -> int:
         refresh(ref, data)
     if aprila:
         _apri_browser(ref)
-    if args.cmd not in ("claim", "fog"):
+    if args.cmd not in ("claim", "fog", "assign", "unassign"):
         report.show_status(ref, data)
     return 0
 

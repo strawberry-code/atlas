@@ -71,6 +71,16 @@ STRINGS: dict[str, dict[str, str]] = {
                                  "en": "nothing to fix on {id}: pass at least one of\n"
                                        "  --artefatti, --costo and --sintesi"},
     "mutate.auto_dipendenza": {"it": "{id} dipende da se stesso", "en": "{id} depends on itself"},
+    "mutate.nome_non_valido": {"it": "'{nome}' non è un nome utilizzabile: serve del testo "
+                                     "su una riga sola, al massimo {max} caratteri",
+                               "en": "'{nome}' is not a usable name: it takes some text "
+                                     "on a single line, at most {max} characters"},
+    "mutate.ramo_bersaglio": {"it": "il ramo {branch} non esiste. Ci sono: {elenco}",
+                              "en": "branch {branch} does not exist. There are: {elenco}"},
+    "mutate.assegna_senza_bersaglio": {"it": "nessun nodo indicato: passa degli id, "
+                                             "oppure --branch <ramo>",
+                                       "en": "no node given: pass some ids, "
+                                             "or --branch <branch>"},
     "mutate.ramo_esiste": {"it": "il ramo {chiave} esiste già", "en": "branch {chiave} already exists"},
     "mutate.nodo_esiste": {"it": "{id} esiste già", "en": "{id} already exists"},
     "mutate.campi_protetti": {"it": "questi campi non si toccano da mutate: {elenco}",

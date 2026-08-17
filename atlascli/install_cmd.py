@@ -38,7 +38,10 @@ RESIDUI = ("core", "bin", "atlas", "templates", "hooks", "VERSION")
 # il primo esiste solo per essere bloccato, il secondo sopravvive a un processo ucciso
 # a meta' e sparisce alla scrittura dopo. Versionarli sporcherebbe ogni diff.
 IGNORE = [f"{DIRNAME}/graphs/*/dashboard.html", f"{DIRNAME}/graphs/*/graph.json.lock",
-          f"{DIRNAME}/graphs/*/.graph.json.tmp", f"{DIRNAME}/current", "__pycache__/"]
+          f"{DIRNAME}/graphs/*/.graph.json.tmp", f"{DIRNAME}/current",
+          # Chi lavora da questa copia: stato locale come 'current'. Versionarlo
+          # farebbe ereditare a chi clona il nome dell'ultimo che l'ha scritto.
+          f"{DIRNAME}/whoami", "__pycache__/"]
 
 CONFIG = {
     "project": None,

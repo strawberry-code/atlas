@@ -48,6 +48,26 @@
     });
   });
 
+  /* ---------- filtro per persona: chip di legenda e righe del pannello ----------
+     Due prese sullo stesso filtro, quindi il click si ascolta una volta sola su
+     entrambe. Il selettore resta ancorato a .legend e .side: sulla mappa anche i
+     nodi portano data-owner, e senza ancoraggio aprire un ticket accenderebbe
+     pure il filtro della persona a cui quel nodo e' assegnato. */
+  document.addEventListener("click", function (e) {
+    var presa = e.target.closest && e.target.closest(".legend .chip[data-owner], .side li[data-owner]");
+    if (!presa) return;
+    var chi = presa.dataset.owner;
+    var attivo = document.body.dataset.owner === chi;
+    document.querySelectorAll("[data-owner].on").forEach(function (x) { x.classList.remove("on"); });
+    if (attivo) {
+      delete document.body.dataset.owner;
+      return;
+    }
+    document.body.dataset.owner = chi;
+    document.querySelectorAll(".legend .chip[data-owner='" + chi + "'], .side li[data-owner='" + chi + "']")
+      .forEach(function (x) { x.classList.add("on"); });
+  });
+
   /* ---------- markdown minimo: prima si nega l'HTML, poi si concede il markdown ---------- */
   function esc(s) {
     return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
@@ -240,6 +260,7 @@
     chips.appendChild(chip(esc(n.type + " · " + n.mode)));
     chips.appendChild(chip('<span class="bdot" style="background:' + n.branchColor + '"></span>' +
       esc(n.branchLabel)));
+    if (n.owner) chips.appendChild(chip(esc(sheet.dataset.ownerLabel + " " + n.owner), "who"));
     if (n.cost) chips.appendChild(chip(esc(n.cost)));
     titolo.innerHTML = '<span class="sid">' + esc(id) + "</span>" + esc(n.title);
     domanda.textContent = n.question;

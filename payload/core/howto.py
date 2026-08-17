@@ -28,10 +28,14 @@ def mutazioni() -> list[str]:
 
     Il criterio e' 'prende g come primo parametro': e' quel che distingue un gesto
     da script dal resto del modulo, e non c'e' nessun elenco da tenere aggiornato.
+    Vale anche per i gesti che mutate re-importa da un modulo spezzato (assign.py):
+    chiedere in piu' che la funzione sia definita qui dentro faceva sparire da
+    questo elenco le mutazioni vere il giorno in cui il file veniva diviso, cioe'
+    proprio quando un agente aveva piu' bisogno di sapere che esistono.
     """
     righe = []
     for nome, funzione in vars(mutate).items():
-        if nome.startswith("_") or not inspect.isfunction(funzione) or funzione.__module__ != mutate.__name__:
+        if nome.startswith("_") or not inspect.isfunction(funzione):
             continue
         firma = inspect.signature(funzione)
         if next(iter(firma.parameters), None) != "g":

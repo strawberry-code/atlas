@@ -68,6 +68,12 @@ Sotto Risposta ci sono tre sotto-sezioni leggere e facoltative: **scelte non can
 
 Se in quell'elenco c'è roba che non è tua, o se il costo e la sintesi sono usciti sbagliati, la correzione è `atlas amend <ID> [--artefatti ...] [--costo ...] [--sintesi ...]`. Riscrive i soli campi che passi e lascia stare tutto il resto: il nodo resta chiuso, e l'istante della chiusura non si sposta, perché è da lì che `doctor` misura le scritture postume. La correzione resta scritta nel nodo con chi l'ha fatta e quando, così chi rilegge sa che quel campo è stato messo a mano e non dedotto. Un nodo ancora aperto non si corregge: lì la contabilità la scrive `close`. Se un cancello rilascia un nodo invece di chiuderlo, `-r/--ragione` su `release` registra il perché come evento in mappa, non solo come un ritorno silenzioso alla frontiera.
 
+### Chi fa cosa, se serve
+
+Un nodo può essere assegnato a una persona con `atlas assign <nome> <ID...>`, o a tutto un ramo con `--branch <ramo>`, che prende i nodi che quel ramo ha in quel momento: uno aggiunto dopo nasce senza assegnatario. Assegnare un ramo sovrascrive anche i nodi che erano già di qualcun altro, e il comando stampa gli id che ha cambiato. `atlas unassign <ID...>` toglie l'assegnazione, e `atlas whoami <nome>` ricorda chi lavora da questa copia del progetto, così `atlas assign --me <ID>` non richiede di riscrivere il nome. Il file `.atlas/whoami` non è versionato.
+
+L'assegnazione non è il lucchetto e non lo sostituisce: dice di chi è quel pezzo di lavoro, mentre il `claim` dice chi ci ha le mani sopra adesso. Un nodo assegnato resta prendibile da chiunque, e assegnarlo mentre qualcuno lo sta lavorando non gli impedisce di chiuderlo. Se non le usi, il grafo si comporta esattamente come prima: nessun nodo nasce assegnato e la dashboard non mostra niente in più.
+
 ### Più grafi
 
 Un grafo per epic, ciascuno isolato in `.atlas/graphs/<slug>/` con la sua mappa e la sua dashboard. Lo switch è a carico di chi lavora: `atlas use <slug>`, oppure `--graph <slug>` sul singolo comando.

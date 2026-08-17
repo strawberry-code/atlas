@@ -81,6 +81,20 @@ atlas doctor                         # controllo di salute: nodi dimenticati, lu
 
 Un nodo per sessione. `close` rifiuta se la Risposta è vuota.
 
+## Chi fa cosa
+
+Le assegnazioni sono facoltative e servono a chi si divide un grafo fra più persone. Un nodo assegnato resta prendibile da chiunque: il lucchetto continua a essere il `claim`, l'assegnazione dice di chi è il pezzo, non chi ci ha le mani sopra adesso.
+
+```bash
+atlas whoami marco                   # chi lavora da questa copia, ricordato in .atlas/whoami
+atlas assign lucia F02 F03           # assegna dei nodi a una persona
+atlas assign lucia --branch B        # e i nodi che il ramo B ha adesso
+atlas assign --me F04                # a te, senza riscrivere il nome
+atlas unassign F02                   # torna senza assegnatario
+```
+
+Il nome è testo semplice e la lista cambia quando serve: non c'è un registro di persone da tenere aggiornato. `.atlas/whoami` non è versionato, perché è chi ha il repo davanti, non un dato del progetto. Nella dashboard compaiono un chip per persona e uno per i non assegnati: cliccandone uno restano illuminati solo i suoi nodi, come per il filtro di stato.
+
 ## Cambiare il grafo
 
 Mai a mano, sempre con uno script:
@@ -104,7 +118,7 @@ def run(g):
 
 Tutto gira in una transazione sola e viene validato prima di scrivere: cicli, archi verso il nulla e id duplicati fanno fallire lo script senza toccare il file.
 
-Altre funzioni: `edit_node`, `link`, `unlink`, `drop` (fuori scopo), `remove_node`, `reopen`, `fog_add`, `fog_drop`, `note_add`, `set_meta`.
+Altre funzioni: `edit_node`, `link`, `unlink`, `drop` (fuori scopo), `remove_node`, `reopen`, `assign`, `unassign`, `fog_add`, `fog_drop`, `note_add`, `set_meta`.
 
 ## Più grafi
 

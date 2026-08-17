@@ -7,6 +7,7 @@ dover sapere che il meccanismo abita altrove.
 """
 from __future__ import annotations
 
+from .assign import assign, nome_persona, unassign    # noqa: F401  (superficie per gli script)
 from .config import Graph, Workspace
 from .editor import Editor, editing, now, validate    # noqa: F401  (superficie per gli script)
 from .identity import identity
@@ -29,7 +30,7 @@ def add_node(g: Editor, id: str, title: str, branch: str, question: str,
     if id in g.ids():
         raise StateError(t("mutate.nodo_esiste", id=id))
     node = {"id": id, "title": title, "branch": branch, "type": type, "mode": mode,
-            "status": OPEN, "assignee": None, "blockedBy": list(blockedBy),
+            "status": OPEN, "assignee": None, "owner": None, "blockedBy": list(blockedBy),
             "question": question, "answer": None, "claim": None,
             "artifacts": list(artifacts), "createdAt": now()}
     g.data["nodes"].append(node)
@@ -38,7 +39,7 @@ def add_node(g: Editor, id: str, title: str, branch: str, question: str,
 
 def edit_node(g: Editor, node_id: str, **fields) -> dict:
     """Cambia i campi descrittivi. Stato e claim passano da claims, non da qui."""
-    protetti = {"id", "status", "assignee", "claim"}
+    protetti = {"id", "status", "assignee", "claim", "owner"}
     if illeciti := protetti & set(fields):
         raise StateError(t("mutate.campi_protetti", elenco=", ".join(sorted(illeciti))))
     node = g.node(node_id)

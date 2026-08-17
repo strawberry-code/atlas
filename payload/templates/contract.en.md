@@ -68,6 +68,12 @@ Under Answer there are three light, optional sub-sections: **non-canonical choic
 
 If that list holds something that isn't yours, or the cost and the summary came out wrong, the fix is `atlas amend <ID> [--artefatti ...] [--costo ...] [--sintesi ...]`. It rewrites only the fields you pass and leaves everything else alone: the node stays closed, and the closing instant does not move, because that is what `doctor` measures later writes from. The correction stays recorded in the node with who made it and when, so whoever reads it knows that field was set by hand and not deduced. A node still open can't be amended: there the bookkeeping is written by `close`. If a gate releases a node instead of closing it, `-r/--ragione` on `release` records why as an event in the map, not just a silent return to the frontier.
 
+### Who does what, if it helps
+
+A node can be assigned to a person with `atlas assign <name> <ID...>`, or a whole branch with `--branch <branch>`, which takes the nodes that branch has at that moment: one added later is born unassigned. Assigning a branch overwrites the nodes that already belonged to someone else, and the command prints the ids it changed. `atlas unassign <ID...>` removes the assignment, and `atlas whoami <name>` remembers who works from this copy of the project, so `atlas assign --me <ID>` doesn't need the name typed again. The `.atlas/whoami` file is not versioned.
+
+An assignment is not the lock and does not replace it: it says whose piece of work this is, while the `claim` says who has their hands on it right now. An assigned node stays up for grabs, and assigning it while someone is working on it doesn't stop them from closing it. If you don't use them, the graph behaves exactly as before: no node is born assigned and the dashboard shows nothing extra.
+
 ### Multiple graphs
 
 One graph per epic, each isolated in `.atlas/graphs/<slug>/` with its own map and its own dashboard. The switch is up to whoever's working: `atlas use <slug>`, or `--graph <slug>` on the single command.

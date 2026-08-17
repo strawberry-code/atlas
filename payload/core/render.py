@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from html import escape
 
-from . import render_panels, render_sheet, render_svg
+from . import render_owners, render_panels, render_sheet, render_svg
 from .config import Graph
 from .model import claimed, frontier, progress
 from .risorse import leggi_template
@@ -50,18 +50,19 @@ def _topbar(ref: Graph, data: dict, front: list[dict], presi: list[dict]) -> str
     )
 
 
-def _mappa(data: dict, depth: dict, front_ids: set[str]) -> str:
+def _mappa(data: dict, depth: dict, front_ids: set[str], gruppi: dict[str, int]) -> str:
     legenda = "".join(
         f'<button type="button" class="chip {css_class(s)}" data-state="{s}">'
         f'<i></i>{STATE[s][0]} {t(STATE[s][1])}</button>' for s in ORDER
-    )
+    ) + render_owners.chips(data, gruppi)
     zoom = (
         f'<div class="zoom"><button type="button" data-zoom="in" aria-label="{escape(t("render.zoom_in"))}">+</button>'
         f'<button type="button" data-zoom="out" aria-label="{escape(t("render.zoom_out"))}">−</button>'
         f'<button type="button" data-zoom="fit" aria-label="{escape(t("render.zoom_fit"))}">⌖</button></div>'
     )
     return (
-        f'<main class="map"><div class="viewport">{render_svg.canvas(data, depth, front_ids)}</div>'
+        f'<main class="map"><div class="viewport">'
+        f'{render_svg.canvas(data, depth, front_ids, gruppi)}</div>'
         f'<div class="legend">{legenda}</div>{zoom}'
         f'<p class="hint">{t("render.legenda_caption")}</p></main>'
     )
@@ -72,6 +73,7 @@ def build(ref: Graph, data: dict) -> str:
     front = frontier(data)
     presi = claimed(data)
     front_ids = {n["id"] for n in front}
+    gruppi = render_owners.indice(data)
     # il tema salvato va timbrato prima del primo paint, o la pagina lampeggia
     stampo_tema = ('<script>try{var t=localStorage.getItem("atlas-theme");'
                    'if(t)document.documentElement.dataset.theme=t}catch(e){}</script>')
@@ -81,8 +83,8 @@ def build(ref: Graph, data: dict) -> str:
         f'<title>{escape(data["meta"]["title"])} · atlas</title>'
         f'{stampo_tema}<style>{leggi_template("dashboard.css")}</style></head><body>'
         f'{_topbar(ref, data, front, presi)}'
-        f'<aside class="side">{render_panels.panels(ref, data, front, presi)}</aside>'
-        f'{_mappa(data, depth, front_ids)}'
+        f'<aside class="side">{render_panels.panels(ref, data, front, presi, gruppi)}</aside>'
+        f'{_mappa(data, depth, front_ids, gruppi)}'
         f'{render_sheet.sheet()}{render_sheet.data_island(ref, data, front_ids)}'
         f'<script>{leggi_template("dashboard.js")}</script>'
         '</body></html>'

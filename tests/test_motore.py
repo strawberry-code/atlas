@@ -818,6 +818,156 @@ class Artefatti(Base):
         self.assertIn('⬤ N2', dash_corretta, "Dashboard corretta: N2 è in lavorazione (il fix chiude la finestra)")
 
 
+class Assegnazioni(Base):
+    """L'assegnazione dice di chi e' il pezzo di lavoro; il claim dice chi ci ha le
+    mani sopra adesso. Sono due campi diversi e non devono interferire."""
+
+    def popola_due_rami(self):
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.add_branch(g, "F", "Fondamenta", "#4f46e5")
+            self.mutate.add_branch(g, "B", "Backend", "#0ea5e9")
+            self.mutate.add_node(g, id="F01", branch="F", title="Primo", question="?")
+            self.mutate.add_node(g, id="F02", branch="F", title="Secondo", question="?")
+            self.mutate.add_node(g, id="B01", branch="B", title="Backend uno", question="?")
+
+    def owner(self, node_id: str):
+        return self.model.owner_of(self.model.node_of(self.store.load(self.ref.json_path), node_id))
+
+    def test_assegna_nodi_e_ramo(self):
+        """Assegnare un ramo sovrascrive anche chi era gia' assegnato: e' un gesto
+        esplicito su un insieme dichiarato, e la mezza assegnazione silenziosa
+        lascerebbe un ramo per meta' di un altro senza dirlo a nessuno. Il comando
+        stampa gli id che ha cambiato, quindi chi sovrascrive lo vede."""
+        self.popola_due_rami()
+        with self.mutate.editing(self.ref) as g:
+            self.assertEqual(["F01"], self.mutate.assign(g, "marco", ["F01"]))
+            self.assertEqual(["F01", "F02"], self.mutate.assign(g, "lucia", branch="F"))
+        self.assertEqual("lucia", self.owner("F01"))
+        self.assertEqual("lucia", self.owner("F02"))
+        self.assertIsNone(self.owner("B01"), "un altro ramo non viene toccato")
+
+    def test_il_ramo_non_prende_i_nodi_aggiunti_dopo(self):
+        """Espansione immediata: l'assegnatario sta sul nodo, non sul ramo."""
+        self.popola_due_rami()
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.assign(g, "marco", branch="F")
+            self.mutate.add_node(g, id="F03", branch="F", title="Terzo", question="?")
+        self.assertIsNone(self.owner("F03"))
+
+    def test_riassegnare_lo_stesso_nome_non_cambia_niente(self):
+        self.popola_due_rami()
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.assign(g, "marco", ["F01"])
+        with self.mutate.editing(self.ref) as g:
+            self.assertEqual([], self.mutate.assign(g, "marco", ["F01"]))
+            self.assertEqual([], self.mutate.unassign(g, ["F02"]), "F02 non era assegnato")
+            self.assertEqual(["F01"], self.mutate.unassign(g, ["F01"]))
+        self.assertIsNone(self.owner("F01"))
+
+    def test_nomi_non_utilizzabili(self):
+        self.popola_due_rami()
+        for cattivo in ("", "   ", "a" * 41, "marco\x00rossi"):
+            with self.subTest(nome=cattivo), self.assertRaises(self.store.StateError):
+                with self.mutate.editing(self.ref) as g:
+                    self.mutate.assign(g, cattivo, ["F01"])
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.assign(g, "  anna   maria \n", ["F01"])
+        self.assertEqual("anna maria", self.owner("F01"), "spazi ripetuti e a capo collassano")
+
+    def test_bersagli_inesistenti_si_fermano_prima_di_scrivere(self):
+        self.popola_due_rami()
+        for argomenti in ({"node_ids": ["MANCA"]}, {"branch": "Z"}, {}):
+            with self.subTest(**argomenti), self.assertRaises(self.store.StateError):
+                with self.mutate.editing(self.ref) as g:
+                    self.mutate.assign(g, "marco", **argomenti)
+        self.assertIsNone(self.owner("F01"), "nessuna scrittura parziale")
+
+    def test_assegnare_non_invalida_la_presa_di_chi_lavora(self):
+        """Il caso vero: si assegna un nodo mentre qualcuno lo sta lavorando.
+
+        L'impronta registrata alla presa non deve cambiare, altrimenti chi chiude
+        si sente dire che la premessa e' scaduta e deve passare da --force."""
+        self.popola_due_rami()
+        self.docs.write_stubs(self.ref, self.store.load(self.ref.json_path))
+        self.claims.claim(self.ref, "F01")
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.assign(g, "lucia", ["F01"])
+        path = self.ref.ticket_path("F01")
+        path.write_text(path.read_text(encoding="utf-8").replace(
+            "## Risposta", "## Risposta\n\nfatto"), encoding="utf-8")
+        node, _ = self.claims.close(self.ref, "F01", "chiuso senza force")
+        self.assertEqual("closed", node["status"])
+        self.assertEqual("lucia", self.owner("F01"), "chiudere non cancella l'assegnazione")
+
+    def test_edit_node_non_puo_riscrivere_l_assegnatario(self):
+        self.popola_due_rami()
+        with self.assertRaises(self.store.StateError):
+            with self.mutate.editing(self.ref) as g:
+                self.mutate.edit_node(g, "F01", owner="marco")
+
+    def test_il_comando_assegna_e_whoami_fa_da_default(self):
+        from core import cli
+        self.popola_due_rami()
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            self.assertEqual(0, cli.main(["assign", "marco", "F01", "B01"]))
+            self.assertEqual(1, cli.main(["assign", "--me", "F02"]))   # nessun whoami ancora
+            self.assertEqual(0, cli.main(["whoami", "giovanni"]))
+            self.assertEqual(0, cli.main(["assign", "--me", "F02"]))
+            self.assertEqual(0, cli.main(["unassign", "B01"]))
+        self.assertEqual("marco", self.owner("F01"))
+        self.assertEqual("giovanni", self.owner("F02"), "--me prende il nome da whoami")
+        self.assertIsNone(self.owner("B01"))
+        self.assertEqual("giovanni", self.ws.whoami())
+
+    def test_whoami_si_legge_e_si_dimentica(self):
+        from core import cli
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            self.assertEqual(0, cli.main(["whoami"]))
+            self.assertEqual(0, cli.main(["whoami", "marco"]))
+            self.assertEqual(0, cli.main(["whoami"]))
+            self.assertEqual(0, cli.main(["whoami", "--clear"]))
+            self.assertEqual(0, cli.main(["whoami"]))
+        self.assertIsNone(self.ws.whoami())
+        self.assertFalse(self.ws.whoami_file.exists())
+
+    def test_la_dashboard_mostra_chi_ha_cosa(self):
+        self.popola_due_rami()
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.assign(g, "marco", ["F01"])
+            self.mutate.assign(g, "lucia", ["F02"])
+        pagina = self.render.build(self.ref, self.store.load(self.ref.json_path))
+        self.assertIn(">marco <b>1</b>", pagina)
+        self.assertIn(">lucia <b>1</b>", pagina)
+        self.assertIn('data-owner="0"', pagina, "il gruppo dei non assegnati esiste: B01")
+        self.assertIn('body[data-owner="1"] .n:not([data-owner="1"])', pagina)
+        self.assertNotIn("marco", pagina.split("<style>")[1].split("</style>")[0],
+                         "il nome non entra mai in un selettore CSS")
+
+    def test_la_dashboard_tace_su_un_grafo_senza_assegnazioni(self):
+        """Chi non usa questa parte non deve trovarsi controlli che non gli dicono niente."""
+        self.popola_due_rami()
+        pagina = self.render.build(self.ref, self.store.load(self.ref.json_path))
+        self.assertNotIn("chip who", pagina)
+        self.assertNotIn("body[data-owner=", pagina)
+
+    def test_un_nome_ostile_non_esce_dalla_pagina(self):
+        """Il nome lo scrive chiunque abbia la riga di comando e finisce in una pagina
+        HTML: nel markup dev'essere testo, e nell'isola dati non deve poter chiudere
+        il blocco script che la contiene."""
+        self.popola_due_rami()
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.assign(g, '</script><script>alert(1)</script>', ["F01"])
+        pagina = self.render.build(self.ref, self.store.load(self.ref.json_path))
+        markup, resto = pagina.split('<script type="application/json" id="atlas-data">')
+        isola, coda = resto.split("</script>", 1)
+        self.assertNotIn("<script>alert(1)", markup)
+        self.assertNotIn("<script>alert(1)", coda)
+        self.assertIn("&lt;/script&gt;&lt;script&gt;", markup, "nel markup è testo, non tag")
+        self.assertNotIn("</script", isola, "l'isola non si lascia chiudere dal dato")
+
+
 class Nebbia(Base):
     """Il caso di #21: 'fog --for X' anteponeva il prefisso anche a chi lo aveva gia'
     scritto nel testo, e in mappa restava per sempre 'per X: per X: ...'."""

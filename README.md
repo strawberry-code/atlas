@@ -81,6 +81,20 @@ atlas doctor                         # health check: dangling nodes, stale locks
 
 One node per session. `close` refuses if the Answer is empty.
 
+## Who does what
+
+Assignments are optional, for when a graph is split across several people. An assigned node stays up for grabs: the lock is still the `claim`, the assignment says whose piece it is, not who has their hands on it right now.
+
+```bash
+atlas whoami marco                   # who works from this copy, remembered in .atlas/whoami
+atlas assign lucia F02 F03           # assigns nodes to a person
+atlas assign lucia --branch B        # and the nodes branch B has now
+atlas assign --me F04                # to you, without retyping the name
+atlas unassign F02                   # back to no assignee
+```
+
+The name is plain text and the list changes whenever it needs to: there is no roster to keep up to date. `.atlas/whoami` is not versioned, because it is whoever has the repo in front of them, not a project fact. The dashboard grows one chip per person plus one for the unassigned: clicking one leaves only their nodes lit, the same way the status filter works.
+
 `atlas how-to` is the single entry point for an agent that lands here cold: it prints the project's contract, the command list, the mutations a script can call, the installed skills, and where every file lives. The contract is the only hand-written part, and everything else is read from the installed code, so it can't drift from the version in use.
 
 ## Changing the graph
@@ -106,7 +120,7 @@ def run(g):
 
 It all runs in a single transaction and gets validated before writing: cycles, edges pointing nowhere, and duplicate ids fail the script without touching the file.
 
-Other functions: `edit_node`, `link`, `unlink`, `drop` (out of scope), `remove_node`, `reopen`, `fog_add`, `fog_drop`, `note_add`, `set_meta`.
+Other functions: `edit_node`, `link`, `unlink`, `drop` (out of scope), `remove_node`, `reopen`, `assign`, `unassign`, `fog_add`, `fog_drop`, `note_add`, `set_meta`.
 
 ## Multiple graphs
 

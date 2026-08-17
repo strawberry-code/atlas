@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from html import escape
 
-from . import claims, theme
+from . import claims, render_owners, theme
 from .config import Graph
 from .model import progress
 from .strings import t
@@ -83,7 +83,8 @@ def _blocco_caution(data: dict, fatti: int, totale: int) -> str:
     )
 
 
-def panels(ref: Graph, data: dict, front: list[dict], presi: list[dict]) -> str:
+def panels(ref: Graph, data: dict, front: list[dict], presi: list[dict],
+           gruppi: dict[str, int]) -> str:
     agente = ref.workspace.config["agent"]
     fatti, totale = progress(data)
     voci_front = [
@@ -122,6 +123,7 @@ def panels(ref: Graph, data: dict, front: list[dict], presi: list[dict]) -> str:
         blocchi.append(_blocco_lista(t("render.chiusi"), voci_chiusi, "",
                                      classe="blocco blocco-chiusi", hl="closed"))
         blocchi.append(_blocco_costi(chiusi))
+    blocchi.append(render_owners.panel(data, gruppi))
     blocchi.append(_blocco_lista(t("render.rami"), voci_rami, t("render.nessun_ramo")))
     blocchi.append(f'<div class="firma">{t("render.footer")}</div>')
     return "".join(blocchi)

@@ -72,12 +72,15 @@ def fingerprint(node: dict) -> str:
     mentre lavorava, la sua sintesi entra pulita e poggia sul vuoto. Questa impronta,
     registrata alla presa e riverificata alla chiusura, e' l'unico modo di accorgersene.
 
-    Esclude claim, che cambia a ogni battito senza che il nodo sia diverso. E' un hash
+    Esclude claim, che cambia a ogni battito senza che il nodo sia diverso, e owner,
+    che dice di chi e' il pezzo e non cosa c'e' da fare: assegnare un nodo mentre
+    qualcuno lo lavora non gli cambia la domanda sotto le mani, e senza questa
+    esclusione gli farebbe fallire la chiusura chiedendogli un --force. E' un hash
     del contenuto e non un contatore incrementale perche' un contatore vive di
     disciplina: basta una mutazione che si dimentica di alzarlo e il controllo tace
     proprio quando servirebbe.
     """
-    corpo = {chiave: valore for chiave, valore in node.items() if chiave != "claim"}
+    corpo = {chiave: valore for chiave, valore in node.items() if chiave not in ("claim", "owner")}
     testo = json.dumps(corpo, sort_keys=True, ensure_ascii=False)
     return hashlib.sha1(testo.encode("utf-8")).hexdigest()[:12]
 
@@ -114,6 +117,35 @@ def fog_for(graph: dict, node_id: str) -> list[str]:
     strutturato scritto da 'fog --for' sia la menzione nel testo libero."""
     confine = re.compile(rf"(?<![0-9A-Za-z_-]){re.escape(node_id)}(?![0-9A-Za-z_-])")
     return [voce for voce in graph.get("fog", []) if confine.search(voce)]
+
+
+def owner_of(node: dict) -> str | None:
+    """A chi e' assegnato il nodo, None se a nessuno.
+
+    Da non confondere con 'assignee', che dice chi tiene il lucchetto adesso e
+    sparisce quando il nodo si rilascia: questo resta finche' qualcuno non lo
+    cambia. Si legge con get perche' i grafi nati prima non hanno il campo, e
+    'non assegnato' e' uno stato legittimo, non un dato da migrare.
+    """
+    return node.get("owner") or None
+
+
+def owners(data: dict) -> dict[str, list[str]]:
+    """Chi ha nodi assegnati e quali, in ordine di nome.
+
+    L'ordine e' alfabetico e non di apparizione perche' da qui escono le colonne
+    della dashboard: con l'ordine di apparizione un nodo chiuso in mezzo alla
+    lista rimescolava i colori delle persone da una resa alla successiva.
+    """
+    mappa: dict[str, list[str]] = {}
+    for node in data["nodes"]:
+        if nome := owner_of(node):
+            mappa.setdefault(nome, []).append(node["id"])
+    return {nome: mappa[nome] for nome in sorted(mappa)}
+
+
+def unowned(data: dict) -> list[str]:
+    return [n["id"] for n in data["nodes"] if not owner_of(n)]
 
 
 def fog_line(node_id: str, riga: str) -> tuple[str, bool]:

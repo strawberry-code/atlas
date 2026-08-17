@@ -126,6 +126,20 @@ class Workspace:
         return self.root / "current"
 
     @property
+    def whoami_file(self) -> Path:
+        """Chi lavora da questa copia del progetto. Sta accanto a 'current' ed e'
+        ignorato da git per la stessa ragione: e' stato locale di chi ha il repo
+        davanti, non un dato del progetto. Versionarlo farebbe ereditare a chi
+        clona il nome dell'ultimo che l'ha scritto."""
+        return self.root / "whoami"
+
+    def whoami(self) -> str | None:
+        path = self.whoami_file
+        if not path.is_file():
+            return None
+        return path.read_text(encoding="utf-8").strip() or None
+
+    @property
     def config(self) -> dict:
         path = self.root / "config.json"
         return _merge(DEFAULTS, leggi_json(path) if path.is_file() else {})
