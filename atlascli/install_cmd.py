@@ -9,6 +9,7 @@ che viaggiano nel pacchetto.
 from __future__ import annotations
 
 import base64
+import contextlib
 import io
 import json
 import os
@@ -230,6 +231,42 @@ class Installer:
         from core.cli import main
         main(["new", self.args.graph, "-t", self.args.graph.replace("-", " ").capitalize()])
 
+    def rifa_dashboard(self) -> None:
+        """Rigenera le dashboard dei grafi che il progetto ha gia'.
+
+        La pagina e' un artefatto derivato e nessun altro passo dell'installazione
+        la tocca: senza questo, una versione che cambia il rendering non arriverebbe
+        mai nei progetti col grafo fermo, e chi la riapre dopo un update riuscito
+        vede quella di prima e conclude che l'update non ha funzionato.
+
+        Un grafo malato non deve pero' far fallire l'installazione, che a quel punto
+        e' gia' andata a buon fine: si dice cosa e' successo e la dashboard si rifara'
+        al primo comando che tocca quel grafo.
+        """
+        if self.args.dry_run:
+            return
+        grafi = self.root / "graphs"
+        slugs = [d.name for d in sorted(grafi.iterdir()) if (d / "graph.json").is_file()] \
+            if grafi.is_dir() else []
+        if not slugs:
+            return
+        os.environ["ATLAS_ROOT"] = str(self.root)
+        from core.cli import main
+        # Quel che il motore stampa finisce qui: l'unica voce che esce e' quella
+        # dell'installazione, e se qualcosa e' andato storto il motivo lo riporta lei.
+        detto = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(detto), contextlib.redirect_stderr(detto):
+                fallito = main(["render", "--all"]) != 0
+            motivo = next((r.strip() for r in detto.getvalue().splitlines() if r.strip()), "?") \
+                if fallito else None
+        except Exception as errore:  # noqa: BLE001 - un grafo illeggibile arriva fin qui
+            motivo = str(errore)
+        if motivo:
+            self.dice(t("install.dashboard_errore", errore=motivo))
+            return
+        self.dice(t("install.dashboard_rifatte", n=len(slugs)))
+
     def registra_globalmente(self) -> None:
         if self.args.dry_run or getattr(self.args, "no_registry", False):
             return
@@ -276,6 +313,7 @@ class Installer:
         self.contratto()
         self.gitignore()
         self.primo_grafo()
+        self.rifa_dashboard()
         self.registra_globalmente()
         print(t("install.riepilogo", versione=current_version(), target=self.target))
         for riga in self.fatti:

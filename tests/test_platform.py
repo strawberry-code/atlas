@@ -8,6 +8,7 @@ per evitare vere chiamate di rete a GitHub.
 from __future__ import annotations
 
 import io
+import json
 import os
 import shutil
 import sys
@@ -226,6 +227,60 @@ class CollegaSkill(unittest.TestCase):
         self._installer().collega_skill()
         self.assertFalse(estranea.is_symlink())
         self.assertTrue((estranea / "roba-mia.txt").is_file())
+
+
+class RifaDashboard(unittest.TestCase):
+    """L'installazione rigenera le dashboard dei grafi che il progetto ha gia'.
+
+    E' il passo che porta nei progetti una versione che ha cambiato il rendering:
+    'atlas update' riallinea invocando install, e senza questo la pagina resterebbe
+    quella generata dalla versione prima finche' qualcuno non tocca il grafo.
+    """
+
+    def setUp(self):
+        self.target = Path(tempfile.mkdtemp())
+        self.root = self.target / ".atlas"
+        (self.root / "graphs").mkdir(parents=True)
+        (self.root / "config.json").write_text('{"project": "prova", "language": "it"}', encoding="utf-8")
+
+    def tearDown(self):
+        os.environ.pop("ATLAS_ROOT", None)
+        shutil.rmtree(self.target, ignore_errors=True)
+
+    def _grafo(self, slug: str) -> Path:
+        cartella = self.root / "graphs" / slug
+        cartella.mkdir(parents=True)
+        (cartella / "graph.json").write_text(json.dumps({
+            "schemaVersion": 1,
+            "meta": {"slug": slug, "title": "Prova", "destination": "una prova",
+                     "updated": "2026-08-18", "notes": []},
+            "branches": {"A": {"label": "Ramo", "color": "#4f46e5"}},
+            "nodes": [], "fog": [], "outOfScope": [],
+        }), encoding="utf-8")
+        return cartella
+
+    def _installa(self) -> install_cmd.Installer:
+        inst = install_cmd.Installer(self.target, SimpleNamespace(dry_run=False), "it")
+        inst.rifa_dashboard()
+        return inst
+
+    def test_rigenera_le_dashboard_esistenti(self):
+        cartella = self._grafo("piano")
+        (cartella / "dashboard.html").write_text("pagina vecchia", encoding="utf-8")
+        inst = self._installa()
+        self.assertNotEqual("pagina vecchia", (cartella / "dashboard.html").read_text(encoding="utf-8"))
+        self.assertTrue(any("1" in riga for riga in inst.fatti))
+
+    def test_senza_grafi_non_dice_niente(self):
+        self.assertEqual([], self._installa().fatti)
+
+    def test_un_grafo_rotto_non_fa_fallire_l_installazione(self):
+        cartella = self._grafo("piano")
+        (cartella / "graph.json").write_text("{ non e' json", encoding="utf-8")
+        inst = self._installa()  # non solleva: l'installazione e' gia' riuscita
+        self.assertEqual(1, len(inst.fatti))
+        self.assertIn("render --all", inst.fatti[0])  # dice come rimediare, e nomina il motivo
+        self.assertIn("graph.json", inst.fatti[0])
 
 
 if __name__ == "__main__":
