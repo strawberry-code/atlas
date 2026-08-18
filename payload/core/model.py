@@ -108,7 +108,18 @@ def blocks(graph: dict, node_id: str) -> list[str]:
 
 
 def progress(graph: dict) -> tuple[int, int]:
-    return sum(1 for n in graph["nodes"] if is_done(n)), len(graph["nodes"])
+    """Quanto e' finito, sul lavoro che resta da fare.
+
+    Non usa is_done, che comprende anche il fuori scopo: li' la domanda e' 'questo
+    nodo sblocca chi lo aspetta', e la risposta e' si'. Qui la domanda e' un'altra,
+    e un nodo messo fuori scopo non e' lavoro fatto; siccome pero' non e' nemmeno
+    lavoro che resta, esce da tutt'e due i termini invece di pesare come debito
+    eterno. Un nodo rivendicato invece resta al denominatore: e' lavoro aperto, e
+    toglierlo farebbe salire l'avanzamento a chi prende un nodo senza aver ancora
+    chiuso niente.
+    """
+    in_gioco = [n for n in graph["nodes"] if n["status"] != DROPPED]
+    return sum(1 for n in in_gioco if n["status"] == CLOSED), len(in_gioco)
 
 
 def fog_for(graph: dict, node_id: str) -> list[str]:

@@ -71,6 +71,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "render.libero": {"it": "libero", "en": "free"},
     "render.avanzamento": {"it": "avanzamento", "en": "progress"},
     "render.nodi_conteggio": {"it": "{fatti} di {totale} nodi", "en": "{fatti} of {totale} nodes"},
+    "render.fuori_conteggio": {"it": " · {n} fuori scopo", "en": " · {n} out of scope"},
     "render.frontiera": {"it": "frontiera", "en": "frontier"},
     "render.frontiera_vuota": {"it": "niente di prendibile: o è tutto chiuso, o è tutto bloccato",
                               "en": "nothing up for grabs: it's either all closed or all blocked"},

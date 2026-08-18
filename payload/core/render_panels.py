@@ -18,6 +18,7 @@ from .topology import convergence
 
 def _blocco_avanzamento(data: dict, fatti: int, totale: int) -> str:
     quota = round(100 * fatti / totale) if totale else 0
+    fuori = sum(1 for n in data["nodes"] if n["status"] == "out-of-scope")
     return (
         f'<section class="blocco"><h2>{t("render.avanzamento")}</h2>'
         '<div class="ring-wrap">'
@@ -28,7 +29,10 @@ def _blocco_avanzamento(data: dict, fatti: int, totale: int) -> str:
         '<circle class="ring-bg" cx="60" cy="60" r="49" pathLength="100"/>'
         f'<circle class="ring-fg" cx="60" cy="60" r="49" pathLength="100" style="--p:{quota}"/></svg>'
         f'<div><span class="pct" data-count="{quota}">{quota}%</span>'
-        f'<span class="frac">{t("render.nodi_conteggio", fatti=fatti, totale=totale)}</span></div></div>'
+        f'<span class="frac">{t("render.nodi_conteggio", fatti=fatti, totale=totale)}'
+        # il denominatore non torna coi blocchi che si contano sulla mappa se
+        # qualcuno e' fuori scopo: si dice qui, invece di lasciarlo dedurre
+        f'{t("render.fuori_conteggio", n=fuori) if fuori else ""}</span></div></div>'
         f'<p class="dest">{escape(data["meta"]["destination"])}</p></section>'
     )
 

@@ -1044,6 +1044,46 @@ class FigureDeiRami(Base):
         self.assertIn("branchShape", pagina, "la scheda del nodo non riceve la figura")
 
 
+class Avanzamento(Base):
+    """L'avanzamento conta i soli nodi chiusi, sul lavoro che resta da fare."""
+
+    def prepara(self):
+        self.popola()                       # F01, F02, F03 in catena
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.add_node(g, id="F04", branch="F", title="Quarto", question="?")
+        self.rispondi("F01")
+        self.claims.claim(self.ref, "F01")
+        self.claims.close(self.ref, "F01", "fatto")
+
+    def test_il_fuori_scopo_esce_da_tutti_e_due_i_termini(self):
+        """Non e' lavoro fatto, ma non e' nemmeno lavoro che resta: pesare come
+        debito eterno impedirebbe a un grafo vivo di arrivare al 100%."""
+        self.prepara()
+        self.assertEqual((1, 4), self.model.progress(self.store.load(self.ref.json_path)))
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.drop(g, "F04", "non serve piu'")
+        self.assertEqual((1, 3), self.model.progress(self.store.load(self.ref.json_path)))
+
+    def test_prendere_un_nodo_non_fa_salire_l_avanzamento(self):
+        """Il rivendicato resta al denominatore: e' lavoro aperto, e toglierlo
+        premierebbe chi prende un nodo senza aver chiuso niente."""
+        self.prepara()
+        prima = self.model.progress(self.store.load(self.ref.json_path))
+        self.claims.claim(self.ref, "F02")
+        self.assertEqual(prima, self.model.progress(self.store.load(self.ref.json_path)))
+
+    def test_un_grafo_con_nodi_fuori_scopo_arriva_al_cento_per_cento(self):
+        self.prepara()
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.drop(g, "F04", "fuori")
+        for node_id in ("F02", "F03"):
+            self.rispondi(node_id)
+            self.claims.claim(self.ref, node_id)
+            self.claims.close(self.ref, node_id, "fatto")
+        fatti, totale = self.model.progress(self.store.load(self.ref.json_path))
+        self.assertEqual(fatti, totale)
+
+
 class TavolozzaScura(Base):
     """Il tema scuro sta scritto due volte, e le due copie devono coincidere.
 
