@@ -34,17 +34,66 @@
     requestAnimationFrame(passo);
   }
 
-  /* ---------- legenda: un chip filtra per stato, riclic per togliere ---------- */
-  document.querySelectorAll(".legend .chip[data-state]").forEach(function (chip) {
-    chip.addEventListener("click", function () {
-      var attivo = chip.classList.contains("on");
-      document.querySelectorAll(".legend .chip.on").forEach(function (c) { c.classList.remove("on"); });
-      if (attivo) {
-        delete document.body.dataset.filter;
-      } else {
-        chip.classList.add("on");
-        document.body.dataset.filter = chip.dataset.state;
-      }
+  /* ---------- filtro per stato: dal chip di legenda o dal titolo di un pannello ----------
+     Le due prese fanno la stessa cosa e si accendono insieme, cosi' il chip dice
+     sempre qual e' il filtro in corso anche a chi l'ha attivato dalla colonna. */
+  function filtraStato(stato) {
+    var attivo = document.body.dataset.filter === stato;
+    document.querySelectorAll(".legend .chip[data-state].on").forEach(function (c) {
+      c.classList.remove("on");
+    });
+    if (attivo) {
+      delete document.body.dataset.filter;
+      return;
+    }
+    document.body.dataset.filter = stato;
+    var chip = document.querySelector('.legend .chip[data-state="' + stato + '"]');
+    if (chip) chip.classList.add("on");
+  }
+  document.addEventListener("click", function (e) {
+    if (!e.target.closest) return;
+    var chip = e.target.closest(".legend .chip[data-state]");
+    if (chip) return filtraStato(chip.dataset.state);
+    // il titolo del blocco, non il blocco intero: le sue voci aprono il ticket
+    var titolo = e.target.closest(".blocco[data-hl] > h2");
+    if (titolo) filtraStato(titolo.parentElement.dataset.hl);
+  });
+
+  /* ---------- click-to-copy: slug del grafo, id e titolo di un nodo ----------
+     Un id si incolla in un comando ('atlas take F01') e lo slug in '-g <slug>':
+     riscriverli a mano guardando lo schermo e' il gesto che questa pagina fa fare
+     piu' spesso. La Clipboard API non basta da sola: aperta da file:// la pagina
+     non e' un contesto sicuro e navigator.clipboard puo' non esserci affatto, o
+     esserci e rifiutare, quindi resta la textarea con execCommand, deprecata ma
+     l'unica che funziona li'. */
+  function copiaNegliAppunti(testo) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(testo).catch(function () { return ripiego(testo); });
+    }
+    return ripiego(testo);
+  }
+  function ripiego(testo) {
+    var ta = document.createElement("textarea");
+    ta.value = testo;
+    ta.setAttribute("readonly", "");
+    ta.style.cssText = "position:fixed;top:0;left:0;opacity:0";
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); } catch (e) { /* niente appunti: resta il testo a video */ }
+    document.body.removeChild(ta);
+    return Promise.resolve();
+  }
+  var timerCopia = 0;
+  document.addEventListener("click", function (e) {
+    var el = e.target.closest && e.target.closest("[data-copy]");
+    if (!el) return;
+    e.preventDefault();
+    e.stopPropagation();
+    copiaNegliAppunti(el.dataset.copy).then(function () {
+      document.querySelectorAll(".copiato").forEach(function (x) { x.classList.remove("copiato"); });
+      el.classList.add("copiato");
+      clearTimeout(timerCopia);
+      timerCopia = setTimeout(function () { el.classList.remove("copiato"); }, 1200);
     });
   });
 
@@ -258,11 +307,15 @@
     chips.textContent = "";
     chips.appendChild(chip(st.glyph + " " + esc(st.label), "state", "--sc:var(--st-" + n.state + ")"));
     chips.appendChild(chip(esc(n.type + " · " + n.mode)));
-    chips.appendChild(chip('<span class="bdot" style="background:' + n.branchColor + '"></span>' +
-      esc(n.branchLabel)));
+    chips.appendChild(chip('<svg class="bshape" viewBox="0 0 24 24" width="9" height="9" ' +
+      'aria-hidden="true"><path d="' + n.branchShape + '" fill="' + n.branchColor +
+      '"/></svg>' + esc(n.branchLabel)));
     if (n.owner) chips.appendChild(chip(esc(sheet.dataset.ownerLabel + " " + n.owner), "who"));
     if (n.cost) chips.appendChild(chip(esc(n.cost)));
-    titolo.innerHTML = '<span class="sid">' + esc(id) + "</span>" + esc(n.title);
+    titolo.innerHTML = '<span class="sid" data-copy="' + esc(id) + '" title="' + esc(sheet.dataset.copia) +
+      '" data-copiato="' + esc(sheet.dataset.copiato) + '">' + esc(id) + "</span>" +
+      '<span class="stt" data-copy="' + esc(n.title) + '" title="' + esc(sheet.dataset.copia) +
+      '" data-copiato="' + esc(sheet.dataset.copiato) + '">' + esc(n.title) + "</span>";
     domanda.textContent = n.question;
     var md = (n.md || "").trim();
     corpo.innerHTML = md ? markdown(esc(md))

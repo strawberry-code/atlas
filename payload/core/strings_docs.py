@@ -88,8 +88,10 @@ STRINGS: dict[str, dict[str, str]] = {
     "render.costi_fuori_conteggio": {"it": "{n} valori non numerici esclusi dal totale",
                                      "en": "{n} non-numeric values excluded from the total"},
     "render.nodi_del_ramo": {"it": "{n} nodi", "en": "{n} nodes"},
-    "render.sottotitolo": {"it": "grafo <code>{slug}</code> · {progetto} · aggiornato al {data}",
-                          "en": "graph <code>{slug}</code> · {progetto} · updated on {data}"},
+    "render.sottotitolo": {"it": "grafo {slug} · {progetto} · aggiornato al {data}",
+                          "en": "graph {slug} · {progetto} · updated on {data}"},
+    "render.copia": {"it": "clicca per copiare", "en": "click to copy"},
+    "render.copiato": {"it": "copiato", "en": "copied"},
     "render.legenda_caption": {"it": "passa il puntatore su un nodo per vederne le dipendenze, "
                                      "cliccalo per leggerne il ticket; un clic sulla legenda filtra "
                                      "per stato o per persona",

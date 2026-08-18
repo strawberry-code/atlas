@@ -37,6 +37,7 @@ def data_island(ref: Graph, data: dict, front_ids: set[str]) -> str:
     '</p>' nel markdown di un ticket chiuderebbe il tag e romperebbe la pagina.
     """
     nodi = {}
+    ordine_rami = list(data["branches"])
     for n in data["nodes"]:
         ramo = data["branches"][n["branch"]]
         nodi[n["id"]] = {
@@ -44,11 +45,16 @@ def data_island(ref: Graph, data: dict, front_ids: set[str]) -> str:
             "state": state_of(n, front_ids), "type": n["type"], "mode": n["mode"],
             "branchLabel": ramo["label"],
             "branchColor": ramo.get("color", theme.BRANCH_FALLBACK),
+            # la stessa figura che il nodo porta sulla mappa, cosi' la scheda e la
+            # card si riconoscono l'una nell'altra
+            "branchShape": theme.shape_of(ordine_rami.index(n["branch"])),
             "cost": n.get("cost") or "",
             "owner": owner_of(n) or "",
             "md": _ticket_md(ref, n["id"]),
         }
-    stati = {s: {"glyph": STATE[s][0], "label": t(STATE[s][1])} for s in ORDER}
+    # il marcatore, non il glifo nudo: per un nodo in lavorazione e' l'anello, lo
+    # stesso che la card porta sulla mappa, qui fermo
+    stati = {s: {"glyph": theme.glyph_html(s, 10), "label": t(STATE[s][1])} for s in ORDER}
     testo = json.dumps({"nodes": nodi, "states": stati}, ensure_ascii=False).replace("</", "<\\/")
     return f'<script type="application/json" id="atlas-data">{testo}</script>'
 
@@ -57,7 +63,10 @@ def sheet() -> str:
     return (
         '<div class="scrim"></div>'
         f'<aside class="sheet" role="dialog" aria-modal="true" data-empty="{escape(t("render.sheet_vuoto"))}"'
-        f' data-owner-label="{escape(t("render.sheet_assegnato"))}">'
+        f' data-owner-label="{escape(t("render.sheet_assegnato"))}"'
+        # le etichette del click-to-copy viaggiano nel markup, non nel JS, che resta
+        # neutro di lingua: le rilegge da qui quando compone il titolo della scheda
+        f' data-copia="{escape(t("render.copia"))}" data-copiato="{escape(t("render.copiato"))}">'
         '<header class="sheet-head"><div class="sheet-chips"></div>'
         f'<button type="button" class="sheet-close" aria-label="{escape(t("render.sheet_chiudi"))}">✕</button>'
         '<h2 class="sheet-title"></h2><p class="sheet-question"></p></header>'

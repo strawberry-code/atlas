@@ -4,9 +4,11 @@
    Regola di questo foglio: si disegna solo cio' che porta informazione. Il
    movimento e' ammesso quando risponde a un gesto (hover, apertura della
    scheda) o quando accompagna un valore che si legge all'apertura (l'anello
-   dell'avanzamento, che si riempie una volta e si ferma). Vietato il ciclo
-   perpetuo: un'animazione che gira da sola tiene la pagina a ridisegnarsi
-   per sempre e non dice niente in piu' del colore e del glifo gia' presenti.
+   dell'avanzamento, che si riempie una volta e si ferma). Un ciclo perpetuo
+   tiene la pagina a ridisegnarsi per sempre, quindi ne esiste uno solo, e
+   dichiarato: l'anello dei nodi in lavorazione. Quello stato e' l'unico che
+   descrive qualcosa che sta accadendo mentre guardi, e girano solo i pochi
+   nodi rivendicati; chi ha chiesto quiete al sistema lo vede fermo.
    Risorsa neutra di lingua, letta raw da render.py (nessun .format: le graffe
    CSS sono al sicuro). Nessuna risorsa remota: font di sistema e basta. */
 
@@ -30,12 +32,24 @@
   --edge-out:#be123c;
   --scrim:rgba(17,28,34,.4);
   /* stati (validati su superficie chiara): bordo, riempimento, testo.
-     I riempimenti scalano col da-farsi: la frontiera satura, il chiuso quasi spento */
-  --st-frontier:#b45309;   --st-frontier-bg:rgba(180,83,9,.18);   --st-frontier-tx:#8a4a08;
-  --st-claimed:#1d4ed8;    --st-claimed-bg:rgba(29,78,216,.13);   --st-claimed-tx:#1e40af;
-  --st-closed:#047857;     --st-closed-bg:rgba(4,120,87,.07);     --st-closed-tx:#065f46;
-  --st-blocked:#8fa0aa;    --st-blocked-bg:rgba(17,28,34,.03);    --st-blocked-tx:#5c6f78;
-  --st-out-of-scope:#a8b6be; --st-out-of-scope-bg:transparent;    --st-out-of-scope-tx:#8b99a0;
+     I riempimenti scalano col da-farsi, ma il chiuso non e' piu' "quasi spento":
+     a rgba(...,.07) su questo fondo dava 1.09 di rapporto contro la superficie e
+     1.07 contro un nodo bloccato, cioe' niente, e da lontano un lavoro finito e
+     uno fermo erano la stessa macchia grigia. Bordi e testi stanno a un rapporto
+     circa 1.3 volte quello di prima, misurato in WCAG contro il fondo. */
+  /* la frontiera e' giallo cantiere (RAL 1023). Su fondo chiaro il giallo pieno sta
+     a 1.14 di rapporto e come bordo sparirebbe, quindi il giallo lo porta il
+     riempimento, che deve colorare e non essere letto, mentre bordo e testo restano
+     sullo stesso hue scendendo di luminanza fin dove si leggono. */
+  --st-frontier:#7a5f00;   --st-frontier-bg:rgba(252,194,0,.45);  --st-frontier-tx:#5c4700;
+  --st-claimed:#1d4ed8;    --st-claimed-bg:rgba(29,122,252,.4);   --st-claimed-tx:#173288;
+  --st-closed:#04724f;     --st-closed-bg:rgba(0,196,106,.42);    --st-closed-tx:#054c38;
+  /* Il rosso sta sul fuori scopo, che e' una decisione presa e va vista; il bloccato
+     arretra in grigio, perche' e' solo lavoro che aspetta il suo turno ed e' la
+     maggioranza dei nodi di un grafo giovane. Il riempimento del fuori scopo resta
+     trasparente: il suo bordo tratteggiato basta gia' a dire che quel nodo e' fuori. */
+  --st-blocked:#8ea0aa;    --st-blocked-bg:transparent;           --st-blocked-tx:#75858e;
+  --st-out-of-scope:#b91c1c; --st-out-of-scope-bg:rgba(239,68,68,.22); --st-out-of-scope-tx:#7f1d1d;
   --code-bg:#d8dde0;
 }
 
@@ -58,11 +72,15 @@
     --edge-out:#fb7185;
     --scrim:rgba(2,5,9,.6);
     /* stati (validati su superficie scura) */
-    --st-frontier:#d97706;   --st-frontier-bg:rgba(217,119,6,.26);  --st-frontier-tx:#fcd34d;
-    --st-claimed:#3b82f6;    --st-claimed-bg:rgba(59,130,246,.2);   --st-claimed-tx:#93c5fd;
-    --st-closed:#059669;     --st-closed-bg:rgba(5,150,105,.09);    --st-closed-tx:#6ee7b7;
-    --st-blocked:#33424f;    --st-blocked-bg:rgba(51,66,79,.16);    --st-blocked-tx:#7e939e;
-    --st-out-of-scope:#2c3a45; --st-out-of-scope-bg:transparent;    --st-out-of-scope-tx:#51666f;
+    /* Come sopra: bordi e riempimenti circa 1.3 volte il rapporto di prima. I testi
+       degli stati vivi restano quelli, perche' erano gia' fra 11 e 14 di rapporto e
+       spingerli oltre li sbianca: si guadagna un numero e si perde il colore, che
+       qui e' l'informazione. Salgono solo i due che erano davvero bassi. */
+    --st-frontier:#fcc200;   --st-frontier-bg:rgba(252,194,0,.3);   --st-frontier-tx:#fde047;
+    --st-claimed:#4d9fff;    --st-claimed-bg:rgba(77,159,255,.26);  --st-claimed-tx:#93c5fd;
+    --st-closed:#00e29a;     --st-closed-bg:rgba(0,226,154,.22);    --st-closed-tx:#6ee7b7;
+    --st-blocked:#3a4c5b;    --st-blocked-bg:transparent;           --st-blocked-tx:#607984;
+    --st-out-of-scope:#f87171; --st-out-of-scope-bg:rgba(248,113,113,.16); --st-out-of-scope-tx:#fca5a5;
     --code-bg:#0c141c;
   }
 }
@@ -83,11 +101,16 @@
   --edge-in:#34d399;
   --edge-out:#fb7185;
   --scrim:rgba(2,5,9,.6);
-  --st-frontier:#d97706;   --st-frontier-bg:rgba(217,119,6,.26);  --st-frontier-tx:#fcd34d;
-  --st-claimed:#3b82f6;    --st-claimed-bg:rgba(59,130,246,.2);   --st-claimed-tx:#93c5fd;
-  --st-closed:#059669;     --st-closed-bg:rgba(5,150,105,.09);    --st-closed-tx:#6ee7b7;
-  --st-blocked:#33424f;    --st-blocked-bg:rgba(51,66,79,.16);    --st-blocked-tx:#7e939e;
-  --st-out-of-scope:#2c3a45; --st-out-of-scope-bg:transparent;    --st-out-of-scope-tx:#51666f;
+  /* Identici a quelli della media query qui sopra, e devono restarlo: questo blocco
+     vale quando il tema e' stato scelto col toggle, quello vale quando lo decide il
+     sistema, e due tavole diverse darebbero alla stessa pagina due aspetti a seconda
+     di come ci si e' arrivati. Il CSS non permette di scriverli una volta sola; a
+     tenerli allineati ci pensa un test (TavolozzaScura). */
+  --st-frontier:#fcc200;   --st-frontier-bg:rgba(252,194,0,.3);   --st-frontier-tx:#fde047;
+  --st-claimed:#4d9fff;    --st-claimed-bg:rgba(77,159,255,.26);  --st-claimed-tx:#93c5fd;
+  --st-closed:#00e29a;     --st-closed-bg:rgba(0,226,154,.22);    --st-closed-tx:#6ee7b7;
+  --st-blocked:#3a4c5b;    --st-blocked-bg:transparent;           --st-blocked-tx:#607984;
+  --st-out-of-scope:#f87171; --st-out-of-scope-bg:rgba(248,113,113,.16); --st-out-of-scope-tx:#fca5a5;
   --code-bg:#0c141c;
 }
 
@@ -169,7 +192,6 @@ li[data-node]:hover b{color:var(--accent)}
 li b{color:var(--ink);font-weight:700;font-size:11px;transition:color .15s ease}
 .tag{margin-left:auto;font-size:9.5px;color:var(--faint);white-space:nowrap;
   max-width:45%;overflow:hidden;text-overflow:ellipsis;flex:none}
-.dot{width:8px;height:8px;flex:none;display:inline-block;align-self:center}
 
 /* avviso: il grafo non converge nel nodo finale */
 .blocco.caution{border-color:var(--st-frontier)}
@@ -279,9 +301,13 @@ body[data-owner] .legend .chip[data-owner]:not(.on){opacity:.5}
 .n{cursor:pointer;transition:opacity .15s ease}
 .n rect.card{transition:stroke-width .15s ease}
 .n:hover rect.card{stroke-width:2.2}
-/* gerarchia a colpo d'occhio: la frontiera preme col bordo spesso, il chiuso arretra */
-.st-frontier rect.card{stroke-width:2}
-.st-closed{opacity:.72}
+/* Tutti i bordi hanno lo stesso spessore: la gerarchia la porta il colore, che
+   adesso e' pieno, e un bordo piu' spesso in piu' sarebbe la stessa cosa detta due
+   volte. Resta il solo ispessimento dell'hover, che non distingue uno stato ma
+   risponde al puntatore.
+   Il chiuso arretra col colore e non con la trasparenza: a .72 il velo mangiava
+   proprio il verde che distingue un nodo finito da uno fermo. */
+.st-closed{opacity:.9}
 .st-closed .ntt{fill:var(--muted)}
 
 .st-frontier rect.card{fill:var(--st-frontier-bg);stroke:var(--st-frontier)}
@@ -325,6 +351,10 @@ body[data-filter] path.edge{opacity:.25}
 .blocco[data-hl="claimed"] h2::before{background:var(--st-claimed)}
 .blocco[data-hl="closed"] h2::before{background:var(--st-closed)}
 .blocco[data-hl]:hover{border-color:var(--border-strong)}
+/* il titolo del blocco e' una presa come il chip: ci si passa sopra per vedere,
+   ci si clicca per fissare */
+.blocco[data-hl] > h2{cursor:pointer}
+.blocco[data-hl] > h2:hover{color:var(--ink)}
 .side:has([data-hl="frontier"]:hover) ~ .map .n:not(.st-frontier),
 .map:has(.chip.st-frontier:hover) .n:not(.st-frontier){opacity:.13}
 .side:has([data-hl="claimed"]:hover) ~ .map .n:not(.st-claimed),
@@ -365,7 +395,21 @@ body.sheet-open .sheet{transform:none}
   padding:3px 8px;border:1px solid var(--border);color:var(--muted);background:var(--pane-2)}
 .schip.state{border-color:color-mix(in oklab,var(--sc) 55%,transparent);
   color:var(--sc);background:color-mix(in oklab,var(--sc) 10%,transparent)}
-.schip .bdot{width:7px;height:7px;display:inline-block}
+/* l'anello dei nodi in lavorazione: gira finche' il nodo resta rivendicato */
+@keyframes atlas-spin{to{transform:rotate(360deg)}}
+.spin{transform-box:fill-box;transform-origin:center;animation:atlas-spin 1.15s linear infinite}
+.spin-arc{stroke:var(--st-claimed)}
+/* Lo stesso anello fermo, dove lo stato e' un'etichetta e non un nodo al lavoro.
+   Il nome non e' .ring, che e' gia' l'anello dell'avanzamento largo 92px: chiamarli
+   uguale faceva ereditare quella misura e il marcatore usciva grande come la card. */
+.st-ring{flex:none;vertical-align:-1px}
+@media (prefers-reduced-motion: reduce){.spin{animation:none}}
+
+/* la figura del ramo: sulla card, nel pannello e nella scheda e' la stessa */
+.bshape{flex:none;align-self:center}
+.schip .bshape{margin-right:1px}
+.bmark{opacity:.9}
+.n:hover .bmark{opacity:1}
 .sheet-close{position:absolute;top:14px;right:14px;width:30px;height:30px;
   border:1px solid var(--border);background:var(--pane-2);color:var(--muted);cursor:pointer;
   font-size:13px;line-height:1;display:grid;place-items:center;transition:color .15s ease}
@@ -373,6 +417,18 @@ body.sheet-open .sheet{transform:none}
 .sheet-title{margin:0;font-size:14.5px;font-weight:700;letter-spacing:.01em;
   text-transform:none;color:var(--ink);display:block}
 .sheet-title .sid{color:var(--accent);font-size:13px;margin-right:8px}
+
+/* click-to-copy: si annuncia con un sottolineato appena accennato e conferma con
+   una parola, perche' negli appunti non si vede se e' arrivato qualcosa. La
+   conferma sta in ::after e non sostituisce il testo, cosi' la riga non si
+   accorcia sotto il puntatore mentre la si legge. */
+[data-copy]{cursor:copy;text-decoration:underline;text-decoration-style:dotted;
+  text-underline-offset:3px;text-decoration-color:var(--border-strong)}
+[data-copy]:hover{text-decoration-color:var(--accent);color:var(--accent)}
+[data-copy].copiato::after{content:" " attr(data-copiato);color:var(--accent-2);
+  font-size:9.5px;letter-spacing:.06em;text-decoration:none}
+.sheet-title .stt{text-decoration-color:transparent}
+.sheet-title .stt:hover{text-decoration-color:var(--accent)}
 .sheet-question{margin:6px 0 0;color:var(--muted);font-size:11px;line-height:1.5;font-style:italic}
 .sheet-body{flex:1;overflow-y:auto;padding:16px 22px 22px;scrollbar-width:thin;
   scrollbar-color:var(--border-strong) transparent}

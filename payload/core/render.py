@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from html import escape
 
-from . import render_owners, render_panels, render_sheet, render_svg
+from . import render_owners, render_panels, render_sheet, render_svg, theme
 from .config import Graph
 from .model import claimed, frontier, progress
 from .risorse import leggi_template
@@ -35,7 +35,12 @@ def _topbar(ref: Graph, data: dict, front: list[dict], presi: list[dict]) -> str
     meta = data["meta"]
     fatti, totale = progress(data)
     quota = round(100 * fatti / totale) if totale else 0
-    sottotitolo = t("render.sottotitolo", slug=escape(meta["slug"]),
+    # lo slug si incolla in '-g <slug>' ogni volta che si lavora su piu' grafi:
+    # qui e' cliccabile, e il testo da copiare e' quello nudo, non il markup
+    slug = (f'<code class="cp" data-copy="{escape(meta["slug"])}" '
+            f'title="{escape(t("render.copia"))}" data-copiato="{escape(t("render.copiato"))}">'
+            f'{escape(meta["slug"])}</code>')
+    sottotitolo = t("render.sottotitolo", slug=slug,
                     progetto=escape(ref.workspace.config["project"]), data=escape(meta["updated"]))
     readouts = (
         f'<span class="ro"><label>{t("render.avanzamento")}</label><b>{quota}%</b></span>'
@@ -53,7 +58,7 @@ def _topbar(ref: Graph, data: dict, front: list[dict], presi: list[dict]) -> str
 def _mappa(data: dict, depth: dict, front_ids: set[str], gruppi: dict[str, int]) -> str:
     legenda = "".join(
         f'<button type="button" class="chip {css_class(s)}" data-state="{s}">'
-        f'<i></i>{STATE[s][0]} {t(STATE[s][1])}</button>' for s in ORDER
+        f'<i></i>{theme.glyph_html(s)} {t(STATE[s][1])}</button>' for s in ORDER
     ) + render_owners.chips(data, gruppi)
     zoom = (
         f'<div class="zoom"><button type="button" data-zoom="in" aria-label="{escape(t("render.zoom_in"))}">+</button>'

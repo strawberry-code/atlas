@@ -57,8 +57,24 @@ def layout(data: dict, depth: dict[str, int]) -> dict[str, tuple[float, float]]:
     return pos
 
 
+def _testa(stato: str, node_id: str, x: float, y: float) -> str:
+    """Glifo e id in testa alla card. Un nodo in lavorazione porta al posto del glifo
+    un anello che gira: e' l'unico stato che descrive qualcosa che sta accadendo
+    adesso, e il movimento lo dice meglio di un pallino fermo. Il translate sta sul
+    gruppo esterno e la rotazione sul figlio, perche' una transform CSS sullo stesso
+    elemento sostituirebbe quella dell'attributo e lo spinner finirebbe nell'angolo."""
+    if stato != "claimed":
+        return f'<text class="nid" x="{x + 16}" y="{y + 21}">{STATE[stato][0]} {node_id}</text>'
+    return (f'<g transform="translate({x + 22},{y + 16})"><g class="spin">'
+            f'<circle class="spin-arc" r="{theme.RING["r"]}" fill="none" '
+            f'stroke-width="{theme.RING["spessore"]}" stroke-linecap="round" '
+            f'stroke-dasharray="{theme.RING["tratto"]}"/></g></g>'
+            f'<text class="nid" x="{x + 32}" y="{y + 21}">{node_id}</text>')
+
+
 def boxes(data: dict, pos: dict, front: set[str], gruppi: dict[str, int]) -> str:
     out = []
+    ordine_rami = list(data["branches"])
     for node in data["nodes"]:
         if node["id"] not in pos:
             continue
@@ -80,9 +96,12 @@ def boxes(data: dict, pos: dict, front: set[str], gruppi: dict[str, int]) -> str
             f'data-owner="{render_owners.gruppo(node, gruppi)}">'
             f'<title>{escape(node["title"])} — {escape(node["question"])}</title>'
             f'<rect class="card" x="{x}" y="{y}" width="{W}" height="{H}" rx="3" '
-            f'stroke-width="1.2"{tratto}/>'
-            f'<rect x="{x}" y="{y}" width="3" height="{H}" fill="{ramo}"/>'
-            f'<text class="nid" x="{x + 16}" y="{y + 21}">{STATE[stato][0]} {node["id"]}</text>'
+            f'stroke-width="1"{tratto}/>'
+            # la figura del ramo, in basso a destra: l'angolo che resta libero
+            # perche' i bloccanti si scrivono in basso a sinistra
+            f'<g class="bmark" transform="translate({x + W - 26},{y + H - 26}) scale(.66)">'
+            f'<path d="{theme.shape_of(ordine_rami.index(node["branch"]))}" fill="{ramo}"/></g>'
+            f'{_testa(stato, node["id"], x, y)}'
             f'<text class="nbadge" x="{x + W - 12}" y="{y + 21}" text-anchor="end">{escape(tipo_modo)}</text>'
             f'{titolo}'
             f'<text class="ndp" x="{x + 16}" y="{y + H - 11}">← {escape(deps)}</text>'

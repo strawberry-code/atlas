@@ -31,12 +31,22 @@ def gruppo(node: dict, idx: dict[str, int]) -> int:
 
 
 def css(idx: dict[str, int]) -> str:
-    """Il filtro per persona: acceso uno, gli altri nodi si spengono."""
+    """Il filtro per persona, nelle due forme che hanno tutte le prese di questa
+    pagina: il puntatore mostra in anteprima, il clic fissa finche' non si rifa'.
+
+    Le regole si generano qui perche' dipendono da quante persone ci sono, e il
+    selettore porta l'indice invece del nome per non far comporre a chi scrive dal
+    terminale un pezzo di foglio di stile."""
     if not idx:
         return ""
-    regole = [f'body[data-owner="{i}"] .n:not([data-owner="{i}"]){{opacity:.13}}'
-              for i in (*idx.values(), NESSUNO)]
+    regole = []
+    for i in (*idx.values(), NESSUNO):
+        regole.append(f'body[data-owner="{i}"] .n:not([data-owner="{i}"]){{opacity:.13}}')
+        regole.append(f'.map:has(.legend .chip[data-owner="{i}"]:hover) .n:not([data-owner="{i}"]),'
+                      f'.side:has(li[data-owner="{i}"]:hover) ~ .map .n:not([data-owner="{i}"])'
+                      f'{{opacity:.13}}')
     regole.append("body[data-owner] path.edge{opacity:.25}")
+    regole.append(".side:has(li[data-owner]:hover) ~ .map :is(path.edge,circle.port){opacity:.25}")
     return "".join(regole)
 
 

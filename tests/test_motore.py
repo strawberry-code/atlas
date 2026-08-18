@@ -9,6 +9,7 @@ import contextlib
 import io
 import json
 import os
+import re
 import runpy
 import shutil
 import subprocess
@@ -804,9 +805,13 @@ class Artefatti(Base):
         # e rigenerera la dashboard. Se usasse load() fuori dal lock, mostrerebbe
         # N1 claimed ma N2 ancora aperto.
         self.render.write(self.ref, dati_dopo_n1)  # usa OLD: N1 claimed, N2 aperto
+        # un nodo in lavorazione si riconosce dalla classe di stato: al posto del
+        # glifo ⬤ la card porta l'anello che gira, che non e' testo
+        in_lavorazione = 'class="n st-claimed" id="node-{}"'.format
         dash_stantia = self.ref.dashboard_path.read_text(encoding="utf-8")
-        self.assertIn('⬤ N1', dash_stantia, "Nella dashboard stantia, N1 è in lavorazione")
-        self.assertNotIn('⬤ N2', dash_stantia, "Nella dashboard stantia, N2 è ancora aperto (non claimed)")
+        self.assertIn(in_lavorazione("N1"), dash_stantia, "Nella dashboard stantia, N1 è in lavorazione")
+        self.assertNotIn(in_lavorazione("N2"), dash_stantia,
+                         "Nella dashboard stantia, N2 è ancora aperto (non claimed)")
 
         # Con il fix: read_transaction rilegge sotto lock lo stato VERO
         with self.store.read_transaction(self.ref.json_path) as data:
@@ -814,8 +819,9 @@ class Artefatti(Base):
 
         # Verifica: la dashboard corretta contiene ENTRAMBI i claim
         dash_corretta = self.ref.dashboard_path.read_text(encoding="utf-8")
-        self.assertIn('⬤ N1', dash_corretta, "Dashboard corretta: N1 è in lavorazione")
-        self.assertIn('⬤ N2', dash_corretta, "Dashboard corretta: N2 è in lavorazione (il fix chiude la finestra)")
+        self.assertIn(in_lavorazione("N1"), dash_corretta, "Dashboard corretta: N1 è in lavorazione")
+        self.assertIn(in_lavorazione("N2"), dash_corretta,
+                      "Dashboard corretta: N2 è in lavorazione (il fix chiude la finestra)")
 
 
 class Assegnazioni(Base):
@@ -1001,6 +1007,67 @@ class ScegliereIlGrafo(Base):
         with contextlib.redirect_stderr(errori), self.assertRaises(SystemExit):
             parser.parse_args(["rendr"])
         self.assertNotIn("atlas use", errori.getvalue(), "'rendr' non è un grafo: niente consiglio")
+
+
+class FigureDeiRami(Base):
+    """Il ramo si legge da una figura in basso a destra, non piu' da una banda di
+    colore sul bordo sinistro."""
+
+    def popola_rami(self, quanti: int):
+        with self.mutate.editing(self.ref) as g:
+            for i in range(quanti):
+                chiave = f"R{i}"
+                self.mutate.add_branch(g, chiave, f"Ramo {i}", "#4f46e5")
+                self.mutate.add_node(g, id=f"{chiave}01", branch=chiave, title=f"Nodo {i}", question="?")
+
+    def test_ogni_ramo_ha_la_sua_figura_e_dopo_otto_si_ricomincia(self):
+        from core import theme
+        forme = [theme.shape_of(i) for i in range(len(theme.SHAPES))]
+        self.assertEqual(len(set(forme)), len(forme), "due rami vicini avrebbero la stessa figura")
+        self.assertEqual(theme.shape_of(0), theme.shape_of(len(theme.SHAPES)), "il nono ramo ricomincia")
+
+    def test_ogni_figura_e_un_path_chiuso(self):
+        from core import theme
+        for nome, path in theme.SHAPES.items():
+            with self.subTest(forma=nome):
+                self.assertTrue(path.startswith("M"), f"{nome} non parte da un punto")
+                self.assertTrue(path.rstrip().endswith("z"), f"{nome} non chiude il contorno")
+
+    def test_la_dashboard_disegna_le_figure_e_non_piu_la_banda(self):
+        self.popola_rami(3)
+        pagina = self.render.build(self.ref, self.store.load(self.ref.json_path))
+        self.assertNotIn('width="3" height="92"', pagina, "la banda del ramo è rimasta sulla card")
+        self.assertEqual(3, pagina.count('class="bmark"'), "una figura per nodo")
+        from core import theme
+        for i in range(3):
+            self.assertIn(theme.shape_of(i + 1), pagina)      # +1: il ramo A del grafo nuovo è il primo
+        self.assertIn("branchShape", pagina, "la scheda del nodo non riceve la figura")
+
+
+class TavolozzaScura(Base):
+    """Il tema scuro sta scritto due volte, e le due copie devono coincidere.
+
+    Una vale quando lo decide il sistema (media query), l'altra quando lo si sceglie
+    col toggle: il CSS non permette di dichiararle una volta sola, e mentre si
+    ritoccavano i colori una delle due e' rimasta indietro, dando alla stessa pagina
+    due aspetti a seconda di come ci si era arrivati."""
+
+    def tavole(self) -> tuple[dict, dict]:
+        css = (SORGENTE / "templates" / "dashboard.css").read_text(encoding="utf-8")
+        return self.token(css, ':root:not([data-theme="light"])'), self.token(css, ':root[data-theme="dark"]')
+
+    @staticmethod
+    def token(css: str, selettore: str) -> dict:
+        inizio = css.index(selettore) + len(selettore)
+        corpo = css[inizio: css.index("}", inizio)]
+        return dict(re.findall(r"(--[\w-]+)\s*:\s*([^;]+);", corpo))
+
+    def test_le_due_tavole_scure_dicono_la_stessa_cosa(self):
+        da_sistema, da_toggle = self.tavole()
+        self.assertTrue(da_sistema, "la tavola della media query non è stata trovata")
+        self.assertEqual(sorted(da_sistema), sorted(da_toggle), "le due tavole non hanno gli stessi token")
+        for nome, valore in da_sistema.items():
+            self.assertEqual(valore.strip(), da_toggle[nome].strip(), f"{nome} diverge fra le due tavole scure")
 
 
 class Nebbia(Base):

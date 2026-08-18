@@ -96,10 +96,10 @@ def panels(ref: Graph, data: dict, front: list[dict], presi: list[dict],
         conteggi[node["branch"]] += 1
     voci_rami = [
         f'<li data-branch="{escape(k)}">'
-        f'<span class="dot" style="background:{r.get("color", theme.BRANCH_FALLBACK)}"></span>'
+        f'{theme.shape_svg(i, r.get("color", theme.BRANCH_FALLBACK), 11)}'
         f'<b>{k}</b> {escape(r["label"])}'
         f'<span class="tag">{t("render.nodi_del_ramo", n=conteggi[k])}</span></li>'
-        for k, r in data["branches"].items()
+        for i, (k, r) in enumerate(data["branches"].items())
     ]
     blocchi = [
         _blocco_caution(data, fatti, totale),
