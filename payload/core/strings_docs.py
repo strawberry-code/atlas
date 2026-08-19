@@ -93,10 +93,12 @@ STRINGS: dict[str, dict[str, str]] = {
                           "en": "graph {slug} · {progetto} · updated on {data}"},
     "render.copia": {"it": "clicca per copiare", "en": "click to copy"},
     "render.copiato": {"it": "copiato", "en": "copied"},
-    "render.legenda_caption": {"it": "passa il puntatore su un nodo per vederne le dipendenze, "
+    "render.legenda_caption": {"it": "una freccia ha il colore dello stato del blocco da cui parte; "
+                                     "passa il puntatore su un nodo per vederne le dipendenze, "
                                      "cliccalo per leggerne il ticket; un clic sulla legenda filtra "
                                      "per stato o per persona",
-                              "en": "hover a node to see its dependencies, click it to read its ticket; "
+                              "en": "an arrow takes the colour of the state of the block it starts from; "
+                                    "hover a node to see its dependencies, click it to read its ticket; "
                                     "click the legend to filter by state or by person"},
     "render.tema": {"it": "cambia tema chiaro/scuro", "en": "switch light/dark theme"},
     "render.sheet_chiudi": {"it": "chiudi il ticket", "en": "close the ticket"},

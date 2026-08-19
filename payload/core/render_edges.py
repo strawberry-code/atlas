@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import re
 
+from .theme import STATE, state_of
+
 # le chiavi di ramo sono dati liberi ma finiscono in un selettore: una chiave
 # fuori da questo alfabeto semplicemente non genera la sua regola di hover
 _CHIAVE_SICURA = re.compile(r"^[\w-]+$")
@@ -33,12 +35,15 @@ def edges(data: dict, pos: dict, front_ids: set[str]) -> str:
     con una porta di aggancio (cerchietto) a ogni estremo.
 
     data-from/data-to reggono l'evidenziazione al passaggio del mouse (vedi
-    hover_css). Gli archi che entrano in un nodo di frontiera portano la classe
-    feed, che il CSS colora con la tinta dello stato: sono il lavoro che
-    sblocca il fronte.
+    hover_css). Ogni arco porta invece la classe da-<stato> del nodo da cui parte,
+    e il CSS gliene da' il colore: le frecce entranti dicono in che stato sono le
+    dipendenze senza doverle cercare sulla mappa, e un blocco con tutte le frecce
+    verdi e' un blocco pronto. Prima erano colorati gli archi entranti in un nodo
+    di frontiera, che di quella lettura era il solo caso gia' risolto.
     """
     from .render_svg import H, W
 
+    stato_di = {n["id"]: state_of(n, front_ids) for n in data["nodes"] if n["id"] in pos}
     deps_per_nodo = {
         node["id"]: [d for d in node["blockedBy"] if d in pos]
         for node in data["nodes"] if node["id"] in pos
@@ -60,12 +65,12 @@ def edges(data: dict, pos: dict, front_ids: set[str]) -> str:
             gap = ey - sy
             mid = sy + gap / 2
             piede = min(14, gap / 3)  # tratto retto finale: orientamento del marker inequivocabile
-            classe = "edge feed" if nid in front_ids else "edge"
+            da = f"da-{stato_di[dep]}"
             out.append(
-                f'<path class="{classe}" data-from="{dep}" data-to="{nid}" '
+                f'<path class="edge {da}" data-from="{dep}" data-to="{nid}" '
                 f'd="M{sx},{sy} C{sx},{mid} {ex},{mid} {ex},{ey - piede} L{ex},{ey}" '
-                f'stroke-width="1.3" marker-end="url(#tip)"/>'
-                f'<circle class="port" data-from="{dep}" data-to="{nid}" cx="{sx}" cy="{sy}" r="2.6"/>'
+                f'marker-end="url(#tip-{stato_di[dep]})"/>'  # spessore e colore: dashboard.css
+                f'<circle class="port {da}" data-from="{dep}" data-to="{nid}" cx="{sx}" cy="{sy}" r="2.6"/>'
             )
     return "".join(out)
 
@@ -75,20 +80,25 @@ def hover_css(ids: list[str]) -> str:
     del mouse sul nodo stesso o sulla sua riga nei pannelli laterali, e in quel
     secondo caso mettono in evidenza anche il nodo. Generate qui perche'
     dipendono dagli id del grafo, a differenza del tema statico (dashboard.css).
-    Path e porta vogliono regole separate: un fill su una bezier aperta la
-    trasforma in un nastro pieno, quindi il path prende solo lo stroke.
+
+    L'evidenziazione ingrossa la linea e non la ricolora. Prima dipingeva di verde
+    gli entranti e di rosso gli uscenti, e su un arco che porta gia' il colore del
+    proprio mittente quel verde cancellava proprio l'informazione che si era andati
+    a cercare: il mouse su un blocco serve a sapere in che stato sono le dipendenze,
+    e le trovava tutte verdi. Entrata e uscita restano distinguibili senza colore:
+    gli archi entranti arrivano sul bordo alto e vengono da mittenti diversi, quelli
+    uscenti partono dal bordo basso e hanno tutti la tinta del nodo sotto il mouse.
     """
     out = []
     for i in ids:
         nodo = f'svg:has(#node-{i}:hover)'                       # mouse sul nodo
         riga = f'body:has(.side [data-node="{i}"]:hover)'        # mouse sulla riga del pannello
         out.append(
-            f'{nodo} path[data-to="{i}"],{riga} path[data-to="{i}"]{{stroke:var(--edge-in);'
-            f'stroke-width:2.2;opacity:1;marker-end:url(#tip-in)}}'
-            f'{nodo} path[data-from="{i}"],{riga} path[data-from="{i}"]{{stroke:var(--edge-out);'
-            f'stroke-width:2.2;opacity:1;marker-end:url(#tip-out)}}'
-            f'{nodo} circle[data-to="{i}"],{riga} circle[data-to="{i}"]{{fill:var(--edge-in);opacity:1}}'
-            f'{nodo} circle[data-from="{i}"],{riga} circle[data-from="{i}"]{{fill:var(--edge-out);opacity:1}}'
+            f'{nodo} :is(path,circle)[data-to="{i}"],{riga} :is(path,circle)[data-to="{i}"],'
+            f'{nodo} :is(path,circle)[data-from="{i}"],{riga} :is(path,circle)[data-from="{i}"]'
+            f'{{opacity:1}}'
+            f'{nodo} path[data-to="{i}"],{riga} path[data-to="{i}"],'
+            f'{nodo} path[data-from="{i}"],{riga} path[data-from="{i}"]{{stroke-width:2.6}}'
             f'{riga} #node-{i}{{opacity:1}}'
             f'{riga} #node-{i} rect.card{{stroke-width:2.2}}'
         )
@@ -112,9 +122,14 @@ def branch_css(keys: list[str]) -> str:
 
 
 def markers() -> str:
+    """Le punte delle frecce. Una per stato di partenza, oltre alle due dell'hover:
+    un marker non eredita il colore del path che lo usa, e una linea colorata con la
+    punta grigia direbbe la meta' di quel che deve dire. Cinque punte in piu' nei defs
+    costano nulla; context-stroke lo farebbe in una sola, ma non su tutti i browser.
+    """
     def marker(nome: str) -> str:
         return (
             f'<marker id="{nome}" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" '
             f'markerHeight="7" orient="auto"><path class="{nome}" d="M0,1 L7,4 L0,7 z"/></marker>'
         )
-    return marker("tip") + marker("tip-in") + marker("tip-out")
+    return marker("tip") + "".join(marker(f"tip-{s}") for s in STATE)

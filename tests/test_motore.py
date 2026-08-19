@@ -1084,6 +1084,51 @@ class Avanzamento(Base):
         self.assertEqual(fatti, totale)
 
 
+class FrecceColorate(Base):
+    """Una freccia porta il colore dello stato del nodo da cui parte.
+
+    E' la lettura che prima mancava: guardando le frecce che entrano in un blocco
+    si sa in che stato sono le sue dipendenze senza doverle cercare sulla mappa, e
+    tutte verdi vuol dire pronto."""
+
+    def pagina(self) -> str:
+        return self.render.build(self.ref, self.store.load(self.ref.json_path))
+
+    def test_l_arco_prende_lo_stato_di_chi_lo_manda(self):
+        self.popola()                                    # F01 → F02 → F03
+        self.rispondi("F01")
+        self.claims.claim(self.ref, "F01")
+        self.claims.close(self.ref, "F01", "fatto")
+        self.claims.claim(self.ref, "F02")
+        pagina = self.pagina()
+        self.assertIn('class="edge da-closed" data-from="F01" data-to="F02"', pagina)
+        self.assertIn('class="edge da-claimed" data-from="F02" data-to="F03"', pagina)
+        self.assertIn('class="port da-closed" data-from="F01"', pagina, "la porta segue l'arco")
+        self.assertIn('marker-end="url(#tip-closed)"', pagina, "la punta segue la linea")
+
+    def test_il_puntatore_ingrossa_l_arco_e_non_lo_ricolora(self):
+        """L'evidenziazione dipingeva di verde gli entranti e di rosso gli uscenti:
+        sopra un colore che porta lo stato del mittente, cancellava proprio quel che
+        si era andati a guardare."""
+        from core import render_edges
+        css = render_edges.hover_css(["F01", "F02"])
+        self.assertIn("stroke-width:2.6", css)
+        self.assertNotIn("stroke:", css, "l'hover riscrive il colore dell'arco")
+        self.assertNotIn("marker-end", css, "l'hover riscrive il colore della punta")
+
+    def test_la_punta_segue_la_linea(self):
+        """Un marker non eredita il colore del path: senza una punta per stato la
+        freccia sarebbe colorata e la sua punta grigia."""
+        from core import theme
+        self.popola()
+        pagina = self.pagina()
+        css = (SORGENTE / "templates" / "dashboard.css").read_text(encoding="utf-8")
+        for stato in theme.STATE:
+            with self.subTest(stato=stato):
+                self.assertIn(f'id="tip-{stato}"', pagina, "manca la punta di questo stato")
+                self.assertIn(f".tip-{stato}{{fill:", css, "la punta non ha colore")
+
+
 class TavolozzaScura(Base):
     """Il tema scuro sta scritto due volte, e le due copie devono coincidere.
 

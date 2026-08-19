@@ -28,9 +28,17 @@
   --edge:#93a6b0;
   --accent:#0e7490;
   --accent-2:#047857;
-  --edge-in:#047857;
-  --edge-out:#be123c;
   --scrim:rgba(17,28,34,.4);
+  /* Gli archi hanno la loro tavola, e non prendono il colore del bordo delle card.
+     Quel bordo e' scuro di proposito, perche' deve reggere come contorno di una
+     superficie gia' colorata; una curva di due pixel dipinta con lo stesso valore
+     esce spenta, e accanto a un blocco pieno sembra sbiadita. Qui il colore e'
+     quello che il blocco mostra davvero, cioe' il riempimento, portato alla
+     luminanza che serve a una linea sottile su questo fondo. */
+  --edge-frontier:#c08a00;
+  --edge-claimed:#1d7afc;
+  --edge-closed:#00a06c;
+  --edge-out-of-scope:#e2333a;
   /* stati (validati su superficie chiara): bordo, riempimento, testo.
      I riempimenti scalano col da-farsi, ma il chiuso non e' piu' "quasi spento":
      a rgba(...,.07) su questo fondo dava 1.09 di rapporto contro la superficie e
@@ -68,9 +76,13 @@
     --edge:#2b3f4c;
     --accent:#38d1e6;
     --accent-2:#34d399;
-    --edge-in:#34d399;
-    --edge-out:#fb7185;
     --scrim:rgba(2,5,9,.6);
+    /* su fondo scuro le tinte piene sono gia' quelle degli stati: qui non c'e' da
+       scendere di luminanza, e un arco puo' portarle tali e quali */
+    --edge-frontier:#fcc200;
+    --edge-claimed:#4d9fff;
+    --edge-closed:#00e29a;
+    --edge-out-of-scope:#f87171;
     /* stati (validati su superficie scura) */
     /* Come sopra: bordi e riempimenti circa 1.3 volte il rapporto di prima. I testi
        degli stati vivi restano quelli, perche' erano gia' fra 11 e 14 di rapporto e
@@ -98,9 +110,11 @@
   --edge:#2b3f4c;
   --accent:#38d1e6;
   --accent-2:#34d399;
-  --edge-in:#34d399;
-  --edge-out:#fb7185;
   --scrim:rgba(2,5,9,.6);
+  --edge-frontier:#fcc200;
+  --edge-claimed:#4d9fff;
+  --edge-closed:#00e29a;
+  --edge-out-of-scope:#f87171;
   /* Identici a quelli della media query qui sopra, e devono restarlo: questo blocco
      vale quando il tema e' stato scelto col toggle, quello vale quando lo decide il
      sistema, e due tavole diverse darebbero alla stessa pagina due aspetti a seconda
@@ -322,15 +336,30 @@ body[data-owner] .legend .chip[data-owner]:not(.on){opacity:.5}
 .st-out-of-scope .nid{fill:var(--st-out-of-scope-tx)}
 .st-out-of-scope .ntt{fill:var(--faint)}
 
-/* archi: quelli che entrano in un nodo di frontiera prendono il colore dello
-   stato, perche' sono il lavoro che sblocca il fronte */
-path.edge{stroke:var(--edge);fill:none;
+/* archi: ognuno prende il colore dello stato del nodo da cui parte. Le frecce
+   che entrano in un blocco dicono cosi' in che stato sono le sue dipendenze
+   senza doverle cercare sulla mappa: tutte verdi vuol dire pronto, e dove non
+   lo e' si vede subito chi lo trattiene e a che punto sta.
+   Il bloccato tiene il grigio dell'arco neutro invece della propria tinta: e'
+   lo stato piu' frequente su un grafo appena aperto, e cinque colori pieni tutti
+   insieme farebbero della mappa un cavo aggrovigliato. */
+path.edge{stroke:var(--edge);fill:none;stroke-width:1.7;
   transition:opacity .15s ease,stroke .15s ease,stroke-width .15s ease}
-path.edge.feed{stroke:color-mix(in oklab,var(--st-frontier) 55%,var(--edge))}
+path.edge.da-frontier{stroke:var(--edge-frontier)}
+path.edge.da-claimed{stroke:var(--edge-claimed)}
+path.edge.da-closed{stroke:var(--edge-closed)}
+path.edge.da-out-of-scope{stroke:var(--edge-out-of-scope)}
 circle.port{fill:var(--edge);transition:fill .15s ease,opacity .15s ease}
+circle.port.da-frontier{fill:var(--edge-frontier)}
+circle.port.da-claimed{fill:var(--edge-claimed)}
+circle.port.da-closed{fill:var(--edge-closed)}
+circle.port.da-out-of-scope{fill:var(--edge-out-of-scope)}
+.tip-frontier{fill:var(--edge-frontier)}
+.tip-claimed{fill:var(--edge-claimed)}
+.tip-closed{fill:var(--edge-closed)}
+.tip-blocked{fill:var(--edge)}
+.tip-out-of-scope{fill:var(--edge-out-of-scope)}
 .tip{fill:var(--edge)}
-.tip-in{fill:var(--edge-in)}
-.tip-out{fill:var(--edge-out)}
 svg:has(.n:hover) .n{opacity:.3}
 svg:has(.n:hover) .n:hover{opacity:1}
 svg:has(.n:hover) path.edge{opacity:.12}
