@@ -18,6 +18,70 @@
     try { localStorage.setItem("atlas-theme", scelto); } catch (e) { /* file:// senza storage: il tema vale per la pagina */ }
   });
 
+  /* ---------- vista: mappa o tabella, stesso principio del tema ---------- */
+  var vista = document.querySelector(".viewmode");
+  vista.addEventListener("click", function () {
+    var tabellaOra = document.documentElement.dataset.view === "table";
+    var scelto = tabellaOra ? "map" : "table";
+    document.documentElement.dataset.view = scelto;
+    try { localStorage.setItem("atlas-view", scelto); } catch (e) { /* vale solo per questa pagina */ }
+  });
+
+  /* ---------- tabella: ordinamento per colonna ----------
+     Ogni cella porta gia' il suo valore di confronto in data-v (vedi
+     render_table.py): qui si ordina e basta, senza interpretare testo di
+     dominio. Un confronto numerico solo quando l'intera stringa e' un numero,
+     altrimenti un confronto naturale a blocchi, cosi' 'F2' precede 'F10' invece
+     di seguirlo come farebbe un confronto lessicografico puro. */
+  var NUMERO = /^-?\d+(?:\.\d+)?$/;
+  function confronta(a, b) {
+    a = a == null ? "" : String(a);
+    b = b == null ? "" : String(b);
+    if (NUMERO.test(a) && NUMERO.test(b)) return parseFloat(a) - parseFloat(b);
+    var ca = a.match(/\d+|\D+/g) || [];
+    var cb = b.match(/\d+|\D+/g) || [];
+    for (var i = 0; i < Math.max(ca.length, cb.length); i++) {
+      if (ca[i] === undefined) return -1;
+      if (cb[i] === undefined) return 1;
+      if (/^\d+$/.test(ca[i]) && /^\d+$/.test(cb[i])) {
+        var d = parseInt(ca[i], 10) - parseInt(cb[i], 10);
+        if (d) return d;
+      } else {
+        var c = ca[i].localeCompare(cb[i], undefined, { sensitivity: "base" });
+        if (c) return c;
+      }
+    }
+    return 0;
+  }
+  var gridtbl = document.querySelector(".gridtbl");
+  if (gridtbl) {
+    // Nomi non generici apposta: 'corpo' e 'tabella' sono gia' presi piu' sotto
+    // per la scheda del ticket, e 'var' in questa IIFE e' di funzione, non di
+    // blocco: un nome ripetuto avrebbe silenziosamente sovrascritto l'altro,
+    // lasciando questo tbody orfano al primo clic su un'intestazione.
+    var intestazioniTbl = Array.prototype.slice.call(gridtbl.querySelectorAll("thead th[data-col]"));
+    var corpoTbl = gridtbl.querySelector("tbody");
+    var ordinaTbl = function (indice, verso) {
+      var righeTbl = Array.prototype.slice.call(corpoTbl.querySelectorAll("tr"));
+      righeTbl.sort(function (r1, r2) {
+        var esito = confronta(r1.children[indice].dataset.v, r2.children[indice].dataset.v);
+        return verso === "desc" ? -esito : esito;
+      });
+      righeTbl.forEach(function (r) { corpoTbl.appendChild(r); });
+      intestazioniTbl.forEach(function (h) { h.removeAttribute("aria-sort"); });
+      intestazioniTbl[indice].setAttribute("aria-sort", verso === "desc" ? "descending" : "ascending");
+      gridtbl.dataset.sortCol = indice;
+      gridtbl.dataset.sortDir = verso;
+    };
+    intestazioniTbl.forEach(function (h, indice) {
+      h.addEventListener("click", function () {
+        var stessa = gridtbl.dataset.sortCol === String(indice);
+        ordinaTbl(indice, stessa && gridtbl.dataset.sortDir === "asc" ? "desc" : "asc");
+      });
+    });
+    if (intestazioniTbl.length) ordinaTbl(0, "asc");   // id crescente: ordine prevedibile alla prima apertura
+  }
+
   /* ---------- count-up del numero di avanzamento, in coppia con l'anello ----------
      Chi ha chiesto quiete vede subito il valore finale, che il markup porta gia'. */
   var pct = document.querySelector(".pct");
@@ -88,7 +152,11 @@
     var el = e.target.closest && e.target.closest("[data-copy]");
     if (!el) return;
     e.preventDefault();
-    e.stopPropagation();
+    // Immediate, non solo stopPropagation: nella tabella l'id da copiare sta
+    // dentro la riga che apre la scheda (entrambi ascoltano su document), e
+    // stopPropagation da solo non basta a fermare un ascoltatore successivo
+    // sullo stesso nodo, solo la risalita verso gli antenati.
+    e.stopImmediatePropagation();
     copiaNegliAppunti(el.dataset.copy).then(function () {
       document.querySelectorAll(".copiato").forEach(function (x) { x.classList.remove("copiato"); });
       el.classList.add("copiato");

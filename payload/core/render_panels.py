@@ -46,12 +46,15 @@ def _blocco_lista(titolo: str, voci: list[str], vuoto: str, classe: str = "blocc
     return f'<section class="{classe}"{attr}><h2>{titolo}</h2><ul>{corpo}</ul></section>'
 
 
-def _costo_numerico(testo: str) -> float | None:
+def costo_numerico(testo: str) -> float | None:
     """Primo numero dentro un costo scritto a mano, None se non ce n'e' nessuno.
 
     Il separatore decimale deve stare fra due cifre: una regex piu' larga
     matcherebbe la punteggiatura della prosa ("una sessione... .") e float()
     la rifiuterebbe, facendo saltare l'intera dashboard per un punto fermo.
+
+    Pubblica perche' la vista tabellare (render_table.py) la riusa per ordinare
+    la colonna costo: la stessa cifra deve valere la stessa cosa nei due posti.
     """
     trovato = re.search(r"\d+(?:[.,]\d+)?", testo)
     return float(trovato.group().replace(",", ".")) if trovato else None
@@ -59,7 +62,7 @@ def _costo_numerico(testo: str) -> float | None:
 
 def _blocco_costi(chiusi: list[dict]) -> str:
     con_costo = [n for n in chiusi if n.get("cost")]
-    numerici = [_costo_numerico(n["cost"]) for n in con_costo]
+    numerici = [costo_numerico(n["cost"]) for n in con_costo]
     totale = sum(v for v in numerici if v is not None)
     fuori_conteggio = sum(1 for v in numerici if v is None)
     return (

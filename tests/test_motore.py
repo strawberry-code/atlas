@@ -450,12 +450,61 @@ class Artefatti(Base):
         html = self.ref.dashboard_path.read_text(encoding="utf-8")
         self.assertIn("Una sessione lunga", html)
 
+    def _tabella(self, html: str) -> str:
+        return html.split('<div class="tablewrap">')[1].split("</table>")[0]
+
+    def test_dashboard_ha_la_vista_tabellare(self):
+        self.popola()
+        self.render_tutto()
+        html = self.ref.dashboard_path.read_text(encoding="utf-8")
+        self.assertIn('class="viewmode"', html)
+        tabella = self._tabella(html)
+        self.assertIn('class="gridtbl"', tabella)
+        self.assertEqual(8, tabella.count("<th "))
+        self.assertEqual(3, tabella.count("<tr data-node="))
+        self.assertIn('<tr data-node="F01">', tabella)
+
+    def test_tabella_regge_un_grafo_vuoto(self):
+        self.render_tutto()
+        self.assertIn('class="gridtbl"', self._tabella(self.ref.dashboard_path.read_text(encoding="utf-8")))
+
+    def test_tabella_ordina_lo_stato_per_gravita_non_per_alfabeto(self):
+        """frontier e' il primo in theme.ORDER: la cella di stato deve portare
+        quell'indice come valore di ordinamento, non il testo dell'etichetta."""
+        self.popola()
+        self.render_tutto()
+        tabella = self._tabella(self.ref.dashboard_path.read_text(encoding="utf-8"))
+        riga_f01 = tabella.split('<tr data-node="F01">')[1].split("</tr>")[0]
+        self.assertIn('data-v="0"', riga_f01)   # F01 e' in frontiera
+
+    def test_tabella_mostra_ripieghi_per_dipendenze_costo_e_assegnazione(self):
+        self.popola()
+        self.render_tutto()
+        tabella = self._tabella(self.ref.dashboard_path.read_text(encoding="utf-8"))
+        riga_f01 = tabella.split('<tr data-node="F01">')[1].split("</tr>")[0]
+        self.assertIn(self.strings.t("render.libero"), riga_f01)
+        self.assertIn(self.strings.t("render.costo_ignoto"), riga_f01)
+        self.assertIn(self.strings.t("render.tbl_non_assegnato"), riga_f01)
+        riga_f02 = tabella.split('<tr data-node="F02">')[1].split("</tr>")[0]
+        cella_dipendenze = riga_f02.rsplit("<td", 1)[1]
+        self.assertIn(">F01<", cella_dipendenze)              # F02 e' bloccato da F01
+        self.assertTrue(cella_dipendenze.startswith(' data-v="1"'),
+                        "l'ordinamento e' per numero di bloccanti, non per l'id del bloccante")
+
+    def test_tabella_mostra_chi_ha_cosa(self):
+        self.popola()
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.assign(g, "marco", ["F01"])
+        pagina = self.render.build(self.ref, self.store.load(self.ref.json_path))
+        riga_f01 = self._tabella(pagina).split('<tr data-node="F01">')[1].split("</tr>")[0]
+        self.assertIn(">marco<", riga_f01)
+
     def test_costo_numerico_estrae_solo_numeri_veri(self):
         casi = {"~40 chiamate": 40.0, "circa 1.5 ore": 1.5, "1,5 ore": 1.5,
                 "15k token": 15.0, "Una sessione... .": None, "a occhio": None}
         for testo, atteso in casi.items():
             with self.subTest(testo=testo):
-                self.assertEqual(self.render_panels._costo_numerico(testo), atteso)
+                self.assertEqual(self.render_panels.costo_numerico(testo), atteso)
 
     def prepara_lavoro(self):
         """Un nodo rivendicato in una repo git, con un file di lavoro appena scritto."""

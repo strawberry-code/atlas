@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from html import escape
 
-from . import render_owners, render_panels, render_sheet, render_svg, theme
+from . import render_owners, render_panels, render_sheet, render_svg, render_table, theme
 from .config import Graph
 from .model import claimed, frontier, progress
 from .risorse import leggi_template
@@ -27,6 +27,21 @@ def _toggle_tema() -> str:
         '<path d="M12 2.8v2.2M12 19v2.2M2.8 12h2.2M19 12h2.2M5.2 5.2l1.6 1.6M17.2 17.2l1.6 1.6'
         'M18.8 5.2l-1.6 1.6M6.8 17.2l-1.6 1.6"/></g>'
         '<g class="moon"><path d="M20 13.2A8 8 0 1 1 10.8 4a6.4 6.4 0 0 0 9.2 9.2z"/></g>'
+        '</svg></button>'
+    )
+
+
+def _toggle_vista() -> str:
+    """Mappa/tabella: l'icona mostrata e' quella della vista attiva, come per il
+    tema (vedi _toggle_tema), non del bersaglio del clic."""
+    return (
+        f'<button type="button" class="viewmode" aria-label="{escape(t("render.vista"))}">'
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">'
+        '<g class="v-map"><circle cx="5.5" cy="6" r="2.3"/><circle cx="18.5" cy="6" r="2.3"/>'
+        '<circle cx="12" cy="18" r="2.3"/><path stroke-linejoin="round" '
+        'd="M7.4 7.6l3.3 8.6M16.6 7.6l-3.3 8.6M7.8 6h8.4"/></g>'
+        '<g class="v-tbl"><rect x="3" y="4.5" width="18" height="15" rx="1"/>'
+        '<path d="M3 9.5h18M3 14.5h18M10 4.5v15"/></g>'
         '</svg></button>'
     )
 
@@ -51,7 +66,8 @@ def _topbar(ref: Graph, data: dict, front: list[dict], presi: list[dict]) -> str
         f'<header class="topbar"><div class="mark">◬</div>'
         f'<div class="ident"><h1>{escape(meta["title"])}</h1>'
         f'<p class="sub">{sottotitolo}</p></div>'
-        f'<span class="spacer"></span><div class="readouts">{readouts}</div>{_toggle_tema()}</header>'
+        f'<span class="spacer"></span><div class="readouts">{readouts}</div>'
+        f'{_toggle_vista()}{_toggle_tema()}</header>'
     )
 
 
@@ -79,17 +95,20 @@ def build(ref: Graph, data: dict) -> str:
     presi = claimed(data)
     front_ids = {n["id"] for n in front}
     gruppi = render_owners.indice(data)
-    # il tema salvato va timbrato prima del primo paint, o la pagina lampeggia
-    stampo_tema = ('<script>try{var t=localStorage.getItem("atlas-theme");'
-                   'if(t)document.documentElement.dataset.theme=t}catch(e){}</script>')
+    # tema e vista salvati vanno timbrati prima del primo paint, o la pagina lampeggia
+    stampo_prefs = ('<script>try{var t=localStorage.getItem("atlas-theme");'
+                    'if(t)document.documentElement.dataset.theme=t;'
+                    'var v=localStorage.getItem("atlas-view");'
+                    'if(v)document.documentElement.dataset.view=v}catch(e){}</script>')
     return (
         f'<!doctype html><html lang="{current()}"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         f'<title>{escape(data["meta"]["title"])} · atlas</title>'
-        f'{stampo_tema}<style>{leggi_template("dashboard.css")}</style></head><body>'
+        f'{stampo_prefs}<style>{leggi_template("dashboard.css")}</style></head><body>'
         f'{_topbar(ref, data, front, presi)}'
         f'<aside class="side">{render_panels.panels(ref, data, front, presi, gruppi)}</aside>'
         f'{_mappa(data, depth, front_ids, gruppi)}'
+        f'{render_table.table(data, front_ids)}'
         f'{render_sheet.sheet()}{render_sheet.data_island(ref, data, front_ids)}'
         f'<script>{leggi_template("dashboard.js")}</script>'
         '</body></html>'
