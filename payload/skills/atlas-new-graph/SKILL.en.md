@@ -14,7 +14,7 @@ Ask the user, with AskUserQuestion, one single thing:
 - **Do they already have a text?** A document, a task list, meeting notes, an issue, a roadmap. In that case the work is translation, and you move to Branch A.
 - **Or is there just an idea?** Then the map needs to be traced, and you move to Branch B.
 
-Also ask for the graph's **slug** (kebab-case, e.g. `epic-auth`) and its **title**, if not already given. If the project already has graphs, show them with `atlas graphs`: maybe the work belongs to one of those.
+Also ask for the graph's **technical name** (kebab-case, e.g. `epic-auth`) and its **title**, if not already given: `atlas new` prefixes it with the creation date on its own (`YYMMDD-epic-auth`), so the name alone is enough, no date needed. If the project already has graphs, show them with `atlas graphs`: maybe the work belongs to one of those.
 
 ## Branch A — there's a text
 

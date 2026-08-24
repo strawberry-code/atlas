@@ -76,4 +76,4 @@ An assignment is not the lock and does not replace it: it says whose piece of wo
 
 ### Multiple graphs
 
-One graph per epic, each isolated in `.atlas/graphs/<slug>/` with its own map and its own dashboard. The switch is up to whoever's working: `atlas use <slug>`, or `-g/--graph <slug>` on the single command, which works both before and after the command itself. The slug does not go where the command goes: `atlas <slug> render` doesn't exist.
+One graph per epic, each isolated in `.atlas/graphs/<slug>/` with its own map and its own dashboard. `atlas new <name>` prefixes the creation date to the technical name you give it on its own (`<name>` becomes `YYMMDD-<name>`): the real slug is that one, not the one passed on the command line. The switch is up to whoever's working: `atlas use <slug>`, or `-g/--graph <slug>` on the single command, which works both before and after the command itself. The slug does not go where the command goes: `atlas <slug> render` doesn't exist.

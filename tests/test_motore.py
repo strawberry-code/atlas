@@ -1044,10 +1044,10 @@ class ScegliereIlGrafo(Base):
         parser = cli.build_parser()
         errori = io.StringIO()
         with contextlib.redirect_stderr(errori), self.assertRaises(SystemExit):
-            parser.parse_args(["prova", "render"])
+            parser.parse_args([self.ref.slug, "render"])
         uscita = errori.getvalue()
-        self.assertIn("-g prova", uscita)
-        self.assertIn("atlas use prova", uscita)
+        self.assertIn(f"-g {self.ref.slug}", uscita)
+        self.assertIn(f"atlas use {self.ref.slug}", uscita)
 
     def test_un_refuso_non_riceve_il_consiglio_sbagliato(self):
         from core import cli
@@ -1446,26 +1446,39 @@ class PiuGrafi(Base):
     def test_grafi_isolati(self):
         self.popola()
         altro = self.mutate.create_graph(self.ws, "secondo", "Secondo", "Altra meta.")
-        self.assertEqual(["prova", "secondo"], self.ws.slugs())
+        self.assertEqual([self.ref.slug, altro.slug], self.ws.slugs())
         self.assertEqual(0, len(self.store.load(altro.json_path)["nodes"]))
         self.assertNotEqual(self.ref.dashboard_path, altro.dashboard_path)
 
     def test_selezione_del_grafo_attivo(self):
-        self.mutate.create_graph(self.ws, "secondo", "Secondo", "Altra meta.")
+        altro = self.mutate.create_graph(self.ws, "secondo", "Secondo", "Altra meta.")
         with self.assertRaises(self.config.ConfigError):
             self.ws.graph()
-        self.ws.pin("secondo")
-        self.assertEqual("secondo", self.ws.graph().slug)
-        os.environ["ATLAS_GRAPH"] = "prova"
+        self.ws.pin(altro.slug)
+        self.assertEqual(altro.slug, self.ws.graph().slug)
+        os.environ["ATLAS_GRAPH"] = self.ref.slug
         try:
-            self.assertEqual("prova", self.ws.graph().slug)
+            self.assertEqual(self.ref.slug, self.ws.graph().slug)
         finally:
             os.environ.pop("ATLAS_GRAPH")
-        self.assertEqual("prova", self.ws.graph("prova").slug)
+        self.assertEqual(self.ref.slug, self.ws.graph(self.ref.slug).slug)
 
     def test_slug_inesistente(self):
         with self.assertRaises(self.config.ConfigError):
             self.ws.graph("mai-esistito")
+
+    def test_ogni_grafo_nuovo_porta_la_data_di_creazione_nel_nome(self):
+        """YYMMDD-<nome-tecnico>: il prefisso lo mette il motore, non chi chiama."""
+        oggi = datetime.now().strftime("%y%m%d")
+        self.assertEqual(f"{oggi}-prova", self.ref.slug)
+        self.assertEqual(f"{oggi}-prova", self.store.load(self.ref.json_path)["meta"]["slug"])
+
+    def test_il_nome_tecnico_si_normalizza_in_kebab_case(self):
+        """Spazi, maiuscole e punteggiatura scritti a mano non devono finire nel
+        nome di una cartella: solo lettere minuscole, cifre e trattini singoli."""
+        strano = self.mutate.create_graph(self.ws, "  Nome Tecnico!! ", "Strano", "Verificare la normalizzazione.")
+        oggi = datetime.now().strftime("%y%m%d")
+        self.assertEqual(f"{oggi}-nome-tecnico", strano.slug)
 
 
 class PromozioneDallaNebbia(Base):
@@ -1569,7 +1582,7 @@ class HowTo(Base):
         self.assertIn("usage: atlas", uscita)                    # l'help di argparse, passato da cli
         self.assertIn("mutate.add_node(g,", uscita)
         self.assertIn("atlas-work:", uscita)                     # le skill installate
-        self.assertIn(".atlas/graphs/prova/tickets", uscita)     # i path, relativi al progetto
+        self.assertIn(f".atlas/graphs/{self.ref.slug}/tickets", uscita)  # i path, relativi al progetto
         for n in range(1, 7):
             self.assertIn(f"─── {n}.", uscita)
 
@@ -1602,7 +1615,7 @@ class HowTo(Base):
 
     def test_regge_un_progetto_senza_grafi(self):
         vuoto = self.config.Workspace(self.root)
-        (self.root / "graphs" / "prova").rename(self.root / "prova-messo-via")
+        (self.root / "graphs" / self.ref.slug).rename(self.root / "prova-messo-via")
         uscita = self.stampa()
         self.assertIn("nessun grafo ancora", uscita)
         self.assertEqual([], vuoto.slugs())

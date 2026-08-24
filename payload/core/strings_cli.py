@@ -54,6 +54,10 @@ STRINGS: dict[str, dict[str, str]] = {
     "help.render": {"it": "rigenera ticket, mappa e dashboard",
                     "en": "regenerates tickets, map and dashboard"},
     "help.new": {"it": "crea un grafo nuovo", "en": "creates a new graph"},
+    "help.new_slug": {"it": "nome tecnico del grafo, in kebab-case (la data di creazione "
+                            "viene anteposta in automatico: YYMMDD-nome)",
+                      "en": "technical name of the graph, kebab-case (the creation date "
+                            "is prefixed automatically: YYMMDD-name)"},
     "default.destination": {"it": "Da scrivere: dove si arriva quando questo grafo è finito.",
                              "en": "To be written: where this graph leads when it's done."},
     "help.new_script": {"it": "crea uno script di mutazione numerato",

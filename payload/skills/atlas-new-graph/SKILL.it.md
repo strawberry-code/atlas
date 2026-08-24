@@ -14,7 +14,7 @@ Chiedi all'utente, con AskUserQuestion, una cosa sola:
 - **Ha già un testo?** Un documento, una lista di task, note di una riunione, un issue, una roadmap. In quel caso il lavoro è tradurre, e passi al ramo A.
 - **Oppure c'è solo un'idea?** Allora la mappa va tracciata, e passi al ramo B.
 
-Chiedi anche lo **slug** del grafo (kebab-case, es. `epic-auth`) e il **titolo**, se non li ha già detti. Se il progetto ha già dei grafi, mostraglieli con `atlas graphs`: forse il lavoro appartiene a uno di quelli.
+Chiedi anche il **nome tecnico** del grafo (kebab-case, es. `epic-auth`) e il **titolo**, se non li ha già detti: `atlas new` vi antepone da solo la data di creazione (`YYMMDD-epic-auth`), quindi basta il nome, senza data. Se il progetto ha già dei grafi, mostraglieli con `atlas graphs`: forse il lavoro appartiene a uno di quelli.
 
 ## Ramo A — c'è un testo
 

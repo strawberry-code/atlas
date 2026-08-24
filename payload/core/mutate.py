@@ -7,6 +7,8 @@ dover sapere che il meccanismo abita altrove.
 """
 from __future__ import annotations
 
+import re
+
 from .assign import assign, nome_persona, unassign    # noqa: F401  (superficie per gli script)
 from .config import Graph, Workspace
 from .editor import Editor, editing, now, validate    # noqa: F401  (superficie per gli script)
@@ -139,9 +141,25 @@ def note_add(g: Editor, line: str) -> None:
 
 # --- nascita di un grafo ---------------------------------------------------
 
+def _slug_tecnico(testo: str) -> str:
+    """Normalizza un nome libero in kebab-case minuscolo: la parte tecnica dello
+    slug del grafo, quella scelta da chi lo crea, prima del prefisso di data."""
+    pezzo = re.sub(r"[^a-z0-9]+", "-", testo.lower()).strip("-")
+    return pezzo or "grafo"
+
+
+def _slug_datato(slug: str) -> str:
+    """YYMMDD-<nome-tecnico>: la data e' quella di creazione, sempre aggiunta da
+    qui e mai lasciata a chi chiama, cosi' ogni grafo nasce gia' ordinabile per
+    quando e' nato anche solo guardando i nomi delle cartelle."""
+    istante = now()
+    return f"{istante[2:4]}{istante[5:7]}{istante[8:10]}-{_slug_tecnico(slug)}"
+
+
 def create_graph(ws: Workspace, slug: str, title: str, destination: str,
                  branches: dict[str, dict] | None = None,
                  notes: list[str] | None = None) -> Graph:
+    slug = _slug_datato(slug)
     ref = Graph(ws, slug)
     if ref.exists():
         raise StateError(t("mutate.grafo_esiste", slug=slug, dir=ref.dir))

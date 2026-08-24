@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -35,6 +36,12 @@ _config_sandbox: Path | None = None
 def verifica(condizione: bool, cosa: str) -> None:
     esiti.append((bool(condizione), cosa))
     print(f"  {'ok  ' if condizione else 'ROTTO'} {cosa}")
+
+
+def datato(nome: str) -> str:
+    """La stessa trasformazione di mutate._slug_datato: 'atlas new <nome>' crea
+    davvero YYMMDD-<nome>, quindi ogni path costruito qui deve passarci."""
+    return f"{datetime.now().strftime('%y%m%d')}-{nome}"
 
 
 def payload_pyc() -> list[str]:
@@ -118,7 +125,7 @@ def main() -> int:
 
         shutil.copyfile(FIXTURE, radice / "scripts" / "001-grafo-di-prova.py")
         locale(target, "exec", ".atlas/scripts/001-grafo-di-prova.py")
-        grafo = json.loads((radice / "graphs" / "epic-test" / "graph.json").read_text(encoding="utf-8"))
+        grafo = json.loads((radice / "graphs" / datato("epic-test") / "graph.json").read_text(encoding="utf-8"))
         verifica(len(grafo["nodes"]) == 12, "script di mutazione applicato")
 
         uscita = locale(target, "status").stdout
@@ -133,10 +140,10 @@ def main() -> int:
         verifica(locale(target, "claim", "F02").returncode == 1, "un nodo per sessione")
         verifica(locale(target, "close", "F01", "-s", "x").returncode == 1, "close senza Risposta rifiutato")
 
-        ticket = radice / "graphs" / "epic-test" / "tickets" / "F01.md"
+        ticket = radice / "graphs" / datato("epic-test") / "tickets" / "F01.md"
         ticket.write_text(ticket.read_text(encoding="utf-8") + "\nLa risposta, scritta.\n", encoding="utf-8")
         verifica(locale(target, "close", "F01", "-s", "così si è deciso").returncode == 0, "close accettato")
-        mappa = (radice / "graphs" / "epic-test" / "map.md").read_text(encoding="utf-8")
+        mappa = (radice / "graphs" / datato("epic-test") / "map.md").read_text(encoding="utf-8")
         verifica("così si è deciso" in mappa, "decisione registrata in map.md")
         verifica("F03" in locale(target, "status").stdout, "la frontiera è avanzata")
 
@@ -156,7 +163,7 @@ def main() -> int:
         verifica("manca il suono dei passi" in nebbia and "F03" in nebbia,
                  "fog --list mostra la voce col destinatario")
 
-        ticket_f03 = (radice / "graphs" / "epic-test" / "tickets" / "F03.md").read_text(encoding="utf-8-sig")
+        ticket_f03 = (radice / "graphs" / datato("epic-test") / "tickets" / "F03.md").read_text(encoding="utf-8-sig")
         verifica("<!-- /atlas:auto -->" in ticket_f03, "il ticket nasce col confine fra parte generata e prosa")
 
         briefing = locale(target, "how-to").stdout
@@ -166,12 +173,12 @@ def main() -> int:
         verifica(all(f"─── {n}." in briefing for n in range(1, 7)), "how-to ha tutte e sei le sezioni")
 
         locale(target, "new", "epic-secondo", "-t", "Secondo stream")
-        verifica((radice / "graphs" / "epic-secondo" / "graph.json").is_file(), "secondo grafo creato")
-        verifica("epic-test" in locale(target, "-g", "epic-test", "status").stdout, "override con --graph")
-        verifica(len(json.loads((radice / "graphs" / "epic-secondo" / "graph.json")
+        verifica((radice / "graphs" / datato("epic-secondo") / "graph.json").is_file(), "secondo grafo creato")
+        verifica("epic-test" in locale(target, "-g", datato("epic-test"), "status").stdout, "override con --graph")
+        verifica(len(json.loads((radice / "graphs" / datato("epic-secondo") / "graph.json")
                                 .read_text(encoding="utf-8"))["nodes"]) == 0, "i due grafi restano isolati")
 
-        html = (radice / "graphs" / "epic-test" / "dashboard.html").read_text(encoding="utf-8")
+        html = (radice / "graphs" / datato("epic-test") / "dashboard.html").read_text(encoding="utf-8")
         verifica(" src=" not in html and "<link" not in html and "cdn" not in html,
                  "dashboard senza risorse remote: stile, script e ticket viaggiano inline")
         verifica("è" in html and "Ã" not in html, "accenti resi bene nella dashboard")
@@ -184,19 +191,19 @@ def main() -> int:
         verifica(esito.returncode == 0, "reinstallare su un progetto vivo va a buon fine")
         verifica((radice / "config.json").read_text(encoding="utf-8") == prima,
                  "reinstall: config intatta")
-        verifica(len(json.loads((radice / "graphs" / "epic-test" / "graph.json")
+        verifica(len(json.loads((radice / "graphs" / datato("epic-test") / "graph.json")
                                 .read_text(encoding="utf-8"))["nodes"]) == 12,
                  "reinstall: grafi intatti")
         verifica((target / "CLAUDE.md").read_text(encoding="utf-8").count("atlas:begin") == 1,
                  "reinstall: contratto non duplicato")
 
-        dashboard = radice / "graphs" / "epic-test" / "dashboard.html"
+        dashboard = radice / "graphs" / datato("epic-test") / "dashboard.html"
         dashboard.unlink()
         esito = locale(target, "render", "--all")
         verifica(esito.returncode == 0 and dashboard.is_file(), "'render --all' rigenera le dashboard")
         verifica("2" in esito.stdout, "render --all: dice quanti grafi ha rigenerato")
 
-        mappa_it_prima = (radice / "graphs" / "epic-test" / "map.md").read_text(encoding="utf-8")
+        mappa_it_prima = (radice / "graphs" / datato("epic-test") / "map.md").read_text(encoding="utf-8")
         esito = locale(target, "lang", "en")
         verifica(esito.returncode == 0, "'atlas lang en' dentro il progetto va a buon fine")
         verifica(json.loads((radice / "config.json").read_text(encoding="utf-8"))["language"] == "en",
@@ -206,12 +213,12 @@ def main() -> int:
                  "lang en: SKILL.md rigenerato in inglese")
         verifica("the graph runs the work" in (radice / "CONTRACT.md").read_text(encoding="utf-8"),
                  "lang en: CONTRACT.md rigenerato in inglese")
-        verifica((radice / "graphs" / "epic-test" / "map.md").read_text(encoding="utf-8") == mappa_it_prima,
+        verifica((radice / "graphs" / datato("epic-test") / "map.md").read_text(encoding="utf-8") == mappa_it_prima,
                  "lang en: map.md di un grafo preesistente resta invariato (intestazioni italiane)")
 
         locale(target, "new", "epic-en", "-t", "English stream", "-d", "Ships in English.")
-        ticket_nuovo = radice / "graphs" / "epic-en" / "tickets"
-        locale(target, "-g", "epic-en", "render")
+        ticket_nuovo = radice / "graphs" / datato("epic-en") / "tickets"
+        locale(target, "-g", datato("epic-en"), "render")
         verifica(ticket_nuovo.is_dir() and not any(ticket_nuovo.iterdir()),
                  "lang en: nuovo grafo senza nodi, nessun ticket da creare")
 
@@ -246,7 +253,7 @@ def verifica_install_in_inglese() -> None:
             encoding="utf-8",
         )
         locale(target, "exec", f".atlas/scripts/{script.name}")
-        ticket = (radice / "graphs" / "demo" / "tickets" / "F01.md").read_text(encoding="utf-8")
+        ticket = (radice / "graphs" / datato("demo") / "tickets" / "F01.md").read_text(encoding="utf-8")
         verifica("## Question" in ticket and "## Domanda" not in ticket,
                  "install --lang en: il primo ticket usa le intestazioni inglesi")
     finally:
@@ -269,7 +276,7 @@ def verifica_migrazione_dal_motore_a_sorgenti() -> None:
         subprocess.run(["git", "init", "-q"], cwd=target, check=True)
         globale(target, "install", str(target), "--yes", "--graph", "epic-test", env=env)
         radice = target / ".atlas"
-        grafo = radice / "graphs" / "epic-test" / "graph.json"
+        grafo = radice / "graphs" / datato("epic-test") / "graph.json"
         prima = grafo.read_text(encoding="utf-8")
 
         vecchio_core = radice / "core"
@@ -310,7 +317,7 @@ def verifica_uninstall() -> None:
         verifica(esito.returncode == 0, "uninstall va a buon fine")
         verifica(not (radice / "skills").exists() and not (radice / "CONTRACT.md").exists(),
                  "uninstall: quel che aveva scritto Atlas non c'e' piu'")
-        verifica((radice / "graphs" / "epic-test" / "graph.json").is_file(),
+        verifica((radice / "graphs" / datato("epic-test") / "graph.json").is_file(),
                  "uninstall: i dati del progetto restano")
         verifica((radice / "config.json").is_file(), "uninstall: config.json resta")
         verifica(not (target / ".claude" / "skills" / "atlas-work").exists(),
@@ -432,7 +439,7 @@ def verifica_file_rotti() -> None:
         subprocess.run(["git", "init", "-q"], cwd=target, check=True)
         globale(target, "install", str(target), "--yes", "--graph", "epic-test", env=env)
 
-        grafo = target / ".atlas" / "graphs" / "epic-test" / "graph.json"
+        grafo = target / ".atlas" / "graphs" / datato("epic-test") / "graph.json"
         grafo.write_text('{"nodes": [', encoding="utf-8")
         esito = globale(target, "validate", env=env)
         verifica("Traceback" not in esito.stderr and "graph.json" in esito.stderr,
@@ -440,7 +447,7 @@ def verifica_file_rotti() -> None:
         esito = globale(target, "doctor", env=env)
         verifica("Traceback" not in esito.stderr and "graph.json" in esito.stdout,
                  "grafo rotto: doctor lo diagnostica")
-        grafo.write_text('{"meta": {"slug": "epic-test"}, "nodes": []}', encoding="utf-8")
+        grafo.write_text(json.dumps({"meta": {"slug": datato("epic-test")}, "nodes": []}), encoding="utf-8")
 
         (target / ".atlas" / "config.json").write_text("{ rotto", encoding="utf-8")
         esito = globale(target, "status", env=env)
@@ -558,7 +565,7 @@ def verifica_scrittura_e_conflitti() -> None:
         radice = target / ".atlas"
         shutil.copyfile(FIXTURE, radice / "scripts" / "001-grafo-di-prova.py")
         locale(target, "exec", ".atlas/scripts/001-grafo-di-prova.py")
-        grafo = radice / "graphs" / "epic-test" / "graph.json"
+        grafo = radice / "graphs" / datato("epic-test") / "graph.json"
 
         verifica(grafo.with_name("graph.json.lock").is_file(),
                  "il lock vive su un file dedicato accanto al grafo")
@@ -572,7 +579,7 @@ def verifica_scrittura_e_conflitti() -> None:
         verifica(tracciato.returncode != 0, "il grafo invece resta versionato")
 
         locale(target, "claim", "F01")
-        ticket = radice / "graphs" / "epic-test" / "tickets" / "F01.md"
+        ticket = radice / "graphs" / datato("epic-test") / "tickets" / "F01.md"
         ticket.write_text(ticket.read_text(encoding="utf-8").replace(
             "## Risposta", "## Risposta\n\nUna risposta scritta guardando la domanda di prima."),
             encoding="utf-8")

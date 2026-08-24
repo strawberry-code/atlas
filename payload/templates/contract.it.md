@@ -76,4 +76,4 @@ L'assegnazione non è il lucchetto e non lo sostituisce: dice di chi è quel pez
 
 ### Più grafi
 
-Un grafo per epic, ciascuno isolato in `.atlas/graphs/<slug>/` con la sua mappa e la sua dashboard. Lo switch è a carico di chi lavora: `atlas use <slug>`, oppure `-g/--graph <slug>` sul singolo comando, che vale sia prima sia dopo il comando stesso. Lo slug non si scrive al posto del comando: `atlas <slug> render` non esiste.
+Un grafo per epic, ciascuno isolato in `.atlas/graphs/<slug>/` con la sua mappa e la sua dashboard. `atlas new <nome>` antepone da solo la data di creazione al nome tecnico che dai (`<nome>` diventa `YYMMDD-<nome>`): lo slug vero è quello, non quello passato sulla riga di comando. Lo switch è a carico di chi lavora: `atlas use <slug>`, oppure `-g/--graph <slug>` sul singolo comando, che vale sia prima sia dopo il comando stesso. Lo slug non si scrive al posto del comando: `atlas <slug> render` non esiste.

@@ -122,16 +122,16 @@ Altre funzioni: `edit_node`, `link`, `unlink`, `drop` (fuori scopo), `remove_nod
 
 ## Più grafi
 
-Uno per epic, isolati.
+Uno per epic, isolati. `atlas new` prende un nome tecnico e vi antepone da solo la data di creazione: `altro-epic` diventa `YYMMDD-altro-epic`, così ogni grafo si ordina per quando è nato già dal nome della cartella.
 
 ```bash
-atlas new altro-epic -t "Titolo" -d "Dove si arriva."
-atlas graphs
-atlas use altro-epic       # rende attivo un grafo, una volta sola
-atlas render -g altro-epic # oppure si sceglie sul singolo comando
+atlas new altro-epic -t "Titolo" -d "Dove si arriva."   # crea YYMMDD-altro-epic
+atlas graphs                                             # elenca lo slug vero, data compresa
+atlas use YYMMDD-altro-epic       # rende attivo un grafo, una volta sola
+atlas render -g YYMMDD-altro-epic # oppure si sceglie sul singolo comando
 ```
 
-Lo slug non si scrive al posto del comando: `atlas altro-epic render` non esiste. `-g/--graph` vale sia prima sia dopo il comando (`atlas -g altro-epic render` e `atlas render -g altro-epic` sono la stessa cosa), e `ATLAS_GRAPH=<slug>` fa lo stesso per tutta la shell.
+Lo slug non si scrive al posto del comando: `atlas YYMMDD-altro-epic render` non esiste. `-g/--graph` vale sia prima sia dopo il comando (`atlas -g YYMMDD-altro-epic render` e `atlas render -g YYMMDD-altro-epic` sono la stessa cosa), e `ATLAS_GRAPH=<slug>` fa lo stesso per tutta la shell.
 
 ## Le due skill
 

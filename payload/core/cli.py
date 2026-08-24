@@ -58,9 +58,9 @@ def commit(ws: Workspace, ref, node: dict, tipo: str) -> None:
 
 def cmd_new(ws: Workspace, args) -> int:
     ref = mutate.create_graph(ws, args.slug, args.title, args.destination)
-    ws.pin(args.slug)
+    ws.pin(ref.slug)
     refresh(ref, load(ref.json_path))
-    print(t("new.creato", slug=args.slug, dir=ref.dir))
+    print(t("new.creato", slug=ref.slug, dir=ref.dir))
     print(t("new.suggerimento"))
     return 0
 
@@ -304,7 +304,7 @@ def aggiungi_comandi(sub) -> None:
     p.add_argument("--all", dest="tutti", action="store_true", help=t("help.render_all")); _grafo(p)
 
     p = sub.add_parser("new", help=t("help.new"))
-    p.add_argument("slug"); p.add_argument("-t", "--title", required=True)
+    p.add_argument("slug", help=t("help.new_slug")); p.add_argument("-t", "--title", required=True)
     p.add_argument("-d", "--destination", default=t("default.destination"))
     p = sub.add_parser("new-script", help=t("help.new_script"))
     p.add_argument("nome")

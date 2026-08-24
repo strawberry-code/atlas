@@ -124,16 +124,16 @@ Other functions: `edit_node`, `link`, `unlink`, `drop` (out of scope), `remove_n
 
 ## Multiple graphs
 
-One per epic, isolated.
+One per epic, isolated. `atlas new` takes a technical name and prefixes it with the creation date on its own — `other-epic` becomes `YYMMDD-other-epic` — so every graph sorts by when it was born just by its folder name.
 
 ```bash
-atlas new other-epic -t "Title" -d "Where it lands."
-atlas graphs
-atlas use other-epic       # makes a graph active, once
-atlas render -g other-epic # or pick it on the single command
+atlas new other-epic -t "Title" -d "Where it lands."     # creates YYMMDD-other-epic
+atlas graphs                                              # lists the real slug, date included
+atlas use YYMMDD-other-epic       # makes a graph active, once
+atlas render -g YYMMDD-other-epic # or pick it on the single command
 ```
 
-The slug does not go where the command goes: `atlas other-epic render` doesn't exist. `-g/--graph` works both before and after the command (`atlas -g other-epic render` and `atlas render -g other-epic` are the same thing), and `ATLAS_GRAPH=<slug>` does the same for the whole shell.
+The slug does not go where the command goes: `atlas YYMMDD-other-epic render` doesn't exist. `-g/--graph` works both before and after the command (`atlas -g YYMMDD-other-epic render` and `atlas render -g YYMMDD-other-epic` are the same thing), and `ATLAS_GRAPH=<slug>` does the same for the whole shell.
 
 ## The two skills
 
