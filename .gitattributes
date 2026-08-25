@@ -1,0 +1,2 @@
+# Atlas: merge driver per i grafi
+.atlas/graphs/*/graph.json merge=atlas-graph
