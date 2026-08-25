@@ -131,8 +131,16 @@ class Dispatch(unittest.TestCase):
         self.fixture = Fixture({})
         self.fixture.start()
         os.environ["ATLAS_UPDATE_BASE_URL"] = self.fixture.base_url
+        # Isola la posizione, per la stessa ragione per cui si isola il registro:
+        # 'lang' senza --global agisce sul progetto sotto la cwd, e la suite gira
+        # dentro il repo, che da quando Atlas e' installato su se' stesso e' un
+        # progetto Atlas. Senza questo il test riscriveva il CLAUDE.md del repo e
+        # ne cambiava la lingua, continuando a passare.
+        self.cwd = Path.cwd()
+        os.chdir(self.home)
 
     def tearDown(self):
+        os.chdir(self.cwd)
         self.fixture.stop()
         os.environ.pop("ATLAS_UPDATE_BASE_URL", None)
         os.environ.pop("ATLAS_CONFIG", None)
@@ -150,6 +158,18 @@ class Dispatch(unittest.TestCase):
         self.assertEqual(0, dispatch.main(["lang", "en"]))
         self.assertEqual("en", registry.language_for())
         self.assertEqual(0, dispatch.main(["lang"]))
+
+    def test_lang_senza_global_tocca_il_progetto_non_il_default(self):
+        """La distinzione la fa il flag, non la posizione: dentro un progetto 'lang'
+        cambia quel progetto e lascia stare il default della macchina."""
+        progetto = self.home / "ospite"
+        (progetto / ".atlas" / "skills").mkdir(parents=True)
+        (progetto / ".atlas" / "config.json").write_text('{"language": "it"}', encoding="utf-8")
+        os.chdir(progetto)
+        self.assertEqual(0, dispatch.main(["lang", "en"]))
+        dati = json.loads((progetto / ".atlas" / "config.json").read_text(encoding="utf-8"))
+        self.assertEqual("en", dati["language"])
+        self.assertEqual("it", registry.language_for())   # il default globale resta fermo
 
     def test_progetto_qui_risale_le_cartelle(self):
         """La firma di un progetto e' config.json: i dati, non il motore, che dalla
