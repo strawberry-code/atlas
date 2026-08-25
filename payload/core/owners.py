@@ -54,23 +54,26 @@ def owners(data: dict) -> dict[str, list[str]]:
     return {nome: mappa[nome] for nome in sorted(mappa, key=chiave_nome)}
 
 
-def squadre(data: dict) -> dict[tuple[str, ...], list[str]]:
-    """Le combinazioni di due o piu' persone che almeno un nodo ha davvero, coi
-    suoi nodi. Ordinate come i nomi che le compongono.
+def insiemi(data: dict) -> dict[tuple[str, ...], list[str]]:
+    """Gli insiemi di assegnatari che almeno un nodo ha davvero, coi suoi nodi.
 
-    Un nodo congiunto continua a comparire anche sotto ogni singola persona in
-    owners(): la squadra non sostituisce le righe individuali, le affianca.
-    Senza, il pannello mostra tre nomi e chi guarda non sa dire se lavorano
-    insieme o su nodi diversi, che e' proprio l'informazione che il campo owner
-    a vettore ha reso rappresentabile.
+    L'insieme, non la persona, e' l'unita' con cui la dashboard raggruppa: un
+    nodo di due persone appartiene alla coppia e a nessuno dei due singoli,
+    altrimenti filtrando su un nome si accendono anche i nodi in cui quel nome
+    e' solo uno dei partecipanti, e non si vede piu' chi lavora da solo.
+    Chi ha nodi solo dentro una squadra non compare fra i singoli: non avrebbe
+    niente da accendere.
+
+    Prima i singoli in ordine di nome, poi le squadre: nella legenda si cercano
+    le persone, e le combinazioni sono la coda naturale di quell'elenco.
     """
     mappa: dict[tuple[str, ...], list[str]] = {}
     for node in data["nodes"]:
-        nomi = tuple(owners_of(node))
-        if len(nomi) > 1:
+        if nomi := tuple(owners_of(node)):
             mappa.setdefault(nomi, []).append(node["id"])
-    return {nomi: mappa[nomi]
-            for nomi in sorted(mappa, key=lambda gruppo: [chiave_nome(n) for n in gruppo])}
+    ordine = sorted(mappa, key=lambda gruppo: (len(gruppo) > 1,
+                                               [chiave_nome(n) for n in gruppo]))
+    return {nomi: mappa[nomi] for nomi in ordine}
 
 
 def unowned(data: dict) -> list[str]:

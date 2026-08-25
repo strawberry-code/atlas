@@ -1385,18 +1385,29 @@ class Assegnazioni(Base):
                          "unowned non conta i nodi condivisi")
 
     def test_il_nodo_condiviso_nella_dashboard(self):
-        """La resa di un nodo con piu' persone: gli indici nel SVG, i nomi nella
+        """La resa di un nodo con piu' persone: l'indice nel SVG, i nomi nella
         tabella, la lista nel JSON della scheda."""
         self.popola_due_rami()
         with self.mutate.editing(self.ref) as g:
             self.mutate.assign(g, "anna,marco", ["F01"])
+            self.mutate.assign(g, "marco", ["F02"])
         pagina = self.render.build(self.ref, self.store.load(self.ref.json_path))
 
-        self.assertIn('data-owners="1 2 3"', pagina,
-                      "il nodo condiviso porta le sue persone e la loro squadra")
         pannello = pagina.split(">assegnazioni<")[1].split("</section>")[0]
-        self.assertIn('<li data-owner="3">anna + marco<span class="tag">1</span>', pannello,
+        self.assertIn('<li data-owner="1"><b>marco</b><span class="tag">1</span>', pannello,
+                      "marco conta il nodo suo soltanto, non quello condiviso")
+        self.assertNotIn("anna<", pannello,
+                         "anna non ha nodi suoi soltanto, quindi non ha una riga sua")
+        self.assertIn('<li data-owner="2">anna + marco<span class="tag">1</span>', pannello,
                       "la squadra e' una riga sua, dopo le persone")
+
+        # la card di un nodo, sulla mappa, porta l'indice del suo insieme e uno solo
+        card_f01 = pagina.split('tickets/F01.md" data-node="F01"')[1][:400]
+        card_f02 = pagina.split('tickets/F02.md" data-node="F02"')[1][:400]
+        self.assertIn('data-owners="2"', card_f01,
+                      "il nodo condiviso porta il solo indice della squadra")
+        self.assertIn('data-owners="1"', card_f02,
+                      "il nodo di una persona sola porta il suo indice")
 
         tabella = pagina.split('<div class="tablewrap">')[1].split("</table>")[0]
         riga_f01 = tabella.split('<tr data-node="F01">')[1].split("</tr>")[0]

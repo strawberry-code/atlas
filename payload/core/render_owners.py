@@ -9,13 +9,14 @@ componga il foglio di stile della pagina.
 Le persone non hanno un colore proprio: sulla mappa il colore porta lo stato e
 il bordo porta il ramo, e una terza scala cromatica renderebbe illeggibili le
 prime due. Chi ha cosa si legge dal filtro e dal pannello, che accendono i nodi
-di una persona sola.
+di un insieme di assegnatari alla volta: una persona sola, oppure la squadra
+esatta che quel nodo ha.
 """
 from __future__ import annotations
 
 from html import escape
 
-from .model import owners, owners_of, squadre
+from .model import insiemi, owners_of
 from .strings import t
 
 NESSUNO = 0    # i nodi senza assegnatario stanno tutti nello stesso gruppo
@@ -23,31 +24,27 @@ SEPARATORE = " + "    # una squadra si legge come i suoi nomi uniti; il '+' nei 
 
 
 def voci(data: dict) -> list[tuple[str, list[str]]]:
-    """Le righe delle assegnazioni, etichetta e nodi: prima le persone, poi le
-    squadre. Una sola fonte per il pannello, i chip e gli indici, perche' le tre
-    cose devono numerare le stesse righe nello stesso ordine."""
-    righe = list(owners(data).items())
-    righe += [(SEPARATORE.join(nomi), ids) for nomi, ids in squadre(data).items()]
-    return righe
+    """Le righe delle assegnazioni, etichetta e nodi, nell'ordine di insiemi().
+    Una sola fonte per il pannello, i chip e gli indici, perche' le tre cose
+    devono numerare le stesse righe nello stesso ordine."""
+    return [(SEPARATORE.join(nomi), ids) for nomi, ids in insiemi(data).items()]
 
 
 def indice(data: dict) -> dict[str, int]:
-    """etichetta -> indice stabile a partire da 1, nell'ordine di voci().
-
-    Persone e squadre stanno nello stesso spazio di indici: un nodo congiunto ne
-    porta piu' d'uno in data-owners, e il filtro esistente accende la squadra
-    senza una regola CSS in piu'."""
+    """etichetta -> indice stabile a partire da 1, nell'ordine di voci()."""
     return {etichetta: i for i, (etichetta, _) in enumerate(voci(data), start=1)}
 
 
 def gruppi(node: dict, idx: dict[str, int]) -> str:
-    """Gli indici del nodo separati da uno spazio, '0' se non e' assegnato: le sue
-    persone, piu' la sua squadra se ne ha una."""
-    nomi = owners_of(node)
-    indici = [idx[nome] for nome in nomi if nome in idx]
-    if len(nomi) > 1 and (squadra := SEPARATORE.join(nomi)) in idx:
-        indici.append(idx[squadra])
-    return " ".join(str(i) for i in indici) or str(NESSUNO)
+    """L'indice dell'insieme a cui il nodo appartiene, '0' se non e' assegnato.
+
+    Uno solo, perche' un nodo sta in un insieme e in nessun altro: e' quel che
+    rende il filtro leggibile, dato che il chip di una persona accende i suoi
+    nodi soltanto e non quelli in cui e' uno dei partecipanti. Resta un attributo
+    a lista (data-owners, selettori con ~=) perche' la resa non deve cambiare
+    forma ogni volta che cambia il criterio di raggruppamento.
+    """
+    return str(idx.get(SEPARATORE.join(owners_of(node)), NESSUNO))
 
 
 def css(idx: dict[str, int]) -> str:
