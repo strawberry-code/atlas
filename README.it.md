@@ -63,6 +63,8 @@ Il motore di un progetto non si aggiorna, perché in un progetto non c'è: vive 
 
 Cambiare lingua a un progetto esistente rigenera `SKILL.md`, `CONTRACT.md` e ogni dashboard: un `map.md` già scritto nella vecchia lingua non viene toccato (le sue intestazioni non combaciano più), quel grafo resta com'era finché non lo si aggiorna a mano, mentre i ticket nuovi seguono la lingua corrente.
 
+Quando il progetto è una repo git, `atlas install` registra anche un merge driver git per i file del grafo: una riga in `.gitattributes` (`merge=atlas-graph` su `.atlas/graphs/*/graph.json`) e una sezione `[merge "atlas-graph"]` nel config git locale, che punta ad `atlas merge-graph`. Da lì in poi un merge git che tocca `graph.json` passa dal driver invece che dal merge di git per righe. I progetti installati prima di questa funzione ricevono il driver al primo `atlas update`, insieme agli altri file riallineati. Per disattivarlo, togli la riga da `.gitattributes` e la sezione dal config git.
+
 ## Lavorare
 
 I comandi del grafo valgono da dentro il progetto, che `atlas` trova da solo risalendo le cartelle:
@@ -76,10 +78,20 @@ atlas take F01                       # rivendica e stampa il contesto in un solo
 atlas close F01 -s "sintesi in una riga"
 atlas amend F01 --artefatti src/a.py # corregge la contabilità di un nodo già chiuso
 atlas render --open                  # dashboard
+atlas serve --no-open                # dashboard su un server locale, viva (Ctrl-C per fermare)
+atlas serve --port 8080              # la stessa, sulla porta che scegli tu
 atlas doctor                         # controllo di salute: nodi dimenticati, lucchetti fermi, dashboard stantia
+atlas conflicts                      # i conflitti di merge irrisolti del grafo attivo
+atlas conflicts --resolve            # li dichiara risolti, dopo aver corretto graph.json a mano
 ```
 
 Un nodo per sessione. `close` rifiuta se la Risposta è vuota.
+
+### Un claim da un'altra macchina
+
+Un claim può venire da un'altra macchina. Quando due macchine lavorano sullo stesso grafo, un claim è un lease: porta `host` e `lease_until`, e un claim remoto è vivo finché il suo lease non scade (default 3600 s, `lease_ttl_seconds` in `config.json`), non finché esiste il suo processo. I claim nostri rinnovano il battito a ogni comando che carica il grafo, quando manca meno di metà del TTL alla scadenza: un comando per TTL tiene vivo il lease, e una raffica non riscrive il file.
+
+Il lucchetto remoto si accende per scelta. Metti `lock.remote` in `.atlas/config.json` con un remote git (per esempio `origin`), e Atlas coordina il claim su ref git condivise prima di toccare un nodo; senza, il comportamento resta quello di sempre, tutto locale. Senza rete il lucchetto degrada in lettura e chiude in mutazione: `status`, `next`, `show` e `brief` mostrano lo stato locale con l'avviso "remote non raggiungibile", mentre `take` su un nodo libero, `close` e `release` rifiutano di scrivere, perché senza la ref non si può escludere che un'altra macchina tenga il nodo; `doctor` riferisce lo stato del lucchetto remoto senza morire. Quando il lucchetto remoto è attivo, la finestra condivisa della deduzione degli artefatti vede anche le ref remote prese da altre macchine durante la lavorazione. `atlas serve` mostra i lucchetti delle altre macchine in un pannello dedicato quando il lucchetto è attivo, degradando con garbo quando il remote non si raggiunge.
 
 ## Chi fa cosa
 
@@ -123,6 +135,13 @@ def run(g):
 Ogni script gira nella sua transazione e viene validato prima di scrivere: cicli, archi verso il nulla e id duplicati fanno fallire lo script senza toccare il file. `atlas exec` accetta più script in una volta, li applica in ordine e si ferma al primo che fallisce.
 
 `atlas renumber` rimette in ordine gli script di `.atlas/scripts/`. Senza argomenti chiude i buchi e i doppioni della numerazione; con dei file li sposta in coda, nell'ordine indicato, dopo il massimo degli altri. In una repo git le rinomine passano da `git mv`. Quando un grafo è condiviso e le storie divergono, la base è quella pubblicata e i propri script si riapplicano sopra: `graph.json` non si fonde mai a mano. Le chiusure già avvenute sull'altra copia si riportano con `mutate.restore_closure`; il ciclo completo è descritto nella skill `atlas-sync`.
+
+Un merge di `graph.json` può comunque capitare: due macchine lavorano sullo stesso grafo, entrambe committano, e i rami si incontrano. A occuparsene è il merge driver git registrato all'installazione. Fonde per id di nodo invece che per riga, scrive sempre JSON valido e non lascia mai marker di conflitto di git nel file. Quando i due lati hanno cambiato lo stesso nodo in modi inconciliabili, esce in conflitto, git marca il file, e un campo `conflicts` in `graph.json` registra quel che non ha saputo fondere. `atlas conflicts` elenca quelle voci, e `atlas conflicts --resolve` le dichiara risolte una volta che hai corretto il file a mano:
+
+```bash
+atlas conflicts                  # elenca i conflitti di merge irrisolti
+atlas conflicts --resolve        # li dichiara risolti, dopo aver corretto graph.json
+```
 
 Altre funzioni: `edit_node`, `link`, `unlink`, `drop` (fuori scopo), `remove_node`, `reopen`, `assign`, `unassign`, `fog_add`, `fog_drop`, `note_add`, `set_meta`, `restore_closure` (riporta una chiusura già avvenuta su un'altra copia). `mutate.assign(g, names, node_ids=(), branch=None, modo="set")` imposta, aggiunge o toglie gli assegnatari di un nodo: `names` accetta `"anna,marco"` o una lista di nomi, e `modo` è `"set"`, `"add"` o `"remove"`.
 

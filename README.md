@@ -63,6 +63,8 @@ A project's engine never gets updated, because a project has none: it lives in t
 
 Switching an existing project's language regenerates `SKILL.md`, `CONTRACT.md`, and every dashboard: a `map.md` already written in the old language is left untouched (its headings no longer match), so that graph stays as it was until you update it by hand, while new tickets follow the current language.
 
+When the project is a git repository, `atlas install` also registers a git merge driver for the graph files: a line in `.gitattributes` (`merge=atlas-graph` on `.atlas/graphs/*/graph.json`) and a `[merge "atlas-graph"]` section in the local git config, pointing at `atlas merge-graph`. From then on, a git merge that touches `graph.json` goes through the driver instead of git's line-based merge. Projects installed before this feature get the driver at the first `atlas update`, together with the other realigned files. To turn it off, remove the line from `.gitattributes` and the section from the git config.
+
 ## Working
 
 Graph commands work from inside the project, which `atlas` finds on its own by walking up the folders:
@@ -76,10 +78,20 @@ atlas take F01                       # claims it and prints its context in one s
 atlas close F01 -s "one-line summary"
 atlas amend F01 --artefatti src/a.py # fixes the bookkeeping of an already closed node
 atlas render --open                  # dashboard
+atlas serve --no-open                # dashboard on a local server, live (Ctrl-C to stop)
+atlas serve --port 8080              # same, on a port you choose
 atlas doctor                         # health check: dangling nodes, stale locks, stale dashboard
+atlas conflicts                      # the active graph's unresolved merge conflicts
+atlas conflicts --resolve            # declare them resolved, once graph.json is fixed by hand
 ```
 
 One node per session. `close` refuses if the Answer is empty.
+
+### Claims from another machine
+
+A claim can come from another machine. When two machines work on the same graph, a claim is a lease: it carries `host` and `lease_until`, and a remote claim is alive until its lease expires (default 3600 s, `lease_ttl_seconds` in `config.json`), not while its process happens to exist. Your own claims renew their heartbeat on every command that loads the graph, when less than half the TTL is left: one command per TTL keeps the lease alive, and a burst doesn't rewrite the file.
+
+The remote lock is opt-in. Set `lock.remote` in `.atlas/config.json` to a git remote (say `origin`), and Atlas coordinates the claim over shared git refs before touching a node; without it the behavior is unchanged, local only. Without the network the lock degrades on reads and closes on writes: `status`, `next`, `show` and `brief` show the local state with a "remote unreachable" notice, while `take` on a free node, `close` and `release` refuse to write, because without the ref you can't rule out that another machine holds the node; `doctor` reports the remote lock's state without dying. When the remote lock is active, the shared-window artifact deduction also sees remote refs taken by other machines during the work. `atlas serve` shows the other machines' locks in a panel of their own when the lock is active, degrading gracefully when the remote can't be reached.
 
 ## Who does what
 
@@ -125,6 +137,13 @@ def run(g):
 Each script runs in its own transaction and gets validated before writing: cycles, edges pointing nowhere, and duplicate ids fail the script without touching the file. `atlas exec` takes several scripts at once, applies them in order, and stops at the first one that fails.
 
 `atlas renumber` renumbers the scripts in `.atlas/scripts/`. With no arguments it closes the gaps and the duplicates in the numbering; with files it moves them to the end, in the order given, after the highest of the others. Inside a git repository the renames go through `git mv`. When a graph is shared and the histories diverge, the base is the published one and your own scripts get re-applied on top: `graph.json` is never merged by hand. Closures that already happened on the other copy are brought back with `mutate.restore_closure`; the full cycle is described in the `atlas-sync` skill.
+
+A `graph.json` merge can still happen, though: two machines work on the same graph, both commit, and the branches meet. The git merge driver registered at install time handles it. It merges by node id instead of by line, always writes valid JSON, and never leaves git conflict markers in the file. When the two sides changed the same node in ways that can't be reconciled, it exits with a conflict, git marks the file, and a `conflicts` field in `graph.json` records what didn't merge. `atlas conflicts` lists those entries, and `atlas conflicts --resolve` declares them resolved once you've fixed the file by hand:
+
+```bash
+atlas conflicts                  # list the unresolved merge conflicts
+atlas conflicts --resolve        # declare them resolved, after fixing graph.json
+```
 
 Other functions: `edit_node`, `link`, `unlink`, `drop` (out of scope), `remove_node`, `reopen`, `assign`, `unassign`, `fog_add`, `fog_drop`, `note_add`, `set_meta`, `restore_closure` (brings back a closure that already happened on another copy). `mutate.assign(g, names, node_ids=(), branch=None, modo="set")` sets, adds or removes a node's owners: `names` takes `"anna,marco"` or a list of names, and `modo` is `"set"`, `"add"` or `"remove"`.
 
