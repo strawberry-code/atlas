@@ -9,6 +9,9 @@ import json
 import re
 from datetime import datetime
 
+# La lettura degli assegnatari sta in owners.py: col campo a vettore qui non ci stava piu'.
+# Si ri-esporta da model perche' e' li' che la cercano i chiamanti, dentro e fuori dal motore.
+from .owners import chiave_nome, owners, owners_of, unowned  # noqa: F401
 from .store import CLAIMED, CLOSED, DROPPED, OPEN, StateError
 from .strings import t
 
@@ -128,35 +131,6 @@ def fog_for(graph: dict, node_id: str) -> list[str]:
     strutturato scritto da 'fog --for' sia la menzione nel testo libero."""
     confine = re.compile(rf"(?<![0-9A-Za-z_-]){re.escape(node_id)}(?![0-9A-Za-z_-])")
     return [voce for voce in graph.get("fog", []) if confine.search(voce)]
-
-
-def owner_of(node: dict) -> str | None:
-    """A chi e' assegnato il nodo, None se a nessuno.
-
-    Da non confondere con 'assignee', che dice chi tiene il lucchetto adesso e
-    sparisce quando il nodo si rilascia: questo resta finche' qualcuno non lo
-    cambia. Si legge con get perche' i grafi nati prima non hanno il campo, e
-    'non assegnato' e' uno stato legittimo, non un dato da migrare.
-    """
-    return node.get("owner") or None
-
-
-def owners(data: dict) -> dict[str, list[str]]:
-    """Chi ha nodi assegnati e quali, in ordine di nome.
-
-    L'ordine e' alfabetico e non di apparizione perche' da qui escono le colonne
-    della dashboard: con l'ordine di apparizione un nodo chiuso in mezzo alla
-    lista rimescolava i colori delle persone da una resa alla successiva.
-    """
-    mappa: dict[str, list[str]] = {}
-    for node in data["nodes"]:
-        if nome := owner_of(node):
-            mappa.setdefault(nome, []).append(node["id"])
-    return {nome: mappa[nome] for nome in sorted(mappa)}
-
-
-def unowned(data: dict) -> list[str]:
-    return [n["id"] for n in data["nodes"] if not owner_of(n)]
 
 
 def fog_line(node_id: str, riga: str) -> tuple[str, bool]:

@@ -14,7 +14,7 @@ from contextlib import contextmanager
 from datetime import datetime
 
 from .config import Graph
-from .model import node_of
+from .model import node_of, owners_of
 from .store import StateError, transaction
 from .strings import t
 from .topology import levels
@@ -69,6 +69,11 @@ def editing(ref: Graph, vocab: dict | None = None):
     """Transazione unica per tutta la durata di uno script di mutazione."""
     with transaction(ref.json_path) as data:
         editor = Editor(ref, data, vocab or ref.workspace.config["vocab"])
+        # La transazione riscrive il file intero: la prima mutazione qualsiasi
+        # mette in pari un grafo vecchio, sciogliendo anche i congiunti scritti a
+        # mano. La lettura pura non riscrive niente e regge grazie a owners_of.
+        for node in data["nodes"]:
+            node["owner"] = owners_of(node)
         yield editor
         validate(data, editor.vocab)
         data["meta"]["updated"] = now()[:10]

@@ -6,7 +6,7 @@ from datetime import timedelta
 from . import claims, docs
 from .config import Graph, Workspace
 from .model import (blocked, blocks, claimed, fog_for, frontier, is_done, node_of,
-                    owner_of, owners, progress, unowned)
+                    owners, owners_of, progress, unowned)
 from .topology import ranked_frontier
 from .store import load
 from .strings import t
@@ -102,7 +102,7 @@ def show_node(ref: Graph, data: dict, node_id: str) -> None:
     ramo = data["branches"][node["branch"]]["label"]
     print(f"\n  {node['id']} · {node['title']}")
     print(f"  {ramo} · {node['type']}/{node['mode']} · {node['status']}")
-    print(t("report.nodo_assegnato", nome=owner_of(node) or t("report.nodo_nessuno")))
+    print(t("report.nodo_assegnato", nome=", ".join(owners_of(node)) or t("report.nodo_nessuno")))
     print(t("report.nodo_bloccato_da", elenco=", ".join(node["blockedBy"]) or t("report.nodo_nessuno")))
     print(t("report.nodo_blocca", elenco=", ".join(blocks(data, node_id)) or t("report.nodo_nessuno")))
     print(t("report.nodo_ticket", path=ref.ticket_path(node_id)))

@@ -14,7 +14,7 @@ from __future__ import annotations
 from html import escape
 
 from . import theme
-from .model import owner_of
+from .model import owners_of
 from .render_panels import costo_numerico
 from .strings import t
 
@@ -38,7 +38,8 @@ def _td(html: str, sort: str) -> str:
 
 def _riga(node: dict, ramo: dict, i_ramo: int, stato: str) -> str:
     titolo = escape(node["title"])
-    chi = owner_of(node)
+    chi = owners_of(node)
+    nomi = ", ".join(chi)
     costo = node.get("cost") or ""
     numero_costo = costo_numerico(costo) if costo else None
     deps = escape(", ".join(node["blockedBy"]) or t("render.libero"))
@@ -53,7 +54,7 @@ def _riga(node: dict, ramo: dict, i_ramo: int, stato: str) -> str:
         _td(f'{theme.shape_svg(i_ramo, ramo.get("color", theme.BRANCH_FALLBACK), 10)} '
             f'{escape(ramo["label"])}', str(i_ramo)),
         _td(escape(tipo_modo), tipo_modo),
-        _td(escape(chi) if chi else f'<i class="tmuted">{escape(t("render.tbl_non_assegnato"))}</i>', chi or ""),
+        _td(escape(nomi) if nomi else f'<i class="tmuted">{escape(t("render.tbl_non_assegnato"))}</i>', nomi),
         _td(escape(costo) if costo else f'<i class="tmuted">{escape(t("render.costo_ignoto"))}</i>',
             "" if numero_costo is None else f"{numero_costo:g}"),
         _td(f'<span class="tclip" title="{deps}">{deps}</span>', str(len(node["blockedBy"]))),

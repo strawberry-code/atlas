@@ -12,6 +12,7 @@ uno script continua a passare da 'mutate.assign', che re-importa questi nomi.
 from __future__ import annotations
 
 from .editor import Editor
+from .model import chiave_nome, owners_of
 from .store import StateError
 from .strings import t
 
@@ -30,7 +31,36 @@ def nome_persona(name: str) -> str:
     pulito = " ".join(name.split())
     if not pulito or len(pulito) > NOME_MAX or any(ord(c) < 32 for c in pulito):
         raise StateError(t("mutate.nome_non_valido", nome=name, max=NOME_MAX))
+    if "," in pulito:
+        raise StateError(t("mutate.nome_separatore", nome=name))
+    if "+" in pulito:
+        raise StateError(t("mutate.nome_accrocchio", nome=name))
     return pulito
+
+
+def persone(spec) -> list[str]:
+    """I nomi che l'utente ha indicato, distinti e in ordine.
+
+    Accetta sia la stringa della riga di comando ('cristiano,pedro') sia una lista di nomi,
+    perche' la stessa funzione serve il CLI e gli script degli ospiti.
+    """
+    if isinstance(spec, str):
+        pezzi = spec.split(",")
+    elif spec is None:
+        pezzi = []
+    else:
+        pezzi = [p for elemento in spec for p in str(elemento).split(",")]
+    nomi = []
+    for pezzo in pezzi:
+        pulito = " ".join(pezzo.split())
+        if not pulito:
+            continue
+        nome = nome_persona(pulito)
+        if nome not in nomi:
+            nomi.append(nome)
+    if not nomi:
+        raise StateError(t("mutate.assegna_senza_nome"))
+    return sorted(nomi, key=chiave_nome)
 
 
 def _bersagli(g: Editor, node_ids, branch: str | None) -> list[str]:
@@ -53,31 +83,44 @@ def _bersagli(g: Editor, node_ids, branch: str | None) -> list[str]:
     return ids
 
 
-def assign(g: Editor, name: str, node_ids: list[str] | tuple[str, ...] = (),
-           branch: str | None = None) -> list[str]:
-    """Assegna nodi a una persona. Torna solo quelli che hanno cambiato assegnatario."""
-    nome = nome_persona(name)
+def assign(g: Editor, names, node_ids: list[str] | tuple[str, ...] = (),
+           branch: str | None = None, modo: str = "set") -> list[str]:
+    """Assegna nodi a una o piu' persone. Torna solo i nodi il cui vettore e' cambiato.
+
+    modo='set' sostituisce il vettore, 'add' lo allarga con i nomi nuovi, 'remove'
+    ne toglie quelli indicati; il risultato resta sempre distinto e ordinato.
+    """
+    if modo not in ("set", "add", "remove"):
+        raise StateError(t("mutate.assegna_modo", modo=modo))
+    nomi = persone(names)
     cambiati = []
     for node_id in _bersagli(g, node_ids, branch):
         node = g.node(node_id)
-        if node.get("owner") != nome:
-            node["owner"] = nome
+        attuali = owners_of(node)
+        if modo == "set":
+            nuovo = list(nomi)
+        elif modo == "add":
+            nuovo = sorted(set(attuali) | set(nomi), key=chiave_nome)
+        else:
+            nuovo = [n for n in attuali if n not in set(nomi)]
+        if nuovo != attuali:
+            node["owner"] = nuovo
             cambiati.append(node_id)
     return cambiati
 
 
 def unassign(g: Editor, node_ids: list[str] | tuple[str, ...] = (),
              branch: str | None = None) -> list[str]:
-    """Toglie l'assegnatario. Torna solo i nodi che ne avevano davvero uno.
+    """Toglie gli assegnatari. Torna solo i nodi che ne avevano davvero uno.
 
-    Scrive None invece di togliere la chiave: un nodo nasce con 'owner': None e
+    Scrive [] invece di togliere la chiave: un nodo nasce con 'owner': [] e
     deve restare cosi' anche dopo essere passato di mano, altrimenti lo stesso
     stato si legge in due forme diverse nel JSON versionato.
     """
     cambiati = []
     for node_id in _bersagli(g, node_ids, branch):
         node = g.node(node_id)
-        if node.get("owner"):
-            node["owner"] = None
+        if owners_of(node):
+            node["owner"] = []
             cambiati.append(node_id)
     return cambiati

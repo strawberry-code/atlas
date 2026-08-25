@@ -87,13 +87,15 @@ Le assegnazioni sono facoltative e servono a chi si divide un grafo fra più per
 
 ```bash
 atlas whoami marco                   # chi lavora da questa copia, ricordato in .atlas/whoami
-atlas assign lucia F02 F03           # assegna dei nodi a una persona
+atlas assign cristiano,pedro F01 F02 # assegna due persone ai nodi, sostituendone l'elenco
 atlas assign lucia --branch B        # e i nodi che il ramo B ha adesso
 atlas assign --me F04                # a te, senza riscrivere il nome
-atlas unassign F02                   # torna senza assegnatario
+atlas assign --add pedro F01         # aggiunge pedro a chi il nodo ha già
+atlas assign --remove pedro F01      # toglie solo pedro, lascia gli altri
+atlas unassign F02                   # torna senza nessuno
 ```
 
-Il nome è testo semplice e la lista cambia quando serve: non c'è un registro di persone da tenere aggiornato. `.atlas/whoami` non è versionato, perché è chi ha il repo davanti, non un dato del progetto. Nella dashboard compaiono un chip per persona e uno per i non assegnati: cliccandone uno restano illuminati solo i suoi nodi, come per il filtro di stato.
+I nomi sono testo semplice e la virgola li separa quando un nodo è di più di una persona; l'elenco cambia quando serve, perché non c'è un registro di persone da tenere aggiornato. `.atlas/whoami` non è versionato, perché è chi ha il repo davanti, non un dato del progetto. Nella dashboard compaiono un chip per persona e uno per i non assegnati: cliccandone uno restano illuminati solo i suoi nodi, come per il filtro di stato. Un nodo condiviso fra due persone compare sotto entrambi i chip.
 
 ## Cambiare il grafo
 
@@ -118,7 +120,7 @@ def run(g):
 
 Tutto gira in una transazione sola e viene validato prima di scrivere: cicli, archi verso il nulla e id duplicati fanno fallire lo script senza toccare il file.
 
-Altre funzioni: `edit_node`, `link`, `unlink`, `drop` (fuori scopo), `remove_node`, `reopen`, `assign`, `unassign`, `fog_add`, `fog_drop`, `note_add`, `set_meta`.
+Altre funzioni: `edit_node`, `link`, `unlink`, `drop` (fuori scopo), `remove_node`, `reopen`, `assign`, `unassign`, `fog_add`, `fog_drop`, `note_add`, `set_meta`. `mutate.assign(g, names, node_ids=(), branch=None, modo="set")` imposta, aggiunge o toglie gli assegnatari di un nodo: `names` accetta `"anna,marco"` o una lista di nomi, e `modo` è `"set"`, `"add"` o `"remove"`.
 
 ## Più grafi
 

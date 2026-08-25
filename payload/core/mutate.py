@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 
-from .assign import assign, nome_persona, unassign    # noqa: F401  (superficie per gli script)
+from .assign import assign, nome_persona, persone, unassign    # noqa: F401  (superficie per gli script)
 from .config import Graph, Workspace
 from .editor import Editor, editing, now, validate    # noqa: F401  (superficie per gli script)
 from .identity import identity
@@ -32,7 +32,7 @@ def add_node(g: Editor, id: str, title: str, branch: str, question: str,
     if id in g.ids():
         raise StateError(t("mutate.nodo_esiste", id=id))
     node = {"id": id, "title": title, "branch": branch, "type": type, "mode": mode,
-            "status": OPEN, "assignee": None, "owner": None, "blockedBy": list(blockedBy),
+            "status": OPEN, "assignee": None, "owner": [], "blockedBy": list(blockedBy),
             "question": question, "answer": None, "claim": None,
             "artifacts": list(artifacts), "createdAt": now()}
     g.data["nodes"].append(node)

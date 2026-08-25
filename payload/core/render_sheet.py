@@ -14,7 +14,7 @@ from html import escape
 
 from . import theme
 from .config import Graph
-from .model import owner_of
+from .model import owners_of
 from .strings import t
 from .theme import ORDER, STATE, state_of
 
@@ -49,7 +49,7 @@ def data_island(ref: Graph, data: dict, front_ids: set[str]) -> str:
             # card si riconoscono l'una nell'altra
             "branchShape": theme.shape_of(ordine_rami.index(n["branch"])),
             "cost": n.get("cost") or "",
-            "owner": owner_of(n) or "",
+            "owner": owners_of(n),
             "md": _ticket_md(ref, n["id"]),
         }
     # il marcatore, non il glifo nudo: per un nodo in lavorazione e' l'anello, lo

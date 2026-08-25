@@ -93,7 +93,7 @@ def boxes(data: dict, pos: dict, front: set[str], gruppi: dict[str, int]) -> str
             f'<a href="tickets/{node["id"]}.md" data-node="{node["id"]}">'
             f'<g class="n {css_class(stato)}" id="node-{node["id"]}" '
             f'data-branch="{escape(node["branch"])}" '
-            f'data-owner="{render_owners.gruppo(node, gruppi)}">'
+            f'data-owners="{render_owners.gruppi(node, gruppi)}">'
             f'<title>{escape(node["title"])} — {escape(node["question"])}</title>'
             f'<rect class="card" x="{x}" y="{y}" width="{W}" height="{H}" rx="3" '
             f'stroke-width="1"{tratto}/>'

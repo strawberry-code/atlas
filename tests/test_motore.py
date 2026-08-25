@@ -886,7 +886,7 @@ class Assegnazioni(Base):
             self.mutate.add_node(g, id="B01", branch="B", title="Backend uno", question="?")
 
     def owner(self, node_id: str):
-        return self.model.owner_of(self.model.node_of(self.store.load(self.ref.json_path), node_id))
+        return self.model.owners_of(self.model.node_of(self.store.load(self.ref.json_path), node_id))
 
     def test_assegna_nodi_e_ramo(self):
         """Assegnare un ramo sovrascrive anche chi era gia' assegnato: e' un gesto
@@ -897,9 +897,9 @@ class Assegnazioni(Base):
         with self.mutate.editing(self.ref) as g:
             self.assertEqual(["F01"], self.mutate.assign(g, "marco", ["F01"]))
             self.assertEqual(["F01", "F02"], self.mutate.assign(g, "lucia", branch="F"))
-        self.assertEqual("lucia", self.owner("F01"))
-        self.assertEqual("lucia", self.owner("F02"))
-        self.assertIsNone(self.owner("B01"), "un altro ramo non viene toccato")
+        self.assertEqual(["lucia"], self.owner("F01"))
+        self.assertEqual(["lucia"], self.owner("F02"))
+        self.assertEqual([], self.owner("B01"), "un altro ramo non viene toccato")
 
     def test_il_ramo_non_prende_i_nodi_aggiunti_dopo(self):
         """Espansione immediata: l'assegnatario sta sul nodo, non sul ramo."""
@@ -907,7 +907,7 @@ class Assegnazioni(Base):
         with self.mutate.editing(self.ref) as g:
             self.mutate.assign(g, "marco", branch="F")
             self.mutate.add_node(g, id="F03", branch="F", title="Terzo", question="?")
-        self.assertIsNone(self.owner("F03"))
+        self.assertEqual([], self.owner("F03"))
 
     def test_riassegnare_lo_stesso_nome_non_cambia_niente(self):
         self.popola_due_rami()
@@ -917,7 +917,7 @@ class Assegnazioni(Base):
             self.assertEqual([], self.mutate.assign(g, "marco", ["F01"]))
             self.assertEqual([], self.mutate.unassign(g, ["F02"]), "F02 non era assegnato")
             self.assertEqual(["F01"], self.mutate.unassign(g, ["F01"]))
-        self.assertIsNone(self.owner("F01"))
+        self.assertEqual([], self.owner("F01"))
 
     def test_nomi_non_utilizzabili(self):
         self.popola_due_rami()
@@ -927,7 +927,7 @@ class Assegnazioni(Base):
                     self.mutate.assign(g, cattivo, ["F01"])
         with self.mutate.editing(self.ref) as g:
             self.mutate.assign(g, "  anna   maria \n", ["F01"])
-        self.assertEqual("anna maria", self.owner("F01"), "spazi ripetuti e a capo collassano")
+        self.assertEqual(["anna maria"], self.owner("F01"), "spazi ripetuti e a capo collassano")
 
     def test_bersagli_inesistenti_si_fermano_prima_di_scrivere(self):
         self.popola_due_rami()
@@ -935,7 +935,7 @@ class Assegnazioni(Base):
             with self.subTest(**argomenti), self.assertRaises(self.store.StateError):
                 with self.mutate.editing(self.ref) as g:
                     self.mutate.assign(g, "marco", **argomenti)
-        self.assertIsNone(self.owner("F01"), "nessuna scrittura parziale")
+        self.assertEqual([], self.owner("F01"), "nessuna scrittura parziale")
 
     def test_assegnare_non_invalida_la_presa_di_chi_lavora(self):
         """Il caso vero: si assegna un nodo mentre qualcuno lo sta lavorando.
@@ -952,7 +952,7 @@ class Assegnazioni(Base):
             "## Risposta", "## Risposta\n\nfatto"), encoding="utf-8")
         node, _ = self.claims.close(self.ref, "F01", "chiuso senza force")
         self.assertEqual("closed", node["status"])
-        self.assertEqual("lucia", self.owner("F01"), "chiudere non cancella l'assegnazione")
+        self.assertEqual(["lucia"], self.owner("F01"), "chiudere non cancella l'assegnazione")
 
     def test_edit_node_non_puo_riscrivere_l_assegnatario(self):
         self.popola_due_rami()
@@ -970,9 +970,9 @@ class Assegnazioni(Base):
             self.assertEqual(0, cli.main(["whoami", "giovanni"]))
             self.assertEqual(0, cli.main(["assign", "--me", "F02"]))
             self.assertEqual(0, cli.main(["unassign", "B01"]))
-        self.assertEqual("marco", self.owner("F01"))
-        self.assertEqual("giovanni", self.owner("F02"), "--me prende il nome da whoami")
-        self.assertIsNone(self.owner("B01"))
+        self.assertEqual(["marco"], self.owner("F01"))
+        self.assertEqual(["giovanni"], self.owner("F02"), "--me prende il nome da whoami")
+        self.assertEqual([], self.owner("B01"))
         self.assertEqual("giovanni", self.ws.whoami())
 
     def test_whoami_si_legge_e_si_dimentica(self):
@@ -996,7 +996,7 @@ class Assegnazioni(Base):
         self.assertIn(">marco <b>1</b>", pagina)
         self.assertIn(">lucia <b>1</b>", pagina)
         self.assertIn('data-owner="0"', pagina, "il gruppo dei non assegnati esiste: B01")
-        self.assertIn('body[data-owner="1"] .n:not([data-owner="1"])', pagina)
+        self.assertIn('body[data-owner="1"] .n:not([data-owners~="1"])', pagina)
         self.assertNotIn("marco", pagina.split("<style>")[1].split("</style>")[0],
                          "il nome non entra mai in un selettore CSS")
 
@@ -1010,10 +1010,11 @@ class Assegnazioni(Base):
     def test_un_nome_ostile_non_esce_dalla_pagina(self):
         """Il nome lo scrive chiunque abbia la riga di comando e finisce in una pagina
         HTML: nel markup dev'essere testo, e nell'isola dati non deve poter chiudere
-        il blocco script che la contiene."""
+        il blocco script che la contiene. Con due persone l'unione dei nomi non deve
+        aprire un buco in piu'."""
         self.popola_due_rami()
         with self.mutate.editing(self.ref) as g:
-            self.mutate.assign(g, '</script><script>alert(1)</script>', ["F01"])
+            self.mutate.assign(g, '</script><script>alert(1)</script>,anna', ["F01"])
         pagina = self.render.build(self.ref, self.store.load(self.ref.json_path))
         markup, resto = pagina.split('<script type="application/json" id="atlas-data">')
         isola, coda = resto.split("</script>", 1)
@@ -1021,6 +1022,126 @@ class Assegnazioni(Base):
         self.assertNotIn("<script>alert(1)", coda)
         self.assertIn("&lt;/script&gt;&lt;script&gt;", markup, "nel markup è testo, non tag")
         self.assertNotIn("</script", isola, "l'isola non si lascia chiudere dal dato")
+
+    def test_persone_spezza_deduplica_e_ordina(self):
+        """Il vettore dei nomi e' sempre distinto e in ordine, in qualunque ordine
+        e ripetizione arrivino dalla riga di comando."""
+        self.assertEqual(["anna", "marco"], self.mutate.persone("marco,anna"))
+        self.assertEqual(["anna"], self.mutate.persone("anna,anna"))
+        self.assertEqual(["anna"], self.mutate.persone("anna,"),
+                         "la virgola di coda non e' un errore")
+        self.assertEqual(["anna", "pedro"], self.mutate.persone("pedro,anna,pedro"))
+
+    def test_persone_di_sole_virgole_solleva(self):
+        """Senza nemmeno un nome non si puo' assegnare niente: e' un errore
+        dichiarato, non un silenzio."""
+        with self.assertRaises(self.store.StateError):
+            self.mutate.persone(",,,")
+
+    def test_nome_persona_rifiuta_virgola_e_piu(self):
+        """Un nome solo non puo' contenere ne' la virgola ne' il '+': entrambi
+        hanno un loro modo di spezzare, e ciascuno dice quale ha usato."""
+        with self.assertRaises(self.store.StateError) as caso:
+            self.mutate.nome_persona("anna,marco")
+        self.assertIn("virgola", str(caso.exception))
+        with self.assertRaises(self.store.StateError) as caso:
+            self.mutate.nome_persona("cristiano+pedro")
+        self.assertIn("persona sola", str(caso.exception))
+
+    def test_assign_set_add_e_remove(self):
+        """I tre modi: set sostituisce, add unisce senza duplicare, remove toglie
+        solo i nomi indicati; ognuno torna solo i nodi davvero cambiati."""
+        self.popola_due_rami()
+        with self.mutate.editing(self.ref) as g:
+            self.assertEqual(["F01"], self.mutate.assign(g, "anna", ["F01"]))
+            self.assertEqual([], self.mutate.assign(g, "anna", ["F01"]),
+                             "assegnare due volte la stessa persona non cambia niente")
+            self.assertEqual(["F01"], self.mutate.assign(g, "marco", ["F01"], modo="add"))
+            self.assertEqual(["anna", "marco"], g.node("F01")["owner"])
+            self.assertEqual([], self.mutate.assign(g, "marco", ["F01"], modo="add"),
+                             "un nome gia' presente non duplica")
+            self.assertEqual(["F01"], self.mutate.assign(g, "anna", ["F01"], modo="remove"))
+            self.assertEqual(["marco"], g.node("F01")["owner"])
+            self.assertEqual([], self.mutate.assign(g, "anna", ["F01"], modo="remove"),
+                             "togliere un nome assente non cambia niente")
+
+    def test_modo_sconosciuto_solleva(self):
+        self.popola_due_rami()
+        with self.assertRaises(self.store.StateError) as caso:
+            with self.mutate.editing(self.ref) as g:
+                self.mutate.assign(g, "anna", ["F01"], modo="sposta")
+        self.assertIn("sposta", str(caso.exception))
+
+    def test_il_vettore_sul_nodo_e_sempre_ordinato(self):
+        """Anche chi passa i nomi in un ordine qualsiasi li ritrova scritti in
+        ordine alfabetico, perche' il grafo versionato ha una sola forma."""
+        self.popola_due_rami()
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.assign(g, "pedro,anna", ["F01"])
+            self.assertEqual(["anna", "pedro"], g.node("F01")["owner"])
+
+    def test_unassign_lascia_lista_vuota_non_none(self):
+        """Un nodo libero e' un vettore vuoto, non una chiave assente: lo stesso
+        stato non deve leggersi in due forme diverse nel JSON versionato."""
+        self.popola_due_rami()
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.assign(g, "marco", ["F01"])
+            self.assertEqual(["F01"], self.mutate.unassign(g, ["F01"]))
+            self.assertEqual([], g.node("F01")["owner"])
+        nodo = self.model.node_of(self.store.load(self.ref.json_path), "F01")
+        self.assertEqual([], nodo["owner"], "unassign scrive [], non None ne' toglie la chiave")
+
+    def test_legge_un_grafo_vecchio_e_lo_mette_in_pari(self):
+        """Il campo owner era una stringa: un grafo scritto prima del cambio si
+        legge gia' come vettore, e la prima mutazione qualsiasi lo riscrive in
+        forma nuova."""
+        self.popola()
+        dati = json.loads(self.ref.json_path.read_text(encoding="utf-8"))
+        dati["nodes"][0]["owner"] = "cristiano"
+        dati["nodes"][1]["owner"] = "cristiano+pedro"
+        self.ref.json_path.write_text(json.dumps(dati, ensure_ascii=False), encoding="utf-8")
+
+        data = self.store.load(self.ref.json_path)
+        self.assertEqual(["cristiano"], self.model.owners_of(data["nodes"][0]))
+        self.assertEqual(["cristiano", "pedro"], self.model.owners_of(data["nodes"][1]))
+
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.add_node(g, id="F04", branch="F", title="Quarto", question="?")
+        dati = json.loads(self.ref.json_path.read_text(encoding="utf-8"))
+        self.assertEqual(["cristiano"], dati["nodes"][0]["owner"],
+                         "dopo una mutazione il file porta la forma nuova")
+        self.assertEqual(["cristiano", "pedro"], dati["nodes"][1]["owner"])
+
+    def test_owners_elenca_i_nodi_di_ogni_persona_e_unowned_non_conta_i_condivisi(self):
+        self.popola_due_rami()
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.assign(g, "anna,marco", ["F01"])
+            self.mutate.assign(g, "marco", ["F02"])
+        data = self.store.load(self.ref.json_path)
+        self.assertEqual(["F01"], self.model.owners(data)["anna"],
+                         "il nodo condiviso sta sotto tutte le sue persone")
+        self.assertEqual(["F01", "F02"], self.model.owners(data)["marco"])
+        self.assertEqual(["B01"], self.model.unowned(data),
+                         "unowned non conta i nodi condivisi")
+
+    def test_il_nodo_condiviso_nella_dashboard(self):
+        """La resa di un nodo con piu' persone: gli indici nel SVG, i nomi nella
+        tabella, la lista nel JSON della scheda."""
+        self.popola_due_rami()
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.assign(g, "anna,marco", ["F01"])
+        pagina = self.render.build(self.ref, self.store.load(self.ref.json_path))
+
+        self.assertIn('data-owners="1 2"', pagina, "il nodo condiviso porta piu' indici")
+
+        tabella = pagina.split('<div class="tablewrap">')[1].split("</table>")[0]
+        riga_f01 = tabella.split('<tr data-node="F01">')[1].split("</tr>")[0]
+        self.assertIn(">anna, marco<", riga_f01, "la cella nomina entrambe le persone")
+
+        isola = pagina.split('<script type="application/json" id="atlas-data">', 1)[1].split("</script>", 1)[0]
+        dati = json.loads(isola.replace("<\\/", "</"))
+        self.assertEqual(["anna", "marco"], dati["nodes"]["F01"]["owner"],
+                         "il JSON della scheda porta una lista")
 
 
 class ScegliereIlGrafo(Base):
@@ -1304,6 +1425,28 @@ class Doctor(Base):
         data = self.store.load(self.ref.json_path)
         avvisi = self.doctor.doctor_avvisi(data, self.ref, self.ws.config["agent"])
         self.assertEqual([], avvisi)
+
+    def test_owner_non_canonico_segnalato(self):
+        """Un owner scritto a mano in forma vecchia ('cristiano+pedro') e' un grafo
+        da mettere in pari: doctor lo segnala nominando il nodo, senza morire."""
+        self.popola()
+        dati = json.loads(self.ref.json_path.read_text(encoding="utf-8"))
+        dati["nodes"][0]["owner"] = "cristiano+pedro"
+        self.ref.json_path.write_text(json.dumps(dati, ensure_ascii=False), encoding="utf-8")
+        data = self.store.load(self.ref.json_path)
+        avvisi = self.doctor.doctor_avvisi(data, self.ref, self.ws.config["agent"])
+        self.assertTrue(any("F01" in a and "cristiano" in a and "pedro" in a for a in avvisi),
+                        "l'avviso nomina il nodo e legge l'assegnazione come vettore")
+
+    def test_owner_in_forma_normale_tace(self):
+        """Un grafo gia' in forma nuova non deve produrre l'avviso di forma."""
+        self.popola()
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.assign(g, "cristiano,pedro", ["F01"])
+        data = self.store.load(self.ref.json_path)
+        avvisi = self.doctor.doctor_avvisi(data, self.ref, self.ws.config["agent"])
+        self.assertFalse(any("forma normale" in a for a in avvisi),
+                         "nessun avviso sulla forma di un owner gia' normale")
 
     def test_nodo_pendente_segnalato_se_non_e_lunico_cancello(self):
         self.popola()

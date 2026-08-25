@@ -5,7 +5,7 @@ from datetime import datetime
 
 from . import claims, docs, gitscan
 from .config import ConfigError, Graph, Workspace
-from .model import by_id, claimed, is_done, istante
+from .model import by_id, claimed, is_done, istante, owners_of
 from .report import ETICHETTA
 from .store import StateError, load
 from .strings import t
@@ -62,6 +62,14 @@ def doctor_avvisi(data: dict, ref: Graph, agente: dict) -> list[str]:
                     tocchi.append(a)
         if tocchi:
             avvisi.append(t("doctor.ambito_toccato", id=nodo["id"], elenco=", ".join(tocchi)))
+
+    # La forma di owner si rimette in pari da sola alla prima mutazione: qui si segnala
+    # e basta. Un nodo senza chiave o con None e' un grafo vecchio legittimo.
+    for nodo in data["nodes"]:
+        grezzo = nodo.get("owner")
+        canonico = owners_of(nodo)
+        if grezzo is not None and grezzo != canonico:
+            avvisi.append(t("doctor.owner_non_canonico", id=nodo["id"], chi=", ".join(canonico)))
 
     return avvisi
 

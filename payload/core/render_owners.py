@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from html import escape
 
-from .model import owner_of, owners
+from .model import owners, owners_of
 from .strings import t
 
 NESSUNO = 0    # i nodi senza assegnatario stanno tutti nello stesso gruppo
@@ -26,8 +26,9 @@ def indice(data: dict) -> dict[str, int]:
     return {nome: i for i, nome in enumerate(owners(data), start=1)}
 
 
-def gruppo(node: dict, idx: dict[str, int]) -> int:
-    return idx.get(owner_of(node) or "", NESSUNO)
+def gruppi(node: dict, idx: dict[str, int]) -> str:
+    """Gli indici delle persone del nodo separati da uno spazio, '0' se nessuno."""
+    return " ".join(str(idx[nome]) for nome in owners_of(node)) or str(NESSUNO)
 
 
 def css(idx: dict[str, int]) -> str:
@@ -41,9 +42,9 @@ def css(idx: dict[str, int]) -> str:
         return ""
     regole = []
     for i in (*idx.values(), NESSUNO):
-        regole.append(f'body[data-owner="{i}"] .n:not([data-owner="{i}"]){{opacity:.13}}')
-        regole.append(f'.map:has(.legend .chip[data-owner="{i}"]:hover) .n:not([data-owner="{i}"]),'
-                      f'.side:has(li[data-owner="{i}"]:hover) ~ .map .n:not([data-owner="{i}"])'
+        regole.append(f'body[data-owner="{i}"] .n:not([data-owners~="{i}"]){{opacity:.13}}')
+        regole.append(f'.map:has(.legend .chip[data-owner="{i}"]:hover) .n:not([data-owners~="{i}"]),'
+                      f'.side:has(li[data-owner="{i}"]:hover) ~ .map .n:not([data-owners~="{i}"])'
                       f'{{opacity:.13}}')
     regole.append("body[data-owner] path.edge{opacity:.25}")
     regole.append(".side:has(li[data-owner]:hover) ~ .map :is(path.edge,circle.port){opacity:.25}")
@@ -59,7 +60,7 @@ def chips(data: dict, idx: dict[str, int]) -> str:
     if not idx:
         return ""
     quanti = owners(data)
-    fuori = sum(1 for n in data["nodes"] if not owner_of(n))
+    fuori = sum(1 for n in data["nodes"] if not owners_of(n))
     voci = [
         f'<button type="button" class="chip who" data-owner="{i}">'
         f'{escape(nome)} <b>{len(quanti[nome])}</b></button>'
@@ -76,7 +77,7 @@ def panel(data: dict, idx: dict[str, int]) -> str:
     if not idx:
         return ""
     quanti = owners(data)
-    fuori = [n["id"] for n in data["nodes"] if not owner_of(n)]
+    fuori = [n["id"] for n in data["nodes"] if not owners_of(n)]
     voci = [
         f'<li data-owner="{i}"><b>{escape(nome)}</b>'
         f'<span class="tag">{len(quanti[nome])}</span></li>'

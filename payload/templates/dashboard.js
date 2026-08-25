@@ -168,7 +168,7 @@
   /* ---------- filtro per persona: chip di legenda e righe del pannello ----------
      Due prese sullo stesso filtro, quindi il click si ascolta una volta sola su
      entrambe. Il selettore resta ancorato a .legend e .side: sulla mappa anche i
-     nodi portano data-owner, e senza ancoraggio aprire un ticket accenderebbe
+     nodi portano data-owners, e senza ancoraggio aprire un ticket accenderebbe
      pure il filtro della persona a cui quel nodo e' assegnato. */
   document.addEventListener("click", function (e) {
     var presa = e.target.closest && e.target.closest(".legend .chip[data-owner], .side li[data-owner]");
@@ -378,7 +378,12 @@
     chips.appendChild(chip('<svg class="bshape" viewBox="0 0 24 24" width="9" height="9" ' +
       'aria-hidden="true"><path d="' + n.branchShape + '" fill="' + n.branchColor +
       '"/></svg>' + esc(n.branchLabel)));
-    if (n.owner) chips.appendChild(chip(esc(sheet.dataset.ownerLabel + " " + n.owner), "who"));
+    /* L'etichetta sta sulla prima chip soltanto: ripetere "assegnato a" per ogni
+       persona di un nodo condiviso e' rumore, il ruolo lo porta gia' la classe. */
+    var nomi = Array.isArray(n.owner) ? n.owner : (n.owner ? [n.owner] : []);
+    nomi.forEach(function (nome, i) {
+      chips.appendChild(chip(esc(i ? nome : sheet.dataset.ownerLabel + " " + nome), "who"));
+    });
     if (n.cost) chips.appendChild(chip(esc(n.cost)));
     titolo.innerHTML = '<span class="sid" data-copy="' + esc(id) + '" title="' + esc(sheet.dataset.copia) +
       '" data-copiato="' + esc(sheet.dataset.copiato) + '">' + esc(id) + "</span>" +

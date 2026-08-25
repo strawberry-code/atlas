@@ -167,7 +167,9 @@ def cmd_assegna(ws: Workspace, ref, args) -> None:
     spostamento 'assign --me F02' assegnerebbe zero nodi a una persona di nome F02.
     """
     nome = None
+    modo = "set"
     if args.cmd == "assign":
+        modo = "add" if args.add else ("remove" if args.remove else "set")
         if args.me:
             if args.nome:
                 args.nodi = [args.nome, *args.nodi]
@@ -179,14 +181,24 @@ def cmd_assegna(ws: Workspace, ref, args) -> None:
         else:
             nome = args.nome
     with mutate.editing(ref) as g:
-        cambiati = (mutate.assign(g, nome, args.nodi, args.branch) if nome
+        cambiati = (mutate.assign(g, nome, args.nodi, args.branch, modo) if nome
                     else mutate.unassign(g, args.nodi, args.branch))
+    # Il messaggio nomina le persone come il grafo le ha scritte, non come sono state
+    # digitate: chi legge 'cristiano,pedro' non saprebbe se il comando ha capito uno o due.
+    if nome:
+        nome = ", ".join(mutate.persone(nome))
     if not cambiati:
-        print(t("assign.gia_cosi", nome=nome) if nome else t("unassign.gia_liberi"))
+        if nome and modo == "remove":
+            print(t("assign.gia_fuori", nome=nome))
+        else:
+            print(t("assign.gia_cosi", nome=nome) if nome else t("unassign.gia_liberi"))
         return
     elenco = ", ".join(cambiati)
-    print(t("assign.fatto", nome=nome, elenco=elenco) if nome
-          else t("unassign.fatto", elenco=elenco))
+    if nome and modo == "remove":
+        print(t("assign.tolti", nome=nome, elenco=elenco))
+    else:
+        print(t("assign.fatto", nome=nome, elenco=elenco) if nome
+              else t("unassign.fatto", elenco=elenco))
 
 
 def _identity(p: argparse.ArgumentParser) -> None:
@@ -292,6 +304,9 @@ def aggiungi_comandi(sub) -> None:
     p.add_argument("nome", nargs="?", default=None, help=t("help.assign_nome"))
     p.add_argument("nodi", nargs="*", default=[], help=t("help.assign_nodi"))
     p.add_argument("-b", "--branch", default=None, help=t("help.assign_branch"))
+    modo = p.add_mutually_exclusive_group()
+    modo.add_argument("--add", action="store_true", help=t("help.assign_add"))
+    modo.add_argument("--remove", dest="remove", action="store_true", help=t("help.assign_remove"))
     p.add_argument("--me", action="store_true", help=t("help.assign_me")); _grafo(p)
     p = sub.add_parser("unassign", help=t("help.unassign"))
     p.add_argument("nodi", nargs="*", default=[], help=t("help.assign_nodi"))

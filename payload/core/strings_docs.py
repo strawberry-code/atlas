@@ -60,6 +60,12 @@ STRINGS: dict[str, dict[str, str]] = {
     "report.next_riga": {"it": "    {id}  {titolo}  · sblocca {sblocca} · cammino residuo {cammino}",
                          "en": "    {id}  {titolo}  · unlocks {sblocca} · {cammino} steps to the end"},
 
+    # --- doctor.py (avvisi diagnostici) ---
+    "doctor.owner_non_canonico": {"it": "{id}: l'assegnazione sul file non è in forma "
+                                        "normale, va letta come «{chi}»",
+                                 "en": "{id}: the assignment on file is not in normal "
+                                       "form, it reads as '{chi}'"},
+
     # --- theme.py (etichette di stato nella dashboard) ---
     "state.frontier": {"it": "prendibile adesso", "en": "up for grabs now"},
     "state.claimed": {"it": "in lavorazione", "en": "in progress"},

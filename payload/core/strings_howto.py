@@ -71,10 +71,14 @@ STRINGS: dict[str, dict[str, str]] = {
                            "en": "fixes artifacts, cost and summary of an already closed node, leaving the closure alone"},
     "howto.mutate.reopen": {"it": "riporta un nodo chiuso allo stato aperto, senza risposta",
                             "en": "brings a closed node back to open, with no answer"},
-    "howto.mutate.assign": {"it": "assegna nodi a una persona; con branch= prende quelli che il ramo ha adesso",
-                            "en": "assigns nodes to a person; with branch= it takes the ones the branch has now"},
-    "howto.mutate.unassign": {"it": "toglie l'assegnatario dai nodi indicati",
-                              "en": "removes the assignee from the given nodes"},
+    "howto.mutate.assign": {"it": "assegna nodi a una o più persone ('anna' oppure 'anna,marco'); "
+                                   "modo='set' sostituisce, 'add' aggiunge, 'remove' toglie; "
+                                   "con branch= prende i nodi che il ramo ha adesso",
+                            "en": "assigns nodes to one or more people ('anna' or 'anna,marco'); "
+                                  "modo='set' replaces, 'add' adds, 'remove' removes; "
+                                  "with branch= it takes the nodes the branch has now"},
+    "howto.mutate.unassign": {"it": "toglie tutti gli assegnatari dai nodi indicati",
+                              "en": "removes every assignee from the given nodes"},
     "howto.mutate.fog_add": {"it": "appunta una riga in nebbia da dentro uno script",
                              "en": "notes a line in the fog from inside a script"},
     "howto.mutate.fog_drop": {"it": "toglie dalla nebbia le righe che contengono needle, dopo averle promosse",

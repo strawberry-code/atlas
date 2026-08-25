@@ -81,6 +81,20 @@ STRINGS: dict[str, dict[str, str]] = {
                                              "oppure --branch <ramo>",
                                        "en": "no node given: pass some ids, "
                                              "or --branch <branch>"},
+    "mutate.assegna_senza_nome": {"it": "nessun nome indicato: passa almeno una persona, "
+                                        "per esempio 'anna' o 'anna,marco'",
+                                  "en": "no name given: pass at least one person, "
+                                        "for example 'anna' or 'anna,marco'"},
+    "mutate.nome_separatore": {"it": "«{nome}» contiene una virgola, che qui separa le persone: "
+                                     "scrivi i nomi come 'anna,marco'",
+                               "en": "'{nome}' contains a comma, which here separates people: "
+                                     "write the names as 'anna,marco'"},
+    "mutate.nome_accrocchio": {"it": "«{nome}» non è una persona sola: i nomi congiunti si "
+                                     "scrivono separati da virgola, 'anna,marco'",
+                               "en": "'{nome}' is not a single person: joint names are written "
+                                     "comma-separated, 'anna,marco'"},
+    "mutate.assegna_modo": {"it": "modo di assegnazione sconosciuto: {modo}",
+                            "en": "unknown assignment mode: {modo}"},
     "mutate.ramo_esiste": {"it": "il ramo {chiave} esiste già", "en": "branch {chiave} already exists"},
     "mutate.nodo_esiste": {"it": "{id} esiste già", "en": "{id} already exists"},
     "mutate.campi_protetti": {"it": "questi campi non si toccano da mutate: {elenco}",
