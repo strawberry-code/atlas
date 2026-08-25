@@ -104,7 +104,9 @@ Mai a mano, sempre con uno script:
 ```bash
 atlas new-script aggiunge-ramo-deploy
 # scrivi le mutazioni in .atlas/scripts/002-aggiunge-ramo-deploy.py
-atlas exec .atlas/scripts/002-aggiunge-ramo-deploy.py
+atlas exec .atlas/scripts/002-aggiunge-ramo-deploy.py 003-sistema-bloccante.py # in ordine, una transazione per script
+atlas renumber # chiude i buchi e i doppioni della numerazione
+atlas renumber --dry-run # mostra le rinomine senza farle
 ```
 
 ```python
@@ -118,9 +120,11 @@ def run(g):
                     blockedBy=["F03"])
 ```
 
-Tutto gira in una transazione sola e viene validato prima di scrivere: cicli, archi verso il nulla e id duplicati fanno fallire lo script senza toccare il file.
+Ogni script gira nella sua transazione e viene validato prima di scrivere: cicli, archi verso il nulla e id duplicati fanno fallire lo script senza toccare il file. `atlas exec` accetta più script in una volta, li applica in ordine e si ferma al primo che fallisce.
 
-Altre funzioni: `edit_node`, `link`, `unlink`, `drop` (fuori scopo), `remove_node`, `reopen`, `assign`, `unassign`, `fog_add`, `fog_drop`, `note_add`, `set_meta`. `mutate.assign(g, names, node_ids=(), branch=None, modo="set")` imposta, aggiunge o toglie gli assegnatari di un nodo: `names` accetta `"anna,marco"` o una lista di nomi, e `modo` è `"set"`, `"add"` o `"remove"`.
+`atlas renumber` rimette in ordine gli script di `.atlas/scripts/`. Senza argomenti chiude i buchi e i doppioni della numerazione; con dei file li sposta in coda, nell'ordine indicato, dopo il massimo degli altri. In una repo git le rinomine passano da `git mv`. Quando un grafo è condiviso e le storie divergono, la base è quella pubblicata e i propri script si riapplicano sopra: `graph.json` non si fonde mai a mano. Le chiusure già avvenute sull'altra copia si riportano con `mutate.restore_closure`; il ciclo completo è descritto nella skill `atlas-sync`.
+
+Altre funzioni: `edit_node`, `link`, `unlink`, `drop` (fuori scopo), `remove_node`, `reopen`, `assign`, `unassign`, `fog_add`, `fog_drop`, `note_add`, `set_meta`, `restore_closure` (riporta una chiusura già avvenuta su un'altra copia). `mutate.assign(g, names, node_ids=(), branch=None, modo="set")` imposta, aggiunge o toglie gli assegnatari di un nodo: `names` accetta `"anna,marco"` o una lista di nomi, e `modo` è `"set"`, `"add"` o `"remove"`.
 
 ## Più grafi
 

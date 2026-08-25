@@ -69,7 +69,14 @@ STRINGS: dict[str, dict[str, str]] = {
                              "en": "To be written: where this graph leads when it's done."},
     "help.new_script": {"it": "crea uno script di mutazione numerato",
                         "en": "creates a numbered mutation script"},
-    "help.exec": {"it": "esegue uno script di mutazione", "en": "runs a mutation script"},
+    "help.exec": {"it": "esegue uno o più script di mutazione",
+                  "en": "runs one or more mutation scripts"},
+    "help.renumber": {"it": "rinumera gli script di mutazione",
+                      "en": "renumbers the mutation scripts"},
+    "help.renumber_file": {"it": "gli script da spostare in coda, nell'ordine indicato",
+                           "en": "the scripts to move to the end, in the given order"},
+    "help.renumber_dry": {"it": "mostra le rinomine senza farle",
+                          "en": "shows the renames without doing them"},
     "help.validate": {"it": "verifica la forma dei grafi", "en": "checks the graphs' shape"},
     "help.doctor": {"it": "stato dell'installazione", "en": "installation status"},
     "help.how_to": {"it": "tutto quel che serve per lavorare qui, in un comando solo",
@@ -96,6 +103,14 @@ STRINGS: dict[str, dict[str, str]] = {
                          "  The graph was not touched."},
     "exec.applicato": {"it": "  {nome} applicato a '{slug}' · {n} nodi",
                        "en": "  {nome} applied to '{slug}' · {n} nodes"},
+
+    # --- cmd_renumber ---
+    "renumber.riga": {"it": "  {da} → {a}", "en": "  {da} → {a}"},
+    "renumber.fatto": {"it": "  {n} script rinumerati", "en": "  {n} scripts renumbered"},
+    "renumber.niente": {"it": "  la numerazione è già lineare: niente da fare",
+                        "en": "  the numbering is already linear: nothing to do"},
+    "renumber.non_numerato": {"it": "«{nome}» non è uno script numerato di .atlas/scripts/",
+                              "en": "'{nome}' is not a numbered script in .atlas/scripts/"},
 
     # --- cmd_validate ---
     "validate.ok": {"it": "  {slug}: forma valida", "en": "  {slug}: valid shape"},

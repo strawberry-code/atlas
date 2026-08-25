@@ -13,7 +13,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import claims, docs, doctor, howto, mutate, render as dash, report, strings
+from . import claims, docs, doctor, gitscan, howto, mutate, render as dash, report, scripts, strings
 from .config import ENV_IDENTITY, ConfigError, Workspace, workspace
 from .model import fog_line, node_of
 from .mutate import editing, validate
@@ -67,8 +67,7 @@ def cmd_new(ws: Workspace, args) -> int:
 
 def cmd_new_script(ws: Workspace, args) -> int:
     ws.scripts_dir.mkdir(parents=True, exist_ok=True)
-    esistenti = sorted(ws.scripts_dir.glob("[0-9][0-9][0-9]-*.py"))
-    numero = int(esistenti[-1].name[:3]) + 1 if esistenti else 1
+    numero = scripts.prossimo(ws.scripts_dir)
     nome = f"{numero:03d}-{args.nome}.py"
     path = ws.scripts_dir / nome
     path.write_text(ws.template("migration.py.tmpl").format(
@@ -79,30 +78,93 @@ def cmd_new_script(ws: Workspace, args) -> int:
 
 def cmd_exec(ws: Workspace, args) -> int:
     ref = ws.graph(args.graph)
-    script = Path(args.script).resolve()
-    if not script.is_file():
-        raise ConfigError(t("exec.script_assente", script=script))
-    # Niente da mettere in sys.path: lo script fa 'from core import mutate' e 'core'
-    # e' gia' importato in questo processo, perche' il motore e' il programma stesso.
-    modulo = runpy.run_path(str(script))
-    if "run" not in modulo:
-        raise StateError(t("exec.senza_run", nome=script.name))
-    try:
-        with editing(ref) as g:
-            modulo["run"](g)
-    except StateError:
-        raise
-    except Exception as errore:                       # lo script e' codice altrui
-        raise StateError(t("exec.morto", nome=script.name,
-                            tipo=type(errore).__name__, errore=errore)) from errore
-    # Sotto lock come ogni altro percorso che rigenera: due script lanciati insieme,
-    # o uno script mentre un altro agente chiude un nodo, facevano atterrare artefatti
-    # costruiti su una lettura vecchia sopra quelli appena scritti.
+    for nome in args.scripts:
+        script = Path(nome).resolve()
+        if not script.is_file():
+            raise ConfigError(t("exec.script_assente", script=script))
+        # Niente da mettere in sys.path: lo script fa 'from core import mutate' e 'core'
+        # e' gia' importato in questo processo, perche' il motore e' il programma stesso.
+        modulo = runpy.run_path(str(script))
+        if "run" not in modulo:
+            raise StateError(t("exec.senza_run", nome=script.name))
+        try:
+            with editing(ref) as g:
+                modulo["run"](g)
+        except StateError:
+            raise
+        except Exception as errore:                   # lo script e' codice altrui
+            raise StateError(t("exec.morto", nome=script.name,
+                                tipo=type(errore).__name__, errore=errore)) from errore
+        print(t("exec.applicato", nome=script.name, slug=ref.slug, n=len(g.data["nodes"])))
+    # Gli artefatti derivati si rigenerano una volta sola, alla fine: sono lo specchio
+    # dello stato finale, e rifarli fra uno script e l'altro mostrerebbe stati di
+    # passaggio che non interessano a nessuno. Sotto lock come ogni altro percorso che
+    # rigenera: due script lanciati insieme, o uno script mentre un altro agente chiude
+    # un nodo, facevano atterrare artefatti costruiti su una lettura vecchia sopra
+    # quelli appena scritti.
     with read_transaction(ref.json_path) as data:
         refresh(ref, data)
-    print(t("exec.applicato", nome=script.name, slug=ref.slug, n=len(data["nodes"])))
     report.show_status(ref, data)
     return 0
+
+
+def cmd_renumber(ws: Workspace, args) -> int:
+    bersagli = None
+    if args.file:
+        bersagli = [_nei_scripts(ws.scripts_dir, nome) for nome in args.file]
+    da_fare = scripts.rinomine(ws.scripts_dir, bersagli)
+    if not da_fare:
+        print(t("renumber.niente"))
+        return 0
+    if args.dry_run:
+        for da, a in da_fare:
+            print(t("renumber.riga", da=da.name, a=a.name))
+        return 0
+    _rinomina(ws, da_fare)
+    for da, a in da_fare:
+        print(t("renumber.riga", da=da.name, a=a.name))
+    print(t("renumber.fatto", n=len(da_fare)))
+    return 0
+
+
+def _nei_scripts(scripts_dir: Path, nome: str) -> Path:
+    """Un argomento del renumber: un path, o un solo nome da cercare in .atlas/scripts/."""
+    candidato = Path(nome)
+    if not candidato.is_absolute() and candidato.parent == Path("."):
+        return scripts_dir / candidato
+    return candidato
+
+
+def _rinomina(ws: Workspace, da_fare: list[tuple[Path, Path]]) -> None:
+    """Applica le rinomine in due fasi, per non perdere un file per strada.
+
+    Rinominare un file sul nome di un altro che deve ancora muoversi lo
+    sovrascriverebbe. Passare tutti da un nome temporaneo e solo dopo posarli sul
+    nome definitivo evita di dover distinguere i casi: due script che si scambiano
+    il numero funzionano come tutti gli altri.
+    """
+    ponte = [(da, _nome_temporaneo(da), a) for da, a in da_fare]
+    for da, temp, _ in ponte:
+        _movi(ws, da, temp)
+    for _, temp, a in ponte:
+        _movi(ws, temp, a)
+
+
+def _movi(ws: Workspace, da: Path, a: Path) -> None:
+    """Un rename: git mv se il file e' tracciato, rename normale altrimenti."""
+    if not gitscan.move(ws.project_root, da, a):
+        da.rename(a)
+
+
+def _nome_temporaneo(a: Path) -> Path:
+    """Un nome libero accanto a 'a', che la numerazione non vede (inizia col punto)."""
+    n = 0
+    while True:
+        corpo = f".{a.stem}.atlas-tmp{n}" if n else f".{a.stem}.atlas-tmp"
+        candidato = a.with_name(f"{corpo}{a.suffix}")
+        if not candidato.exists():
+            return candidato
+        n += 1
 
 
 def cmd_validate(ws: Workspace, args) -> int:
@@ -225,7 +287,7 @@ def _grafo(p: argparse.ArgumentParser) -> None:
 
 COMANDI = ("status", "next", "graphs", "use", "show", "brief", "claim", "take", "release",
            "close", "fog", "assign", "unassign", "whoami", "render", "new", "new-script",
-           "exec", "validate", "doctor", "how-to")
+           "exec", "renumber", "validate", "doctor", "how-to")
 
 
 class Parser(argparse.ArgumentParser):
@@ -323,15 +385,18 @@ def aggiungi_comandi(sub) -> None:
     p.add_argument("-d", "--destination", default=t("default.destination"))
     p = sub.add_parser("new-script", help=t("help.new_script"))
     p.add_argument("nome")
-    p = sub.add_parser("exec", help=t("help.exec")); p.add_argument("script")
+    p = sub.add_parser("exec", help=t("help.exec")); p.add_argument("scripts", nargs="+")
+    p = sub.add_parser("renumber", help=t("help.renumber"))
+    p.add_argument("file", nargs="*", default=None, help=t("help.renumber_file"))
+    p.add_argument("--dry-run", action="store_true", help=t("help.renumber_dry"))
     sub.add_parser("validate", help=t("help.validate"))
     sub.add_parser("doctor", help=t("help.doctor"))
     sub.add_parser("how-to", help=t("help.how_to"))
 
 
 def dispatch(ws: Workspace, args) -> int:
-    if args.cmd in ("new", "new-script", "exec", "validate", "doctor", "graphs", "use",
-                    "how-to", "whoami"):
+    if args.cmd in ("new", "new-script", "exec", "renumber", "validate", "doctor", "graphs",
+                    "use", "how-to", "whoami"):
         if args.cmd == "graphs":
             report.show_graphs(ws); return 0
         if args.cmd == "whoami":
@@ -341,7 +406,8 @@ def dispatch(ws: Workspace, args) -> int:
         if args.cmd == "use":
             ws.graph(args.slug); ws.pin(args.slug); print(t("use.attivo", slug=args.slug)); return 0
         return {"new": cmd_new, "new-script": cmd_new_script, "exec": cmd_exec,
-                "validate": cmd_validate, "doctor": cmd_doctor}[args.cmd](ws, args)
+                "renumber": cmd_renumber, "validate": cmd_validate,
+                "doctor": cmd_doctor}[args.cmd](ws, args)
 
     if args.cmd == "render" and getattr(args, "tutti", False):
         # Il giro che faceva l'hook di fine sessione quando era uno script nel progetto.

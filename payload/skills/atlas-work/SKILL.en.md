@@ -63,3 +63,5 @@ To leave a rough order of magnitude for what it cost (calls, tokens, time), add 
 The summary lands on its own in `map.md` under Decisions made, and the dashboard regenerates. If `close` refuses because the Answer is empty, write it: it's not an obstacle to route around with `--force`.
 
 **One node per session, even when one more is still up for grabs.** Once the node is closed, stop and report what was decided and what opened up. The next node is the user's choice, not the session's inertia.
+
+When the work is to be published on a graph shared with others, turn to the `atlas-sync` skill, which says how to align before the push.

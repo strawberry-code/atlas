@@ -12,9 +12,8 @@ import re
 from .assign import assign, nome_persona, persone, unassign    # noqa: F401  (superficie per gli script)
 from .config import Graph, Workspace
 from .editor import Editor, editing, now, validate    # noqa: F401  (superficie per gli script)
-from .identity import identity
-from .model import by_id, is_done
-from .store import OPEN, DROPPED, SCHEMA_VERSION, StateError, write_new
+from .lifecycle import amend, drop, reopen, restore_closure    # noqa: F401  (idem)
+from .store import OPEN, SCHEMA_VERSION, StateError, write_new
 from .strings import t
 
 
@@ -69,53 +68,6 @@ def unlink(g: Editor, node_id: str, blocked_by: str) -> None:
     if blocked_by not in node["blockedBy"]:
         raise StateError(t("mutate.non_bloccato", id=node_id, blocked_by=blocked_by))
     node["blockedBy"].remove(blocked_by)
-
-
-def drop(g: Editor, node_id: str, reason: str) -> dict:
-    """Fuori scopo: il nodo esce dal percorso ma continua a sbloccare chi lo aspettava."""
-    node = g.node(node_id)
-    node.update(status=DROPPED, assignee=None, claim=None, answer=reason)
-    g.data["outOfScope"].append(f"**{node['title']}** ({node_id}): {reason}")
-    return node
-
-
-def amend(g: Editor, node_id: str, artifacts: list[str] | None = None,
-          cost: str | None = None, summary: str | None = None) -> dict:
-    """Corregge la contabilita' di un nodo gia' chiuso: artefatti, costo, sintesi.
-
-    La deduzione automatica degli artefatti sbaglia in una classe di casi nota, e
-    chi se ne accorge lo fa rileggendo la chiusura appena fatta: senza questa via
-    il dato sbagliato resta li', e con lui gli avvisi che doctor ne ricava.
-
-    Tocca solo i campi passati e lascia stare stato, closedAt e closedBy: e' una
-    riga di contabilita' riscritta, non una chiusura rifatta, e doctor deve
-    continuare a misurare le scritture postume dall'istante vero della chiusura.
-    La correzione resta scritta nel nodo, cosi' chi rilegge sa che quel campo e'
-    stato messo a mano e non dedotto.
-    """
-    node = g.node(node_id)
-    if not is_done(node):
-        raise StateError(t("mutate.amend_non_chiuso", id=node_id, stato=node["status"]))
-    cambiati = {}
-    if artifacts is not None:
-        cambiati["artifacts"] = list(artifacts)
-    if cost is not None:
-        cambiati["cost"] = cost
-    if summary is not None:
-        cambiati["answer"] = summary
-    if not cambiati:
-        raise StateError(t("mutate.amend_senza_campi", id=node_id))
-    node.update(cambiati)
-    node.setdefault("amendments", []).append(
-        {"at": now(), "by": identity(), "fields": sorted(cambiati)})
-    return node
-
-
-def reopen(g: Editor, node_id: str) -> dict:
-    node = g.node(node_id)
-    node.update(status=OPEN, assignee=None, claim=None, answer=None)
-    node.pop("closedAt", None)
-    return node
 
 
 # --- contorno --------------------------------------------------------------

@@ -106,7 +106,9 @@ Never by hand, always with a script:
 ```bash
 atlas new-script adds-deploy-branch
 # write the mutations in .atlas/scripts/002-adds-deploy-branch.py
-atlas exec .atlas/scripts/002-adds-deploy-branch.py
+atlas exec .atlas/scripts/002-adds-deploy-branch.py 003-fix-blocker.py # applied in order, one transaction each
+atlas renumber # close the gaps and the duplicates in the numbering
+atlas renumber --dry-run # show the renames without doing them
 ```
 
 ```python
@@ -120,9 +122,11 @@ def run(g):
                     blockedBy=["F03"])
 ```
 
-It all runs in a single transaction and gets validated before writing: cycles, edges pointing nowhere, and duplicate ids fail the script without touching the file.
+Each script runs in its own transaction and gets validated before writing: cycles, edges pointing nowhere, and duplicate ids fail the script without touching the file. `atlas exec` takes several scripts at once, applies them in order, and stops at the first one that fails.
 
-Other functions: `edit_node`, `link`, `unlink`, `drop` (out of scope), `remove_node`, `reopen`, `assign`, `unassign`, `fog_add`, `fog_drop`, `note_add`, `set_meta`. `mutate.assign(g, names, node_ids=(), branch=None, modo="set")` sets, adds or removes a node's owners: `names` takes `"anna,marco"` or a list of names, and `modo` is `"set"`, `"add"` or `"remove"`.
+`atlas renumber` renumbers the scripts in `.atlas/scripts/`. With no arguments it closes the gaps and the duplicates in the numbering; with files it moves them to the end, in the order given, after the highest of the others. Inside a git repository the renames go through `git mv`. When a graph is shared and the histories diverge, the base is the published one and your own scripts get re-applied on top: `graph.json` is never merged by hand. Closures that already happened on the other copy are brought back with `mutate.restore_closure`; the full cycle is described in the `atlas-sync` skill.
+
+Other functions: `edit_node`, `link`, `unlink`, `drop` (out of scope), `remove_node`, `reopen`, `assign`, `unassign`, `fog_add`, `fog_drop`, `note_add`, `set_meta`, `restore_closure` (brings back a closure that already happened on another copy). `mutate.assign(g, names, node_ids=(), branch=None, modo="set")` sets, adds or removes a node's owners: `names` takes `"anna,marco"` or a list of names, and `modo` is `"set"`, `"add"` or `"remove"`.
 
 ## Multiple graphs
 

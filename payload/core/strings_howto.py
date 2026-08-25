@@ -71,6 +71,14 @@ STRINGS: dict[str, dict[str, str]] = {
                            "en": "fixes artifacts, cost and summary of an already closed node, leaving the closure alone"},
     "howto.mutate.reopen": {"it": "riporta un nodo chiuso allo stato aperto, senza risposta",
                             "en": "brings a closed node back to open, with no answer"},
+    "howto.mutate.restore_closure": {"it": "ripristina una chiusura già avvenuta su un'altra copia, "
+                                           "con i suoi metadati originali; serve a riapplicare il "
+                                           "proprio lavoro sopra un grafo arrivato da altri, non a "
+                                           "chiudere un nodo",
+                                    "en": "restores a closure that already happened on another copy, "
+                                          "with its original metadata; it serves to reapply your own "
+                                          "work on top of a graph that came from others, not to "
+                                          "close a node"},
     "howto.mutate.assign": {"it": "assegna nodi a una o più persone ('anna' oppure 'anna,marco'); "
                                    "modo='set' sostituisce, 'add' aggiunge, 'remove' toglie; "
                                    "con branch= prende i nodi che il ramo ha adesso",

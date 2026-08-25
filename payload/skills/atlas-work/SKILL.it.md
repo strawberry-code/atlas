@@ -63,3 +63,5 @@ Se vuoi lasciare un ordine di grandezza di quanto è costato (chiamate, token, t
 La sintesi finisce da sola in `map.md` sotto Decisioni prese, e la dashboard si rigenera. Se `close` rifiuta perché la Risposta è vuota, scrivila: non è un ostacolo da aggirare con `--force`.
 
 **Un nodo per sessione, anche quando ne resta uno prendibile.** Chiuso il nodo, fermati e riferisci cosa si è deciso e cosa si è aperto. Il nodo successivo è una scelta dell'utente, non l'inerzia della sessione.
+
+Quando il lavoro va pubblicato su un grafo condiviso con altri, passa dalla skill `atlas-sync`, che dice come allinearsi prima del push.

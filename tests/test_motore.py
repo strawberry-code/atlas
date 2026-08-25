@@ -873,6 +873,266 @@ class Artefatti(Base):
                       "Dashboard corretta: N2 è in lavorazione (il fix chiude la finestra)")
 
 
+class RipristinoChiusura(Base):
+    """restore_closure riporta un nodo allo stato chiuso che la chiusura aveva su
+    un'altra copia: i metadati passati sono quelli veri, e il nodo li ritrova
+    identici, senza rifare nessuna delle verifiche che la chiusura aveva gia' fatto."""
+
+    def test_ripristina_i_metadati_passati_non_l_ora_di_adesso(self):
+        self.popola()
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.restore_closure(g, "F01", answer="fatto", closedBy="cristiano",
+                                        closedAt="2026-01-02T03:04:05+01:00",
+                                        cost="una mattinata", artifacts=["b.txt"])
+        nodo = self.model.node_of(self.store.load(self.ref.json_path), "F01")
+        self.assertEqual(self.store.CLOSED, nodo["status"])
+        self.assertEqual("fatto", nodo["answer"], "la risposta e' quella passata")
+        self.assertEqual("cristiano", nodo["closedBy"], "closedBy e' quello passato")
+        self.assertEqual("2026-01-02T03:04:05+01:00", nodo["closedAt"],
+                         "closedAt e' il timestamp vecchio, identico, non l'ora di adesso")
+        self.assertEqual("una mattinata", nodo["cost"], "il costo e' quello passato")
+        self.assertEqual(["b.txt"], nodo["artifacts"], "gli artefatti sono quelli passati")
+
+    def test_un_nodo_assegnato_resta_assegnato(self):
+        self.popola()
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.assign(g, "marco", ["F01"])
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.restore_closure(g, "F01", answer="fatto", closedBy="cristiano",
+                                        closedAt="2026-01-02T03:04:05+01:00")
+        nodo = self.model.node_of(self.store.load(self.ref.json_path), "F01")
+        self.assertEqual(["marco"], nodo["owner"], "il vettore owner non si azzera")
+        self.assertIsNone(nodo["assignee"], "assignee si azzera")
+        self.assertIsNone(nodo["claim"], "claim si azzera")
+
+    def test_campi_obbligatori_vuoti_rifiutati(self):
+        self.popola()
+        casi = [
+            {"answer": "", "closedBy": "cristiano", "closedAt": "2026-01-02T03:04:05+01:00"},
+            {"answer": "fatto", "closedBy": "   ", "closedAt": "2026-01-02T03:04:05+01:00"},
+            {"answer": "fatto", "closedBy": "cristiano", "closedAt": None},
+        ]
+        for campi in casi:
+            with self.subTest(campi=campi):
+                with self.assertRaises(self.store.StateError):
+                    with self.mutate.editing(self.ref) as g:
+                        self.mutate.restore_closure(g, "F01", **campi)
+
+    def test_un_nodo_gia_chiuso_o_fuori_scopo_rifiutato(self):
+        self.popola()
+        self.rispondi("F01")
+        self.claims.claim(self.ref, "F01")
+        self.claims.close(self.ref, "F01", "fatto")
+        with self.assertRaises(self.store.StateError):
+            with self.mutate.editing(self.ref) as g:
+                self.mutate.restore_closure(g, "F01", answer="fatto", closedBy="cristiano",
+                                            closedAt="2026-01-02T03:04:05+01:00")
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.drop(g, "F02", "non serve piu'")
+        with self.assertRaises(self.store.StateError):
+            with self.mutate.editing(self.ref) as g:
+                self.mutate.restore_closure(g, "F02", answer="fatto", closedBy="cristiano",
+                                            closedAt="2026-01-02T03:04:05+01:00")
+
+    def test_il_giro_completo_del_merge(self):
+        """Chiusura vera, annotazione, reopen, ripristino: il nodo torna identico
+        a com'era dopo la chiusura avvenuta sull'altra copia."""
+        self.popola()
+        self.rispondi("F01")
+        self.claims.claim(self.ref, "F01")
+        chiuso, _ = self.claims.close(self.ref, "F01", "la sintesi buona",
+                                      cost="due ore", artifacts=["a.py", "b.py"])
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.reopen(g, "F01")
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.restore_closure(g, "F01", chiuso["answer"], chiuso["closedBy"],
+                                        chiuso["closedAt"], cost=chiuso["cost"],
+                                        artifacts=chiuso["artifacts"])
+        nodo = self.model.node_of(self.store.load(self.ref.json_path), "F01")
+        for campo in ("status", "answer", "closedBy", "closedAt", "cost",
+                      "artifacts", "owner", "assignee", "claim"):
+            self.assertEqual(chiuso[campo], nodo[campo],
+                             f"{campo} deve tornare com'era dopo la chiusura vera")
+
+
+class Rinumerazione(Base):
+    """La numerazione degli script di mutazione: compattare, spostare in coda,
+    senza perdere un file per strada."""
+
+    def scrivi(self, numero: int, nome: str, etichetta: str) -> Path:
+        path = self.ws.scripts_dir / f"{numero:03d}-{nome}.py"
+        path.write_text(f"# {etichetta}\n", encoding="utf-8")
+        return path
+
+    def test_compattazione_rinumera_chi_e_fuori_posto(self):
+        from core import scripts
+        self.scrivi(1, "a", "primo")
+        self.scrivi(2, "b", "secondo")
+        self.scrivi(2, "c", "terzo")
+        self.scrivi(5, "d", "quarto")
+        coppie = scripts.rinomine(self.ws.scripts_dir)
+        self.assertEqual(
+            [("002-c.py", "003-c.py"), ("005-d.py", "004-d.py")],
+            [(da.name, a.name) for da, a in coppie],
+            "la compattazione tocca solo chi e' fuori posto, nell'ordine di elenco")
+        for da, a in coppie:
+            da.rename(a)
+        self.assertEqual(
+            ["001-a.py", "002-b.py", "003-c.py", "004-d.py"],
+            [p.name for p in scripts.elenco(self.ws.scripts_dir)],
+            "i numeri diventano 001, 002, 003, 004 nell'ordine giusto")
+        self.assertEqual("# terzo\n", (self.ws.scripts_dir / "003-c.py").read_text(encoding="utf-8"),
+                         "il contenuto di 002-c segue il file in 003-c")
+        self.assertEqual("# quarto\n", (self.ws.scripts_dir / "004-d.py").read_text(encoding="utf-8"),
+                         "il contenuto di 005-d segue il file in 004-d")
+
+    def test_sposta_in_coda_dopo_il_massimo_degli_altri(self):
+        from core import scripts
+        self.scrivi(1, "a", "primo")
+        self.scrivi(2, "b", "secondo")
+        self.scrivi(3, "c", "terzo")
+        coppie = scripts.rinomine(self.ws.scripts_dir,
+                                  [self.ws.scripts_dir / "002-b.py", self.ws.scripts_dir / "001-a.py"])
+        self.assertEqual(
+            [("002-b.py", "004-b.py"), ("001-a.py", "005-a.py")],
+            [(da.name, a.name) for da, a in coppie],
+            "i bersagli vanno in coda, nell'ordine indicato, dopo il massimo degli altri")
+        for da, a in coppie:
+            da.rename(a)
+        self.assertEqual(
+            ["003-c.py", "004-b.py", "005-a.py"],
+            [p.name for p in scripts.elenco(self.ws.scripts_dir)],
+            "gli altri restano al loro posto, i bersagli si accodano")
+
+    def test_lo_scambio_di_due_numeri_non_perde_nessun_file(self):
+        from core import cli
+        self.scrivi(1, "a", "primo")
+        self.scrivi(2, "a", "secondo")
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(0, cli.main(["renumber", "002-a.py", "001-a.py"]))
+        self.assertEqual("# secondo\n", (self.ws.scripts_dir / "001-a.py").read_text(encoding="utf-8"),
+                         "002-a.py e' finito in 001-a.py senza sovrascrivere il vecchio")
+        self.assertEqual("# primo\n", (self.ws.scripts_dir / "002-a.py").read_text(encoding="utf-8"),
+                         "001-a.py e' finito in 002-a.py senza sovrascrivere il vecchio")
+
+    def test_una_numerazione_gia_lineare_non_produce_rinomine(self):
+        from core import scripts
+        self.scrivi(1, "a", "primo")
+        self.scrivi(2, "b", "secondo")
+        self.scrivi(3, "c", "terzo")
+        self.assertEqual([], scripts.rinomine(self.ws.scripts_dir),
+                         "una numerazione gia' lineare non tocca niente")
+
+    def test_un_bersaglio_inesistente_o_non_numerato_solleva(self):
+        from core import scripts
+        self.scrivi(1, "a", "primo")
+        for bersaglio in (self.ws.scripts_dir / "999-manca.py", self.ws.scripts_dir / "nota.py"):
+            with self.subTest(bersaglio=bersaglio.name):
+                with self.assertRaises(self.store.StateError):
+                    scripts.rinomine(self.ws.scripts_dir, [bersaglio])
+
+    def test_prossimo_parte_da_uno_e_sale_col_massimo(self):
+        from core import scripts
+        self.assertEqual(1, scripts.prossimo(self.ws.scripts_dir), "cartella vuota → 1")
+        self.scrivi(3, "a", "terzo")
+        self.scrivi(7, "b", "settimo")
+        self.assertEqual(8, scripts.prossimo(self.ws.scripts_dir), "il massimo piu' uno")
+
+    def test_renumber_dry_run_non_tocca_il_disco(self):
+        from core import cli
+        self.scrivi(1, "a", "primo")
+        self.scrivi(2, "b", "secondo")
+        self.scrivi(2, "c", "terzo")
+        self.scrivi(5, "d", "quarto")
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            self.assertEqual(0, cli.main(["renumber", "--dry-run"]))
+        self.assertIn("→", buffer.getvalue(), "il dry-run mostra le rinomine")
+        self.assertEqual(
+            ["001-a.py", "002-b.py", "002-c.py", "005-d.py"],
+            sorted(p.name for p in self.ws.scripts_dir.iterdir()),
+            "il dry-run non rinomina niente")
+
+    def test_renumber_senza_argomenti_compatta(self):
+        from core import cli
+        self.scrivi(1, "a", "primo")
+        self.scrivi(2, "b", "secondo")
+        self.scrivi(2, "c", "terzo")
+        self.scrivi(5, "d", "quarto")
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(0, cli.main(["renumber"]))
+        self.assertEqual(
+            ["001-a.py", "002-b.py", "003-c.py", "004-d.py"],
+            sorted(p.name for p in self.ws.scripts_dir.iterdir()),
+            "la numerazione esce lineare")
+        self.assertEqual("# terzo\n", (self.ws.scripts_dir / "003-c.py").read_text(encoding="utf-8"),
+                         "il contenuto segue il file")
+
+    def test_renumber_accetta_il_solo_nome_del_file(self):
+        from core import cli
+        self.scrivi(1, "a", "primo")
+        self.scrivi(2, "b", "secondo")
+        self.scrivi(3, "c", "terzo")
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(0, cli.main(["renumber", "002-b.py"]))
+        self.assertEqual(
+            ["001-a.py", "003-c.py", "004-b.py"],
+            [p.name for p in sorted(self.ws.scripts_dir.iterdir())],
+            "il solo nome del file basta a spostarlo in coda")
+
+
+class EsecuzioneScript(Base):
+    """exec applica piu' script in una chiamata sola, ognuno nella propria
+    transazione, fermandosi al primo che fallisce."""
+
+    def scrivi_script(self, nome: str, corpo: str) -> Path:
+        path = self.tmp / nome
+        path.write_text(corpo, encoding="utf-8")
+        return path
+
+    def script_nodo(self, node_id: str) -> str:
+        return ("from core import mutate\n"
+                f"def run(g):\n"
+                f"    mutate.add_node(g, id='{node_id}', branch='F', "
+                f"title='Nodo {node_id}', question='?')\n")
+
+    def test_due_script_arrivano_entrambi_nell_ordine_dato(self):
+        from core import cli
+        self.popola()
+        primo = self.scrivi_script("primo.py", self.script_nodo("F04"))
+        secondo = self.scrivi_script("secondo.py", self.script_nodo("F05"))
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(0, cli.main(["exec", str(primo), str(secondo)]))
+        ids = [n["id"] for n in self.store.load(self.ref.json_path)["nodes"]]
+        self.assertIn("F04", ids, "il primo script arriva nel grafo")
+        self.assertIn("F05", ids, "il secondo script arriva nel grafo")
+        self.assertLess(ids.index("F04"), ids.index("F05"),
+                        "l'ordine di applicazione e' quello dato")
+
+    def test_se_il_secondo_fallisce_il_primo_resta_e_il_terzo_non_parte(self):
+        from core import cli
+        self.popola()
+        primo = self.scrivi_script("primo.py", self.script_nodo("F04"))
+        secondo = self.scrivi_script("secondo.py", "def run(g):\n    raise RuntimeError('boom')\n")
+        terzo = self.scrivi_script("terzo.py", self.script_nodo("F05"))
+        err = io.StringIO()
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
+            self.assertEqual(1, cli.main(["exec", str(primo), str(secondo), str(terzo)]))
+        ids = [n["id"] for n in self.store.load(self.ref.json_path)["nodes"]]
+        self.assertIn("F04", ids, "il primo script resta applicato")
+        self.assertNotIn("F05", ids, "il terzo script non parte")
+        self.assertIn("secondo.py", err.getvalue(), "l'errore nomina lo script caduto")
+
+    def test_un_solo_script_continua_a_funzionare(self):
+        from core import cli
+        self.popola()
+        solo = self.scrivi_script("solo.py", self.script_nodo("F04"))
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(0, cli.main(["exec", str(solo)]))
+        ids = [n["id"] for n in self.store.load(self.ref.json_path)["nodes"]]
+        self.assertIn("F04", ids, "lo script arriva nel grafo")
+
+
 class Assegnazioni(Base):
     """L'assegnazione dice di chi e' il pezzo di lavoro; il claim dice chi ci ha le
     mani sopra adesso. Sono due campi diversi e non devono interferire."""

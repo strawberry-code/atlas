@@ -93,3 +93,20 @@ def changed_since(root: Path, artifact_path: str, closed_at: str) -> bool | None
 
     # L'artefatto non e' cambiato.
     return False
+
+
+def move(root: Path, src: Path, dst: Path) -> bool:
+    """Rinomina con 'git mv' se il file e' tracciato, torna False se git non se ne occupa.
+
+    git mv fallisce da solo su un file non tracciato, ma anche qui serve un False
+    silenzioso: il chiamante ripiega su un rename normale, e un comando non deve mai
+    morire per un motivo che non dipende dal progetto.
+    """
+    if not (root / ".git").exists():
+        return False
+    try:
+        esito = subprocess.run(["git", "mv", str(src), str(dst)],
+                               cwd=root, capture_output=True, text=True)
+    except OSError:
+        return False
+    return esito.returncode == 0

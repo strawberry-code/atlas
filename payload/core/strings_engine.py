@@ -106,6 +106,14 @@ STRINGS: dict[str, dict[str, str]] = {
     "mutate.grafo_esiste": {"it": "il grafo '{slug}' esiste già in {dir}",
                            "en": "graph '{slug}' already exists in {dir}"},
     "mutate.ramo_default_label": {"it": "Percorso principale", "en": "Main path"},
+    "mutate.ripristino_incompleto": {"it": "{id}: per ripristinare una chiusura servono la risposta, "
+                                            "chi l'ha chiusa e quando",
+                                    "en": "{id}: restoring a closure needs the answer, "
+                                          "who closed it and when"},
+    "mutate.ripristino_gia_chiuso": {"it": "{id} è già chiuso: ripristinare sopra una chiusura ne "
+                                             "cancellerebbe un'altra",
+                                    "en": "{id} is already closed: restoring over a closure "
+                                          "would erase another one"},
 
     # --- config.py ---
     "config.root_mancante": {"it": "nessun {dirname}/ da qui in su: installa Atlas con 'atlas install'",
