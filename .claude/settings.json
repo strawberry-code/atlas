@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "atlas render --all",
+            "statusMessage": "Aggiornamento delle dashboard Atlas"
+          }
+        ]
+      }
+    ]
+  }
+}

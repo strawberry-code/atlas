@@ -7,3 +7,10 @@ __pycache__/
 /atlascli/_payload.py
 # Coda locale degli attriti da sistemare, si svuota man mano che li chiudiamo
 /atlas-friction.md
+
+# Atlas: artefatti rigenerabili
+.atlas/graphs/*/dashboard.html
+.atlas/graphs/*/graph.json.lock
+.atlas/graphs/*/.graph.json.tmp
+.atlas/current
+.atlas/whoami

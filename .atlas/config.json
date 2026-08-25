@@ -1,0 +1,33 @@
+{
+  "project": "atlas",
+  "language": "it",
+  "agent": {
+    "process_name": "claude",
+    "default_assignee": "claude",
+    "idle_hours": 4,
+    "max_claims_per_session": 1
+  },
+  "git": {
+    "commit_on_close": false,
+    "commit_type": "feat",
+    "stage": "node-paths"
+  },
+  "vocab": {
+    "types": [
+      "grilling",
+      "research",
+      "prototype",
+      "task"
+    ],
+    "modes": [
+      "HITL",
+      "AFK"
+    ],
+    "statuses": [
+      "open",
+      "claimed",
+      "closed",
+      "out-of-scope"
+    ]
+  }
+}
