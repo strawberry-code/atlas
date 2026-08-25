@@ -38,7 +38,9 @@ La riga sotto il titolo, stampata da `take`, dice ramo, tipo, modo e stato.
 - **AFK**: lavori da solo. La risposta la scrivi tu.
 - **HITL**: la risposta si costruisce parlando con l'utente. Porta la domanda, una alla volta, e aspetta. Rispondere al posto suo è il modo più veloce di rendere inutile il grafo.
 
-Per i nodi `grilling` usa le skill `grilling` e `domain-modeling`, per i `prototype` la skill `prototype`, per i `research` la skill `research`, se sono installate. Le Note della mappa possono nominarne altre.
+Per i nodi `grilling` la griglia è il lavoro, e Atlas ne distribuisce due. `atlas-strategic-grilling` è la griglia lunga, per una decisione strutturale o irreversibile che ne vincola altre: nessun budget, si va avanti finché l'albero non è percorso. `atlas-tactical-grilling` è la griglia operativa su un ambito ristretto, di solito di codice: ricognizione autonoma sul codice, un numero dichiarato di domande all'utente, sintesi da confermare. Quale delle due serve lo dice quanto altro dipende da questo nodo, e il grafo lo sa già: guarda chi lo ha come bloccante e cosa dice `atlas next`. Nel dubbio prendi la strategica, perché una decisione irreversibile grigliata poco costa più di una circoscritta grigliata troppo.
+
+Per i `prototype` usa `atlas-prototype`, per i `research` `atlas-research`, e per il vocabolario di dominio e gli ADR `atlas-domain-modeling`, che va in coppia con le due griglie. Il metodo che regge tutto il grafo, destinazione, nebbia e ambito, sta in `atlas-wayfinder`. Le Note della mappa possono nominare altre skill del progetto.
 
 ## 4. Lavora, e lascia traccia nel ticket
 

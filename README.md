@@ -16,9 +16,9 @@ It's worth installing when a piece of work spans more than one session and has r
 
 ## How you work, in practice
 
-Install the CLI, install it in a project (creates `.atlas/`, registers the project, adds the two skills), then the loop stays the same every time:
+Install the CLI, install it in a project (creates `.atlas/`, registers the project, adds the skills), then the loop stays the same every time:
 
-1. **Create or import a graph**, from a text you already have or by tracing it from scratch with the wayfinder if the idea is still fog. The `atlas-new-graph` skill handles this.
+1. **Create or import a graph**, from a text you already have or by tracing it from scratch if the idea is still fog. The `atlas-wayfinder` and `atlas-new-graph` skills handle this.
 2. **Look at the frontier** with `atlas status`, or `atlas next` to rank it by impact when several nodes are up for grabs.
 3. **Take a node** with `atlas take <ID>`, before touching it: claims it and prints its context (question, blockers' answers, fog that names it) in the same step.
 4. **Work it**: if the node is AFK, the agent does it alone; if it's HITL, the `atlas-work` skill asks its questions one at a time and waits.
@@ -48,7 +48,7 @@ atlas install . --graph my-epic      # create the first graph right away
 atlas install . --lang en            # content and skills in English instead of Italian
 ```
 
-Only the project's own data lands in `.atlas/`: `config.json`, the graphs, the mutation scripts, the skills, the contract, and a `README.md` telling whoever finds that folder how to get `atlas`. The engine doesn't go in there: it lives in the executable, one per machine. Outside `.atlas/` you get two symlinks in `.claude/skills/`, the end-of-session hook in `.claude/settings.json`, and the contract in `CLAUDE.md`. The project also gets registered in `~/.config/atlas.json` under a slug (default: the folder name; `--slug` for a different one).
+Only the project's own data lands in `.atlas/`: `config.json`, the graphs, the mutation scripts, the skills, the contract, and a `README.md` telling whoever finds that folder how to get `atlas`. The engine doesn't go in there: it lives in the executable, one per machine. Outside `.atlas/` you get one symlink per skill in `.claude/skills/`, the end-of-session hook in `.claude/settings.json`, and the contract in `CLAUDE.md`. The project also gets registered in `~/.config/atlas.json` under a slug (default: the folder name; `--slug` for a different one).
 
 ```bash
 atlas list                           # registered projects and their state
@@ -141,9 +141,22 @@ atlas render -g YYMMDD-other-epic # or pick it on the single command
 
 The slug does not go where the command goes: `atlas YYMMDD-other-epic render` doesn't exist. `-g/--graph` works both before and after the command (`atlas -g YYMMDD-other-epic render` and `atlas render -g YYMMDD-other-epic` are the same thing), and `ATLAS_GRAPH=<slug>` does the same for the whole shell.
 
-## The two skills
+## The skills
 
-`atlas-new-graph` builds a new graph, from a text you already have or by tracing it with the wayfinder. `atlas-work` works a node from the frontier to its close. They invoke themselves when needed.
+They invoke themselves when needed, and `atlas how-to` lists them with their descriptions.
+
+Three govern the working cycle:
+
+- **`atlas-wayfinder`** is the method behind all the rest: naming the destination, deciding rather than doing, telling fog apart from a node, ruling out of scope whatever sits past the destination.
+- **`atlas-new-graph`** builds a new graph, from a text you already have or by tracing it from scratch.
+- **`atlas-work`** works a node from the frontier to its close, and **`atlas-sync`** brings your copy of a shared graph back in line before publishing on top of it.
+
+The other five say how a node gets worked, one per type, because a node type no document defines is just a label:
+
+- **`atlas-strategic-grilling`** and **`atlas-tactical-grilling`** are the two ways of working a `grilling` node. The first is Matt Pocock's method: one question at a time, no budget, until the design tree has been walked. The second works a narrow scope in three phases, the agent's reconnaissance on the code, a declared number of questions to the user (twelve by default), a synthesis to confirm.
+- **`atlas-research`** answers a `research` node by going to primary sources and citing every claim with a link and a date.
+- **`atlas-prototype`** builds the throwaway artifact of a `prototype` node, a TUI for logic or interface variants to look at side by side.
+- **`atlas-domain-modeling`** sharpens the domain language while decisions are made, and records as ADRs only the decisions that are expensive to reverse.
 
 ## License
 

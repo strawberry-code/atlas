@@ -16,9 +16,9 @@ Ha senso installarlo quando un pezzo di lavoro dura più sessioni e ha dipendenz
 
 ## Come si lavora, in pratica
 
-Si installa il CLI, si installa in un progetto (crea `.atlas/`, registra il progetto, aggiunge le due skill), poi il ciclo è sempre lo stesso:
+Si installa il CLI, si installa in un progetto (crea `.atlas/`, registra il progetto, aggiunge le skill), poi il ciclo è sempre lo stesso:
 
-1. **Si crea o importa un grafo**, da un testo che già esiste oppure tracciandolo da zero col wayfinder se l'idea è ancora nebbia. Se ne occupa la skill `atlas-new-graph`.
+1. **Si crea o importa un grafo**, da un testo che già esiste oppure tracciandolo da zero se l'idea è ancora nebbia. Se ne occupano le skill `atlas-wayfinder` e `atlas-new-graph`.
 2. **Si guarda la frontiera** con `atlas status`, o `atlas next` per ordinarla per impatto quando i nodi prendibili sono più d'uno.
 3. **Si prende un nodo** con `atlas take <ID>`, prima di toccarlo: rivendica e stampa il suo contesto (domanda, Risposte dei bloccanti, nebbia che lo nomina) nello stesso passo.
 4. **Si lavora**: se il nodo è AFK lo fa l'agente da solo, se è HITL la skill `atlas-work` porta le domande una alla volta e aspetta.
@@ -48,7 +48,7 @@ atlas install . --graph mio-epic     # crea subito il primo grafo
 atlas install . --lang en            # contenuti e skill in inglese invece che italiano
 ```
 
-In `.atlas/` finiscono solo i dati del progetto: `config.json`, i grafi, gli script di mutazione, le skill, il contratto e un `README.md` che spiega a chi trova quella cartella come procurarsi `atlas`. Il motore non ci finisce: vive nell'eseguibile, uno per macchina. Fuori da `.atlas/` restano due symlink in `.claude/skills/`, l'hook di fine sessione in `.claude/settings.json` e il contratto in `CLAUDE.md`. Il progetto viene anche registrato in `~/.config/atlas.json` con uno slug (default: nome della cartella; `--slug` per un nome diverso).
+In `.atlas/` finiscono solo i dati del progetto: `config.json`, i grafi, gli script di mutazione, le skill, il contratto e un `README.md` che spiega a chi trova quella cartella come procurarsi `atlas`. Il motore non ci finisce: vive nell'eseguibile, uno per macchina. Fuori da `.atlas/` resta un symlink per skill in `.claude/skills/`, l'hook di fine sessione in `.claude/settings.json` e il contratto in `CLAUDE.md`. Il progetto viene anche registrato in `~/.config/atlas.json` con uno slug (default: nome della cartella; `--slug` per un nome diverso).
 
 ```bash
 atlas list                           # progetti registrati e il loro stato
@@ -139,9 +139,22 @@ atlas render -g YYMMDD-altro-epic # oppure si sceglie sul singolo comando
 
 Lo slug non si scrive al posto del comando: `atlas YYMMDD-altro-epic render` non esiste. `-g/--graph` vale sia prima sia dopo il comando (`atlas -g YYMMDD-altro-epic render` e `atlas render -g YYMMDD-altro-epic` sono la stessa cosa), e `ATLAS_GRAPH=<slug>` fa lo stesso per tutta la shell.
 
-## Le due skill
+## Le skill
 
-`atlas-new-graph` costruisce un grafo nuovo, da un testo che hai già o tracciandolo col wayfinder. `atlas-work` lavora un nodo dalla frontiera alla chiusura. Si invocano da sole quando serve.
+Si invocano da sole quando serve, e `atlas how-to` le elenca con le loro descrizioni.
+
+Tre governano il ciclo di lavoro:
+
+- **`atlas-wayfinder`** è il metodo che regge tutto il resto: nominare la destinazione, decidere invece di fare, distinguere la nebbia da un nodo, mettere fuori ambito quel che sta oltre la destinazione.
+- **`atlas-new-graph`** costruisce un grafo nuovo, da un testo che hai già o tracciandolo da zero.
+- **`atlas-work`** lavora un nodo dalla frontiera alla chiusura, e **`atlas-sync`** allinea la propria copia di un grafo condiviso prima di pubblicarci sopra.
+
+Le altre cinque dicono come si lavora un nodo, una per tipo, perché un tipo di nodo che nessun documento definisce è solo un'etichetta:
+
+- **`atlas-strategic-grilling`** e **`atlas-tactical-grilling`** sono i due modi di lavorare un nodo `grilling`. La prima è il metodo di Matt Pocock: una domanda alla volta, senza budget, finché l'albero del disegno non è percorso. La seconda lavora un ambito ristretto in tre fasi, la ricognizione dell'agente sul codice, un numero dichiarato di domande all'utente (dodici di default), la sintesi da confermare.
+- **`atlas-research`** risponde a un nodo `research` andando alle fonti primarie e citando ogni affermazione con link e data.
+- **`atlas-prototype`** costruisce l'artefatto usa e getta di un nodo `prototype`, una TUI per la logica o varianti di interfaccia da guardare accanto.
+- **`atlas-domain-modeling`** affila il linguaggio del dominio mentre si decide, e registra come ADR le sole decisioni care da rovesciare.
 
 ## Licenza
 

@@ -38,7 +38,9 @@ The line under the title, printed by `take`, says branch, type, mode, and status
 - **AFK**: you work it alone. You write the answer.
 - **HITL**: the answer gets built by talking with the user. Bring the question, one at a time, and wait. Answering on their behalf is the fastest way to make the graph pointless.
 
-For `grilling` nodes use the `grilling` and `domain-modeling` skills, for `prototype` ones the `prototype` skill, for `research` ones the `research` skill, if installed. The map's Notes may name others.
+For `grilling` nodes the grilling is the work, and Atlas ships two of them. `atlas-strategic-grilling` is the long one, for a structural or irreversible decision that constrains others: no budget, you go until the tree has been walked. `atlas-tactical-grilling` is the operational one on a narrow scope, usually code: reconnaissance on the code first, then a declared number of questions to the user, then a synthesis to confirm. What tells you which one you need is how much else depends on this node, and the graph already knows: look at what has it as a blocker, and at `atlas next`. When in doubt take the strategic one, because an irreversible decision grilled too little costs more than a narrow one grilled too much.
+
+For `prototype` nodes use `atlas-prototype`, for `research` ones `atlas-research`, and for domain vocabulary and ADRs `atlas-domain-modeling`, which pairs with either grilling. The method behind the whole graph, destination, fog and scope, lives in `atlas-wayfinder`. The map's Notes may name other skills of the project.
 
 ## 4. Work, and leave a trail in the ticket
 

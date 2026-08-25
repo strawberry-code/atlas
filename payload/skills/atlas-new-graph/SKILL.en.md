@@ -1,6 +1,6 @@
 ---
 name: atlas-new-graph
-description: Builds a new Atlas task graph, starting from a text the user already has or tracing it from scratch with the wayfinder. Use it when the user wants to plan an epic, turn a document into tasks, or says they want to create a graph.
+description: Builds a new Atlas task graph, starting from a text the user already has or tracing it from scratch with the method in `atlas-wayfinder`. Use it when the user wants to plan an epic, turn a document into tasks, or says they want to create a graph.
 ---
 
 # Building a graph
@@ -27,9 +27,9 @@ Also ask for the graph's **technical name** (kebab-case, e.g. `epic-auth`) and i
 
 ## Branch B — there's just an idea
 
-Use the `wayfinder` skill, if installed, with the stated goal of producing an Atlas graph instead of tickets on a tracker. In short, the method:
+The method lives in `atlas-wayfinder`, which says how a destination gets named, how fog is told apart from a node, and what stays out of scope. Here is the procedure:
 
-1. **Name the destination** with `grilling` and `domain-modeling`, one question at a time.
+1. **Name the destination** with `atlas-strategic-grilling` and `atlas-domain-modeling`, one question at a time.
 2. **Map the frontier** by grilling again, but breadth-first: fan out across the whole problem space instead of going deep on a single thread. This is what surfaces the fog, meaning what you don't know yet.
 3. If no fog comes up from the grilling, **stop and tell the user**: if the work is already clear, a graph is an unnecessary ceremony.
 4. Turn into nodes only what you can already formulate precisely. The test is whether you can state the question now, not whether you already know the answer. Everything else goes into the fog with `mutate.fog_add`, and it becomes a node once some answer has made it specifiable.
@@ -70,7 +70,7 @@ def run(g):
                     question="What does the pipeline produce, and how do you verify the artifact is good?",
                     blockedBy=["F01"])
 
-    mutate.note_add(g, "Interface decisions go through the design-an-interface skill.")
+    mutate.note_add(g, "Domain language decisions get written down in CONTEXT.md.")
     mutate.fog_add(g, "how updates get distributed outside the store")
 ```
 

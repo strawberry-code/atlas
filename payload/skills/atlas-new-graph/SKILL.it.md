@@ -1,6 +1,6 @@
 ---
 name: atlas-new-graph
-description: Costruisce un grafo di task Atlas nuovo, partendo da un testo che l'utente ha già oppure tracciandolo da zero con il wayfinder. Usala quando l'utente vuole pianificare un epic, trasformare un documento in task, o dice di voler creare un grafo.
+description: Costruisce un grafo di task Atlas nuovo, partendo da un testo che l'utente ha già oppure tracciandolo da zero col metodo di `atlas-wayfinder`. Usala quando l'utente vuole pianificare un epic, trasformare un documento in task, o dice di voler creare un grafo.
 ---
 
 # Costruire un grafo
@@ -27,9 +27,9 @@ Chiedi anche il **nome tecnico** del grafo (kebab-case, es. `epic-auth`) e il **
 
 ## Ramo B — c'è solo un'idea
 
-Usa la skill `wayfinder`, se installata, con l'obiettivo dichiarato di produrre un grafo Atlas invece di ticket su un tracker. In breve, il metodo:
+Il metodo sta in `atlas-wayfinder`, che dice come si nomina una destinazione, come si distingue la nebbia da un nodo e cosa resta fuori ambito. Qui la procedura:
 
-1. **Nomina la destinazione** con `grilling` e `domain-modeling`, una domanda alla volta.
+1. **Nomina la destinazione** con `atlas-strategic-grilling` e `atlas-domain-modeling`, una domanda alla volta.
 2. **Mappa la frontiera** grigliando ancora, ma in ampiezza: ventaglia su tutto lo spazio del problema invece di scendere a fondo su un filo solo. Serve a far emergere la nebbia, cioè quello che non sai ancora.
 3. Se dal grilling non emerge nebbia, **fermati e dillo all'utente**: se il lavoro è già chiaro, un grafo è una cerimonia inutile.
 4. Trasforma in nodi solo quello che sai già formulare con precisione. Il test è se riesci a enunciare la domanda adesso, non se sai già rispondere. Il resto va nella nebbia con `mutate.fog_add`, e diventerà un nodo quando qualche risposta l'avrà reso specificabile.
@@ -70,7 +70,7 @@ def run(g):
                     question="Che cosa produce la pipeline, e come si verifica che l'artefatto sia buono?",
                     blockedBy=["F01"])
 
-    mutate.note_add(g, "Le decisioni di interfaccia passano dalla skill design-an-interface.")
+    mutate.note_add(g, "Le decisioni sul linguaggio del dominio si scrivono in CONTEXT.md.")
     mutate.fog_add(g, "come si distribuiscono gli aggiornamenti fuori dallo store")
 ```
 
