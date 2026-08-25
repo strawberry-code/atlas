@@ -46,6 +46,23 @@ The method lives in `atlas-wayfinder`, which says how a destination gets named, 
 
 The **mode** is the most important question you ask of every node: can the agent write the answer alone (AFK), or does it need to be built with the human (HITL)? When in doubt, it's HITL. A node that decides something irreversible is always HITL.
 
+## Branches, and who works them
+
+A branch is not a colour on the map: it's a line of work that can move on its own. Draw them **as independent from each other as you can**, meaning with few crossing dependencies, and without forcing it: if two pieces of work genuinely depend on each other, the edge goes in anyway. Separation is a design criterion, not a rule to honour by lying about dependencies.
+
+It buys something concrete. Two independent branches are two people working at the same time without touching the same nodes, and when the graph is shared across machines they are also two sequences of closures that merge without conflict. Tangled branches produce the same work plus the collisions.
+
+A badly drawn branch is easy to spot: nearly every node in it is blocked by a node from another branch. That isn't a branch, it's the continuation of that other one, and you're better off merging them or moving the boundary until it stands on its own.
+
+**Assignments follow branches.** Assign a whole branch, not scattered nodes:
+
+```python
+mutate.assign(g, "anna", branch="L")
+mutate.assign(g, "marco", branch="A")
+```
+
+Sprinkling names over loose nodes makes the frontier unreadable: nobody recognises their own territory any more, and two people end up on the same node each believing it was free. The reasonable exception is the delivery branch, which gathers everyone's work: there a node can stay unowned, or have two owners.
+
 ## Writing the script
 
 ```sh
