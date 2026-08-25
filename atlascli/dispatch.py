@@ -123,9 +123,31 @@ def _allinea_lingua() -> None:
     strings_motore.set_language(lingua)
 
 
+def _inietta_lucchetto(radice: Path | None) -> None:
+    """Se il progetto dichiara lock.remote, costruisce il trasporto git-refs e lo
+    inietta nell'holder del motore. Feature spenta di default: senza lock.remote il
+    motore resta local-only e al boot non parte nessuna rete. Un config illeggibile
+    si ingoia, come per la lingua: a dirlo pensa il comando che quel file lo apre."""
+    if radice is None:
+        return
+    try:
+        dati = json.loads((radice / ".atlas" / "config.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    if not isinstance(dati, dict):
+        return
+    remote = dati.get("lock", {}).get("remote")
+    if not isinstance(remote, str) or not remote:
+        return
+    from core import remotelock as lucchetto
+    from .remotelock import TrasportoRefsGit
+    lucchetto.set_trasporto(TrasportoRefsGit(remote))
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else list(argv)
     _allinea_lingua()
+    _inietta_lucchetto(progetto_qui())
 
     if not argv or argv[0] in ("-h", "--help", "help"):
         build_parser().print_help()

@@ -13,7 +13,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import claims, docs, doctor, gitscan, howto, mutate, render as dash, report, scripts, strings
+from . import claims, docs, doctor, gitscan, howto, merge, mutate, render as dash, report, scripts, serve, strings
 from .config import ENV_IDENTITY, ConfigError, Workspace, workspace
 from .model import fog_line, node_of
 from .mutate import editing, validate
@@ -206,6 +206,38 @@ def cmd_doctor(ws: Workspace, args) -> int:
     return 0
 
 
+def cmd_conflicts(ws: Workspace, ref, args) -> int:
+    """I conflitti di merge irrisolti: li mostra, o li dichiara risolti.
+
+    'atlas conflicts' stampa il campo conflicts lasciato dal merge driver (A02):
+    git ha gia' dichiarato il conflitto, e qui si vede su quali nodi e campi.
+    'atlas conflicts --resolve' toglie il campo passando da mutate: chi lo lancia
+    dichiara di aver corretto graph.json a mano, non chiede al motore di decidere
+    al suo posto.
+    """
+    data = load(ref.json_path)
+    conflitti = [s for s in data.get("conflicts") or [] if isinstance(s, dict)]
+    if not conflitti:
+        print(t("conflicts.nessuno"))
+        return 0
+    if args.resolve:
+        with mutate.editing(ref) as g:
+            mutate.conflicts_clear(g)
+        for s in conflitti:
+            print(t("conflicts.risolta_riga", nodo=s.get("node") or "-",
+                    campo=s.get("field") or "-", tipo=s.get("type") or "-"))
+        print(t("conflicts.risolti"))
+        with read_transaction(ref.json_path) as data:
+            refresh(ref, data)
+        return 0
+    print(t("conflicts.intestazione", slug=ref.slug))
+    for s in conflitti:
+        print(t("conflicts.riga", nodo=s.get("node") or "-",
+                campo=s.get("field") or "-", tipo=s.get("type") or "-"))
+    print(t("conflicts.rimedio"))
+    return 0
+
+
 def cmd_whoami(ws: Workspace, args) -> int:
     """Legge o scrive il nome di chi lavora da questa copia del progetto."""
     if args.dimentica:
@@ -285,9 +317,21 @@ def _grafo(p: argparse.ArgumentParser) -> None:
     p.add_argument("-g", "--graph", default=argparse.SUPPRESS, help=t("opt.graph"))
 
 
+# I comandi su cui scatta il rinnovo-su-lettura (L06): quelli che caricano il grafo
+# mentre la sessione lavora. Ci sono i comandi del ciclo di vita (claim, close, ...)
+# e i comandi di lettura con cui il holder guarda il lavoro (status, brief, ...).
+# Restano fuori quelli che non sono 'la sessione che lavora': setup e manutenzione
+# (new, exec, doctor, how-to, ...), serve (osserva ma non lavora), merge-graph
+# (driver git) e conflicts (lettura diagnostica del merge).
+_RINNOVA_BATTITO = frozenset((
+    "status", "next", "show", "brief",
+    "claim", "take", "release", "close", "amend",
+    "fog", "assign", "unassign", "render",
+))
+
 COMANDI = ("status", "next", "graphs", "use", "show", "brief", "claim", "take", "release",
-           "close", "fog", "assign", "unassign", "whoami", "render", "new", "new-script",
-           "exec", "renumber", "validate", "doctor", "how-to")
+           "close", "fog", "assign", "unassign", "whoami", "render", "serve", "merge-graph",
+           "conflicts", "new", "new-script", "exec", "renumber", "validate", "doctor", "how-to")
 
 
 class Parser(argparse.ArgumentParser):
@@ -380,6 +424,19 @@ def aggiungi_comandi(sub) -> None:
     p.add_argument("--open", dest="aprila", action="store_true")
     p.add_argument("--all", dest="tutti", action="store_true", help=t("help.render_all")); _grafo(p)
 
+    p = sub.add_parser("serve", help=t("help.serve"))
+    p.add_argument("--port", type=int, default=0, help=t("help.serve_port"))
+    p.add_argument("--no-open", dest="apri", action="store_false", help=t("help.serve_no_open")); _grafo(p)
+
+    p = sub.add_parser("merge-graph", help=t("help.merge_graph"))
+    p.add_argument("base", help=t("help.merge_base"))
+    p.add_argument("ours", help=t("help.merge_ours"))
+    p.add_argument("theirs", help=t("help.merge_theirs"))
+
+    p = sub.add_parser("conflicts", help=t("help.conflicts"))
+    p.add_argument("--resolve", action="store_true", help=t("help.conflicts_resolve"))
+    _grafo(p)
+
     p = sub.add_parser("new", help=t("help.new"))
     p.add_argument("slug", help=t("help.new_slug")); p.add_argument("-t", "--title", required=True)
     p.add_argument("-d", "--destination", default=t("default.destination"))
@@ -409,6 +466,10 @@ def dispatch(ws: Workspace, args) -> int:
                 "renumber": cmd_renumber, "validate": cmd_validate,
                 "doctor": cmd_doctor}[args.cmd](ws, args)
 
+    if args.cmd == "merge-graph":
+        # Il driver per git: opera sui tre path, non ha bisogno del workspace.
+        return merge.merge_files(args.base, args.ours, args.theirs)
+
     if args.cmd == "render" and getattr(args, "tutti", False):
         # Il giro che faceva l'hook di fine sessione quando era uno script nel progetto.
         for slug in ws.slugs():
@@ -419,6 +480,17 @@ def dispatch(ws: Workspace, args) -> int:
         return 0
 
     ref = ws.graph(args.graph)
+    if args.cmd in _RINNOVA_BATTITO:
+        # L06: il battito di chi tiene. Un comando che carica il grafo mentre la
+        # sessione lavora e' il segnale di vita: il lease dei claim nostri si
+        # rinnova se e' vicino alla scadenza (meta' del TTL), cosi' un comando ogni
+        # TTL tiene la lock e una raffica non produce churn. Scrive solo se serve.
+        claims.rinnova_se_necessario(ref)
+    if args.cmd == "conflicts":
+        return cmd_conflicts(ws, ref, args)
+    if args.cmd == "serve":
+        return serve.cmd_serve(ref, args)
+
     if args.cmd == "close":
         node, avviso = claims.close(ref, args.node, args.sintesi, args.force, cost=args.costo, artifacts=args.artefatti)
         print(t("close.fatto", id=node["id"]))
@@ -481,12 +553,14 @@ def dispatch(ws: Workspace, args) -> int:
         report.show_brief(ref, load(ref.json_path), args.node)
         return 0
 
-    # Comandi di sola lettura: non mutano, non rigenerano, escono prima
+    # Comandi di sola lettura: non rigenerano gli artefatti, escono prima. Il
+    # rinnovo-su-lettura (sopra) puo' aver aggiornato il battito del lease scrivendo
+    # il grafo, ma qui non si toccano i file derivati.
     if args.cmd == "status":
-        report.show_status(ref, load(ref.json_path))  # sola lettura: non tocca gli artefatti
+        report.show_status(ref, load(ref.json_path))
         return 0
     if args.cmd == "next":
-        report.show_next(ref, load(ref.json_path))  # sola lettura: non tocca gli artefatti
+        report.show_next(ref, load(ref.json_path))
         return 0
 
     # Comandi che mutano (claim, release, fog, render): rigenerano sotto lock

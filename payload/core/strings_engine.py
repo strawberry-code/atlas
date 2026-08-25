@@ -37,6 +37,12 @@ STRINGS: dict[str, dict[str, str]] = {
                                            "en": "artifacts not deduced: {altro} was closed or released while\n"
                                                  "  this node was in progress, so the deduced files would be\n"
                                                  "  its files too. Declare them with --artefatti"},
+    "close.artifacts_remoto_rete": {"it": "artefatti non dedotti: il lucchetto remoto non è raggiungibile\n"
+                                          "  e non posso escludere che altre macchine abbiano lavorato in\n"
+                                          "  questa finestra. Dichiarali con --artefatti",
+                                    "en": "artifacts not deduced: the remote lock is unreachable and I\n"
+                                          "  can't rule out that other machines worked in this window.\n"
+                                          "  Declare them with --artefatti"},
     "close.artifacts_presa_illeggibile": {"it": "artefatti non dedotti: l'istante di presa di {id} non si legge\n"
                                                 "  ('{at}'). Correggilo in graph.json oppure dichiara i file\n"
                                                 "  con --artefatti",
@@ -51,6 +57,43 @@ STRINGS: dict[str, dict[str, str]] = {
                                      "  Your answer may rest on a premise that no longer holds:\n"
                                      "  re-read the node with 'atlas show {id}' and close again, or use\n"
                                      "  --force if the change doesn't affect what you wrote."},
+    "claim.remoto_tenuto": {"it": "{id} è in lavorazione su un'altra macchina ({host}) "
+                                  "con un lease fresco: aspetta che scada, o forza.",
+                            "en": "{id} is being worked on another machine ({host}) "
+                                  "with a fresh lease: wait for it to expire, or force."},
+    "claim.remoto_rete": {"it": "il lucchetto remoto non è raggiungibile: niente è stato "
+                                "scritto su {id}. Riprova, oppure togli lock.remote dalla "
+                                "config per lavorare solo in locale.",
+                          "en": "the remote lock is unreachable: nothing was written to {id}. "
+                                "Retry, or remove lock.remote from the config to work local-only."},
+    "claim.remoto_rete_rinnovo": {"it": "remote non raggiungibile: il rinnovo del lucchetto "
+                                          "è rimandato, mostro lo stato locale",
+                                 "en": "remote unreachable: lock renewal is postponed, "
+                                       "showing local state"},
+    "claim.remoto_gara": {"it": "il lucchetto remoto di {id} è cambiato nel frattempo: riprova.",
+                          "en": "the remote lock of {id} changed meanwhile: retry."},
+    "close.remoto_tenuto": {"it": "{id} è rivendicato da un'altra macchina ({host}) con un "
+                                  "lease fresco: aspetta la scadenza o usa --force.",
+                            "en": "{id} is claimed by another machine ({host}) with a fresh "
+                                  "lease: wait for it to expire or use --force."},
+    "close.remoto_rete": {"it": "il lucchetto remoto non è raggiungibile: {id} non è stato "
+                                "chiuso. Riprova, oppure usa --force.",
+                          "en": "the remote lock is unreachable: {id} was not closed. Retry, "
+                                "or use --force."},
+    "close.remoto_rete_rilascio": {"it": "non sono riuscito a liberare la serratura remota "
+                                         "di {id}: scadrà da sola.",
+                                   "en": "couldn't release the remote lock of {id}: it will "
+                                         "expire on its own."},
+    "release.remoto_non_tuo": {"it": "{id} è tenuto da un'altra macchina ({host}) con un "
+                                     "lease fresco: non si può rilasciare qui.",
+                               "en": "{id} is held by another machine ({host}) with a fresh "
+                                     "lease: it can't be released here."},
+    "release.remoto_rete": {"it": "il lucchetto remoto non è raggiungibile: {id} non è stato "
+                                  "rilasciato. Riprova, oppure togli lock.remote dalla config.",
+                            "en": "the remote lock is unreachable: {id} was not released. "
+                                  "Retry, or remove lock.remote from the config."},
+    "release.remoto_gara": {"it": "il lucchetto remoto di {id} è cambiato nel frattempo: riprova.",
+                            "en": "the remote lock of {id} changed meanwhile: retry."},
 
     # --- mutate.py ---
     "mutate.id_duplicato": {"it": "id duplicato: {id}", "en": "duplicate id: {id}"},
@@ -143,6 +186,12 @@ STRINGS: dict[str, dict[str, str]] = {
     "store.grafo_senza_nodi": {"it": "{path} non ha la lista 'nodes', quindi non è un grafo Atlas.",
                                "en": "{path} has no 'nodes' list, so it is not an Atlas graph."},
 
+    # --- merge.py ---
+    "merge.conflitto": {"it": "  conflitto su {nodo}: {campo} ({tipo})",
+                        "en": "  conflict on {nodo}: {campo} ({tipo})"},
+    "merge.illeggibile": {"it": "{path} non si legge come JSON ({dettaglio}): merge non eseguito.",
+                          "en": "{path} is not readable as JSON ({dettaglio}): merge not performed."},
+
     # --- docs.py (errori) ---
     "docs.marker_sezione_persa": {"it": "la sezione '{heading}' di map.md ha perso il marker {mark}.\n"
                                         "  Senza quel confine non si sa dove finisce la prosa scritta a mano.",
@@ -152,4 +201,25 @@ STRINGS: dict[str, dict[str, str]] = {
                                       "  Rimettila, oppure cancella map.md e lascia che 'atlas render' la ricrei.",
                                "en": "map.md has no section '{heading}': renaming it stops regeneration.\n"
                                      "  Put it back, or delete map.md and let 'atlas render' recreate it."},
+
+    # --- render_panels.py (lucchetti remoti nella dashboard) ---
+    "render.remoto": {"it": "Lucchetti remoti", "en": "Remote locks"},
+    "render.remoto_vuoto": {"it": "nessun lucchetto remoto su altre macchine",
+                            "en": "no remote locks on other machines"},
+    "render.remoto_rete": {"it": "remote non raggiungibile: mostro l'ultima lettura",
+                           "en": "remote unreachable: showing the last read"},
+    "render.remoto_scaduto": {"it": "scaduto", "en": "expired"},
+    "render.remoto_scade": {"it": "scade alle {ora}", "en": "expires at {ora}"},
+    "render.remoto_ignoto": {"it": "scadenza ignota", "en": "unknown expiry"},
+
+    # --- doctor.py ---
+    "doctor.remoto_rete": {"it": "il lucchetto remoto non risponde: le macchine non si "
+                                 "vedono, verifica la rete o togli lock.remote dalla config",
+                           "en": "the remote lock is not responding: the machines can't "
+                                 "see each other, check the network or remove lock.remote "
+                                 "from the config"},
+    "doctor.remoto_spento": {"it": "la config dichiara lock.remote ma il lucchetto remoto "
+                                   "non è attivo: le macchine non si proteggono a vicenda",
+                             "en": "the config declares lock.remote but the remote lock is "
+                                   "not active: the machines don't protect each other"},
 }

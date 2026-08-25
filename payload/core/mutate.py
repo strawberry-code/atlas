@@ -91,6 +91,18 @@ def note_add(g: Editor, line: str) -> None:
     g.data["meta"]["notes"].append(line)
 
 
+def conflicts_clear(g: Editor) -> None:
+    """Dichiara risolti i conflitti di merge: toglie il campo 'conflicts' dal grafo.
+
+    La risoluzione vera e' di chi legge: modifica graph.json a mano scegliendo la
+    parte giusta, poi questo gesto toglie il marcatore che il merge driver ha
+    lasciato (A02). Senza la correzione a mano il campo sparisce ma il contenuto
+    resta quello del merge, cioe' 'nostro vince sul conflitto': il gesto dichiara,
+    non risolve. Passa da mutate perche' la forma del grafo si cambia solo da qui.
+    """
+    g.data.pop("conflicts", None)
+
+
 # --- nascita di un grafo ---------------------------------------------------
 
 def _slug_tecnico(testo: str) -> str:

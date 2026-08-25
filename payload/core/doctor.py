@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from . import claims, docs, gitscan
+from . import claims, docs, gitscan, remotelock
 from .config import ConfigError, Graph, Workspace
 from .model import by_id, claimed, is_done, istante, owners_of
 from .report import ETICHETTA
@@ -15,6 +15,17 @@ from .topology import convergence
 def doctor_avvisi(data: dict, ref: Graph, agente: dict) -> list[str]:
     """Avvisi sulla salute di un grafo: non bloccano niente, segnalano soltanto."""
     avvisi = []
+
+    # Un merge che non ha saputo risolvere lascia il campo conflicts nel grafo
+    # (A02): e' il caso in cui doctor serve di piu', perche' git ha gia' dichiarato
+    # il conflitto e il grafo aspetta una decisione che solo un umano prende.
+    # Il grafo resta leggibile e valido, quindi il controllo non puo' mai morire.
+    conflitti = [s for s in data.get("conflicts") or [] if isinstance(s, dict)]
+    for s in conflitti:
+        avvisi.append(t("doctor.conflitto", nodo=s.get("node") or "-",
+                        campo=s.get("field") or "-", tipo=s.get("type") or "-"))
+    if conflitti:
+        avvisi.append(t("doctor.conflitti_rimedio"))
 
     # A grafo finito la non-convergenza non ha piu' niente da dire, e ripetuta
     # a ogni esecuzione insegnerebbe solo a ignorare gli avvisi.
@@ -70,6 +81,22 @@ def doctor_avvisi(data: dict, ref: Graph, agente: dict) -> list[str]:
         canonico = owners_of(nodo)
         if grezzo is not None and grezzo != canonico:
             avvisi.append(t("doctor.owner_non_canonico", id=nodo["id"], chi=", ".join(canonico)))
+
+    # Il lucchetto remoto (L07): riferirne lo stato senza morire. Attivo e
+    # raggiungibile e' silenzio; dichiarato in config ma non attivo, o attivo ma
+    # irraggiungibile, e' un avviso: due macchine che non si vedono possono pestarsi,
+    # ed e' esattamente cio' che il lucchetto deve evitare. Un trasporto che alza
+    # invece di rispondere non deve far morire l'unico comando che serve quando qualcosa
+    # e' gia' rotto.
+    if remotelock.attivo():
+        try:
+            letto = remotelock.elenca()
+        except Exception:
+            letto = remotelock.Esito(remotelock.RETE)
+        if not isinstance(letto, list):
+            avvisi.append(t("doctor.remoto_rete"))
+    elif ref.workspace.config.get("lock", {}).get("remote"):
+        avvisi.append(t("doctor.remoto_spento"))
 
     return avvisi
 

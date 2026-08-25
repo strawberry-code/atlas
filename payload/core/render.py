@@ -89,7 +89,11 @@ def _mappa(data: dict, depth: dict, front_ids: set[str], gruppi: dict[str, int])
     )
 
 
-def build(ref: Graph, data: dict) -> str:
+def build(ref: Graph, data: dict, remoto: list[object] | None = None,
+          remoto_errore: bool = False) -> str:
+    """La pagina. 'remoto' e' la verita' dei lucchetti delle altre macchine come
+    l'ha letta serve.py (remotelock.elenca), None se il lucchetto remoto e' spento:
+    allora la vista e' quella di oggi, senza pannello."""
     depth = levels(data)
     front = frontier(data)
     presi = claimed(data)
@@ -106,7 +110,7 @@ def build(ref: Graph, data: dict) -> str:
         f'<title>{escape(data["meta"]["title"])} · atlas</title>'
         f'{stampo_prefs}<style>{leggi_template("dashboard.css")}</style></head><body>'
         f'{_topbar(ref, data, front, presi)}'
-        f'<aside class="side">{render_panels.panels(ref, data, front, presi, gruppi)}</aside>'
+        f'<aside class="side">{render_panels.panels(ref, data, front, presi, gruppi, remoto=remoto, remoto_errore=remoto_errore)}</aside>'
         f'{_mappa(data, depth, front_ids, gruppi)}'
         f'{render_table.table(data, front_ids)}'
         f'{render_sheet.sheet()}{render_sheet.data_island(ref, data, front_ids)}'

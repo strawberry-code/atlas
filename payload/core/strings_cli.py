@@ -60,6 +60,23 @@ STRINGS: dict[str, dict[str, str]] = {
     "help.whoami_clear": {"it": "dimentica il nome", "en": "forgets the name"},
     "help.render": {"it": "rigenera ticket, mappa e dashboard",
                     "en": "regenerates tickets, map and dashboard"},
+    "help.serve": {"it": "serve la dashboard su un server locale, viva",
+                   "en": "serves the dashboard on a local server, live"},
+    "help.serve_port": {"it": "porta del server (0 = scegli una porta libera)",
+                        "en": "server port (0 = pick a free port)"},
+    "help.serve_no_open": {"it": "non aprire il browser all'avvio",
+                           "en": "do not open the browser on startup"},
+    "help.merge_graph": {"it": "fonde tre versioni di graph.json per id di nodo (driver per git)",
+                         "en": "merges three graph.json versions by node id (git driver)"},
+    "help.merge_base": {"it": "l'antenato comune, %%O", "en": "the common ancestor, %%O"},
+    "help.merge_ours": {"it": "la nostra versione, che viene riscritta, %%A",
+                        "en": "our version, which gets rewritten, %%A"},
+    "help.merge_theirs": {"it": "la versione dell'altro ramo, %%B",
+                          "en": "the other branch's version, %%B"},
+    "help.conflicts": {"it": "i conflitti di merge irrisolti del grafo attivo",
+                       "en": "the active graph's unresolved merge conflicts"},
+    "help.conflicts_resolve": {"it": "dichiara risolti i conflitti e toglie il campo dal grafo",
+                               "en": "declares conflicts resolved and removes the field from the graph"},
     "help.new": {"it": "crea un grafo nuovo", "en": "creates a new graph"},
     "help.new_slug": {"it": "nome tecnico del grafo, in kebab-case (la data di creazione "
                             "viene anteposta in automatico: YYMMDD-nome)",
@@ -153,8 +170,28 @@ STRINGS: dict[str, dict[str, str]] = {
                                      "Verifica che non sia una scrittura fuori scopo.",
                               "en": "{id} is closed but these artifacts were modified afterwards: {elenco}. "
                                     "Check it isn't an out-of-scope write."},
+    "doctor.conflitto": {"it": "conflitto di merge irrisolto su {nodo}: {campo} ({tipo})",
+                         "en": "unresolved merge conflict on {nodo}: {campo} ({tipo})"},
+    "doctor.conflitti_rimedio": {"it": "conflitti irrisolti: correggi graph.json a mano e poi "
+                                       "dichiarali risolti con 'atlas conflicts --resolve'",
+                                "en": "unresolved conflicts: fix graph.json by hand, then "
+                                      "declare them resolved with 'atlas conflicts --resolve'"},
     "si": {"it": "sì", "en": "yes"},
     "no": {"it": "no", "en": "no"},
+
+    # --- cmd_conflicts ---
+    "conflicts.nessuno": {"it": "  nessun conflitto irrisolto", "en": "  no unresolved conflicts"},
+    "conflicts.intestazione": {"it": "  conflitti irrisolti di '{slug}':",
+                               "en": "  unresolved conflicts of '{slug}':"},
+    "conflicts.riga": {"it": "    {nodo}: {campo} ({tipo})", "en": "    {nodo}: {campo} ({tipo})"},
+    "conflicts.rimedio": {"it": "  Correggi graph.json a mano scegliendo la parte giusta, poi "
+                                "'atlas conflicts --resolve'.",
+                          "en": "  Fix graph.json by hand picking the right side, then "
+                                "'atlas conflicts --resolve'."},
+    "conflicts.risolta_riga": {"it": "  dichiarato risolto: {nodo}: {campo} ({tipo})",
+                               "en": "  declared resolved: {nodo}: {campo} ({tipo})"},
+    "conflicts.risolti": {"it": "  conflitti dichiarati risolti: il campo è stato tolto da graph.json",
+                          "en": "  conflicts declared resolved: the field was removed from graph.json"},
 
     # --- dispatch ---
     "use.attivo": {"it": "  grafo attivo: {slug}", "en": "  active graph: {slug}"},
@@ -195,6 +232,12 @@ STRINGS: dict[str, dict[str, str]] = {
     "whoami.scritto": {"it": "  sei {nome} · scritto in {path}, non versionato",
                        "en": "  you are {nome} · written to {path}, not versioned"},
     "whoami.dimenticato": {"it": "  nome dimenticato", "en": "  name forgotten"},
+
+    # --- serve.py ---
+    "serve.avviato": {"it": "  dashboard su {url} (grafo {slug}); Ctrl-C per fermare",
+                      "en": "  dashboard at {url} (graph {slug}); Ctrl-C to stop"},
+    "serve.grafo_mancante": {"it": "il grafo non si legge ancora",
+                             "en": "the graph is not readable yet"},
 
     # --- hooks/session_end.py ---
     "hook.rivendicato": {"it": "Atlas: {elenco} resta rivendicato. "

@@ -7,9 +7,10 @@ e' la parte che cambia piu' spesso perche' segue quel che il grafo ha da dire.
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from html import escape
 
-from . import claims, render_owners, theme
+from . import claims, remotelock, render_owners, theme
 from .config import Graph
 from .model import progress
 from .strings import t
@@ -90,8 +91,40 @@ def _blocco_caution(data: dict, fatti: int, totale: int) -> str:
     )
 
 
+def _ora(epoch: int) -> str:
+    """L'ora locale di una scadenza in epoch, per la vista."""
+    return datetime.fromtimestamp(epoch).strftime("%H:%M")
+
+
+def _blocco_remoto(ref: Graph, remoto: list[object], errore: bool) -> str:
+    """Chi tiene cosa sulle altre macchine: host, scadenza, se il lease e' scaduto.
+
+    La ref remota viaggia come '<slug>/<id>': qui si ritaglia l'id del nodo e si
+    mostra la scadenza del lease. Il payload della ref porta solo host e scadenza,
+    quindi 'da quando' si legge come 'scade alle': l'istante di presa non viaggia."""
+    voci = []
+    for e in sorted(remoto, key=lambda x: (x.nome or "")):
+        nome = (e.nome or "").split("/", 1)[1] if "/" in (e.nome or "") else (e.nome or "")
+        host = escape(e.host or "?")
+        scad = e.scadenza
+        if scad is None:
+            etichetta = t("render.remoto_ignoto")
+        elif remotelock.fresco(scad):
+            etichetta = t("render.remoto_scade", ora=_ora(scad))
+        else:
+            etichetta = t("render.remoto_scaduto")
+        voci.append(
+            f'<li data-node="{escape(nome)}"><b>{escape(nome)}</b> '
+            f'<span class="tag">{host} · {etichetta}</span></li>'
+        )
+    if errore:
+        voci.insert(0, f'<li class="remoto-rete">{escape(t("render.remoto_rete"))}</li>')
+    return _blocco_lista(t("render.remoto"), voci, t("render.remoto_vuoto"))
+
+
 def panels(ref: Graph, data: dict, front: list[dict], presi: list[dict],
-           gruppi: dict[str, int]) -> str:
+           gruppi: dict[str, int], remoto: list[object] | None = None,
+           remoto_errore: bool = False) -> str:
     agente = ref.workspace.config["agent"]
     fatti, totale = progress(data)
     voci_front = [
@@ -120,6 +153,11 @@ def panels(ref: Graph, data: dict, front: list[dict], presi: list[dict],
             f'{claims.claim_state(n, agente)}</span></li>' for n in presi
         ]
         blocchi.append(_blocco_lista(t("render.in_lavorazione"), voci, "", hl="claimed"))
+    # I lucchetti delle altre macchine: compaiono solo col lucchetto remoto attivo
+    # (serve.py li inietta come dati), e si mettono accanto a 'in lavorazione'
+    # perche' dicono la stessa cosa dall'altro lato della rete.
+    if remoto is not None or remoto_errore:
+        blocchi.append(_blocco_remoto(ref, remoto or [], remoto_errore))
     chiusi = [n for n in data["nodes"] if n["status"] == "closed"]
     if chiusi:
         voci_chiusi = [

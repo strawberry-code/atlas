@@ -17,12 +17,15 @@ DIRNAME = ".atlas"
 ENV_GRAPH = "ATLAS_GRAPH"
 ENV_ROOT = "ATLAS_ROOT"
 ENV_IDENTITY = "ATLAS_IDENTITY"
+ENV_HOST = "ATLAS_HOST"
 
 DEFAULTS = {
     "project": "progetto",
     "language": "it",
     "agent": {"process_name": "claude", "default_assignee": "claude",
-              "idle_hours": 4, "max_claims_per_session": 1},
+              "idle_hours": 4, "max_claims_per_session": 1,
+              "lease_ttl_seconds": 3600},
+    "lock": {"remote": None},
     "git": {"commit_on_close": False, "commit_type": "feat", "stage": "node-paths"},
     "vocab": {"types": ["grilling", "research", "prototype", "task"],
               "modes": ["HITL", "AFK"],

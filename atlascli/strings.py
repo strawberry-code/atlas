@@ -103,6 +103,12 @@ STRINGS: dict[str, dict[str, str]] = {
                          "en": "\n  Try:  atlas doctor"},
     "install.primo_grafo": {"it": "  Primo grafo: atlas new <slug> -t \"Titolo\"",
                            "en": "  First graph: atlas new <slug> -t \"Title\""},
+    "install.merge_driver_ok": {"it": "merge driver git registrato (config e .gitattributes)",
+                                "en": "git merge driver registered (config and .gitattributes)"},
+    "install.merge_driver_dry_run": {"it": "registrerebbe il merge driver git (config e .gitattributes)",
+                                     "en": "would register the git merge driver (config and .gitattributes)"},
+    "install.merge_driver_commento": {"it": "# Atlas: merge driver per i grafi",
+                                      "en": "# Atlas: merge driver for graphs"},
 
     "update.errore_rete": {"it": "\n  impossibile controllare la nuova versione: {errore}\n",
                           "en": "\n  couldn't check for a new version: {errore}\n"},

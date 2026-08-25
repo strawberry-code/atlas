@@ -95,4 +95,6 @@ STRINGS: dict[str, dict[str, str]] = {
                               "en": "changes the meta fields: title, destination, notes"},
     "howto.mutate.note_add": {"it": "aggiunge una nota al grafo, che finisce in mappa",
                               "en": "adds a note to the graph, which ends up in the map"},
+    "howto.mutate.conflicts_clear": {"it": "dichiara risolti i conflitti di merge e toglie il campo dal grafo",
+                                     "en": "declares merge conflicts resolved and removes the field from the graph"},
 }

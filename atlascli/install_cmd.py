@@ -55,6 +55,41 @@ CONFIG = {
               "statuses": ["open", "claimed", "closed", "out-of-scope"]},
 }
 
+# Il merge driver per i graph.json: git chiama 'atlas merge-graph' quando deve
+# unire un grafo (%O antenato, %A nostro, %B loro). Il nome del driver deve
+# combaciare nei due punti: l'attributo in .gitattributes e la voce nel config
+# git. Chi usa il progetto ha atlas su PATH: qui si scrive la config, non si
+# verifica che il comando esista.
+MERGE_DRIVER = "atlas-graph"
+MERGE_COMANDO = "atlas merge-graph %O %A %B"
+ATTRIBUTI_MERGE = f".atlas/graphs/*/graph.json merge={MERGE_DRIVER}"
+
+
+def _gitdir_da_file(punto: Path) -> Path | None:
+    """La gitdir scritta in un .git che e' un file (worktree o submodule)."""
+    testo = punto.read_text(encoding="utf-8").strip()
+    if not testo.startswith("gitdir:"):
+        return None
+    return (punto.parent / testo.split(":", 1)[1].strip()).resolve()
+
+
+def config_gia_registrato(testo: str) -> bool:
+    """Vero se il config git ha gia' il driver sotto [merge \"atlas-graph\"]."""
+    sezione = None
+    for riga in testo.splitlines():
+        riga = riga.strip()
+        if riga.startswith("[") and riga.endswith("]"):
+            sezione = riga[1:-1].strip().replace('"', "").strip()
+        elif sezione == "merge atlas-graph" and riga.startswith("driver"):
+            return True
+    return False
+
+
+def config_con_driver(testo: str) -> str:
+    """Il config git con la sezione del driver aggiunta in coda."""
+    blocco = f'\n[merge "{MERGE_DRIVER}"]\n\tdriver = {MERGE_COMANDO}\n'
+    return testo.rstrip() + blocco if testo.strip() else blocco.lstrip("\n")
+
 
 class Installer:
     def __init__(self, target: Path, args, lingua: str = "it"):
@@ -69,7 +104,11 @@ class Installer:
 
     def scrive(self, path: Path, testo: str) -> None:
         if self.args.dry_run:
-            self.dice(t("install.scriverebbe", path=path.relative_to(self.target)))
+            try:
+                rel = path.relative_to(self.target)
+            except ValueError:
+                rel = path  # fuori dal progetto: e' il config comune di una worktree
+            self.dice(t("install.scriverebbe", path=rel))
             return
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(testo, encoding="utf-8")
@@ -242,6 +281,55 @@ class Installer:
                     if testo.strip() else f"{commento}\n{coda}\n")
         self.dice(t("install.gitignore_righe", n=len(mancanti)))
 
+    def _config_git(self) -> Path | None:
+        """Il file config della repo del progetto, o None se non e' una repo.
+
+        .git e' una cartella (repo normale) o un file con 'gitdir: <path>'
+        (worktree o submodule). Per i worktree il config vero sta nel commondir,
+        che il file commondir dentro la gitdir indica rispetto alla gitdir stessa.
+        """
+        punto = self.target / ".git"
+        if punto.is_dir():
+            return punto / "config"
+        if punto.is_file():
+            gitdir = _gitdir_da_file(punto)
+            if gitdir is None:
+                return None
+            commondir = gitdir / "commondir"
+            if commondir.is_file():
+                base = (gitdir / commondir.read_text(encoding="utf-8").strip()).resolve()
+                return base / "config"
+            return gitdir / "config"
+        return None
+
+    def registra_merge_driver(self) -> None:
+        """Registra il merge driver git per i graph.json, se il progetto e' una repo.
+
+        Due scritture: la riga in .gitattributes (radice del working tree) e la
+        voce nel config git locale. Progetto senza .git: niente da registrare, e
+        non e' un errore. Se la registrazione c'e' gia', non si riscrive a vuoto.
+        """
+        config_path = self._config_git()
+        if config_path is None:
+            return
+        attributi = self.target / ".gitattributes"
+        testo_config = config_path.read_text(encoding="utf-8") if config_path.is_file() else ""
+        testo_attr = attributi.read_text(encoding="utf-8") if attributi.is_file() else ""
+        scritto = False
+
+        if ATTRIBUTI_MERGE not in testo_attr:
+            commento = t("install.merge_driver_commento")
+            coda = (f"{testo_attr.rstrip()}\n\n{commento}\n{ATTRIBUTI_MERGE}\n"
+                    if testo_attr.strip() else f"{commento}\n{ATTRIBUTI_MERGE}\n")
+            self.scrive(attributi, coda)
+            scritto = True
+        if not config_gia_registrato(testo_config):
+            self.scrive(config_path, config_con_driver(testo_config))
+            scritto = True
+        if scritto:
+            chiave = "install.merge_driver_dry_run" if self.args.dry_run else "install.merge_driver_ok"
+            self.dice(t(chiave))
+
     def primo_grafo(self) -> None:
         if not self.args.graph or self.args.dry_run:
             return
@@ -332,6 +420,7 @@ class Installer:
         self.registra_hook()
         self.contratto()
         self.gitignore()
+        self.registra_merge_driver()
         self.primo_grafo()
         self.rifa_dashboard()
         self.registra_globalmente()
