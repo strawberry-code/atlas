@@ -54,5 +54,24 @@ def owners(data: dict) -> dict[str, list[str]]:
     return {nome: mappa[nome] for nome in sorted(mappa, key=chiave_nome)}
 
 
+def squadre(data: dict) -> dict[tuple[str, ...], list[str]]:
+    """Le combinazioni di due o piu' persone che almeno un nodo ha davvero, coi
+    suoi nodi. Ordinate come i nomi che le compongono.
+
+    Un nodo congiunto continua a comparire anche sotto ogni singola persona in
+    owners(): la squadra non sostituisce le righe individuali, le affianca.
+    Senza, il pannello mostra tre nomi e chi guarda non sa dire se lavorano
+    insieme o su nodi diversi, che e' proprio l'informazione che il campo owner
+    a vettore ha reso rappresentabile.
+    """
+    mappa: dict[tuple[str, ...], list[str]] = {}
+    for node in data["nodes"]:
+        nomi = tuple(owners_of(node))
+        if len(nomi) > 1:
+            mappa.setdefault(nomi, []).append(node["id"])
+    return {nomi: mappa[nomi]
+            for nomi in sorted(mappa, key=lambda gruppo: [chiave_nome(n) for n in gruppo])}
+
+
 def unowned(data: dict) -> list[str]:
     return [n["id"] for n in data["nodes"] if not owners_of(n)]

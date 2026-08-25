@@ -11,7 +11,7 @@ from datetime import datetime
 
 # La lettura degli assegnatari sta in owners.py: col campo a vettore qui non ci stava piu'.
 # Si ri-esporta da model perche' e' li' che la cercano i chiamanti, dentro e fuori dal motore.
-from .owners import chiave_nome, owners, owners_of, unowned  # noqa: F401
+from .owners import chiave_nome, owners, owners_of, squadre, unowned  # noqa: F401
 from .store import CLAIMED, CLOSED, DROPPED, OPEN, StateError
 from .strings import t
 

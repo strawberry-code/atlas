@@ -1392,7 +1392,11 @@ class Assegnazioni(Base):
             self.mutate.assign(g, "anna,marco", ["F01"])
         pagina = self.render.build(self.ref, self.store.load(self.ref.json_path))
 
-        self.assertIn('data-owners="1 2"', pagina, "il nodo condiviso porta piu' indici")
+        self.assertIn('data-owners="1 2 3"', pagina,
+                      "il nodo condiviso porta le sue persone e la loro squadra")
+        pannello = pagina.split(">assegnazioni<")[1].split("</section>")[0]
+        self.assertIn('<li data-owner="3">anna + marco<span class="tag">1</span>', pannello,
+                      "la squadra e' una riga sua, dopo le persone")
 
         tabella = pagina.split('<div class="tablewrap">')[1].split("</table>")[0]
         riga_f01 = tabella.split('<tr data-node="F01">')[1].split("</tr>")[0]
