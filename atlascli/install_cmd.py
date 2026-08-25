@@ -20,7 +20,7 @@ import tarfile
 from pathlib import Path
 
 from . import hook, registry
-from .errori import leggi_json
+from .errori import ErroreAtlas, leggi_json
 from .registry import RegistryError
 from .progetto import template
 from .strings import set_language, t
@@ -107,7 +107,11 @@ class Installer:
 
     def scrive_documenti(self) -> None:
         """SKILL.md nella lingua scelta, il contratto e il README della cartella."""
-        for skill in (self.root / "skills").iterdir():
+        # Le skill possono non esserci: uninstall le porta via e lascia config.json,
+        # che e' la firma del progetto. Da quello stato un 'atlas lang' moriva su
+        # iterdir() con un FileNotFoundError nudo, invece di rifare i documenti.
+        skills = self.root / "skills"
+        for skill in (skills.iterdir() if skills.is_dir() else ()):
             if skill.is_dir():
                 shutil.copyfile(skill / f"SKILL.{self.lingua}.md", skill / "SKILL.md")
         self.scrive(self.root / "CONTRACT.md", template(f"contract.{self.lingua}.md"))
@@ -129,13 +133,25 @@ class Installer:
         if tolti:
             self.dice(t("install.residui_rimossi", elenco=", ".join(tolti)))
 
+    def _nome_chiesto(self) -> str:
+        """Il nome del progetto chiesto a chi installa, o la diagnosi se non c'e' nessuno.
+
+        Senza un terminale la domanda non ha risposta possibile, e input() usciva come
+        EOFError nudo: succedeva a chiunque lanciasse install da uno script, da una CI
+        o da un agente, cioe' i chiamanti per cui l'harness esiste.
+        """
+        try:
+            risposta = input(t("install.nome_progetto", default=self.target.name))
+        except EOFError:
+            raise ErroreAtlas(t("install.stdin_muto")) from None
+        return risposta.strip() or self.target.name
+
     def configura(self) -> None:
         path = self.root / "config.json"
         if path.is_file():
             self.dice(t("install.config_presente"))
             return
-        nome = self.target.name if self.args.yes else (
-            input(t("install.nome_progetto", default=self.target.name)).strip() or self.target.name)
+        nome = self.target.name if self.args.yes else self._nome_chiesto()
         cfg = dict(CONFIG, project=nome, language=self.lingua)
         self.scrive(path, json.dumps(cfg, ensure_ascii=False, indent=2) + "\n")
         self.dice(t("install.config_creato", nome=nome))
@@ -196,7 +212,11 @@ class Installer:
         if self.args.no_claude_md:
             return
         path = self.target / "CLAUDE.md"
-        blocco = f"{BEGIN}\n{(self.root / 'CONTRACT.md').read_text(encoding='utf-8').strip()}\n{END}"
+        # Il contratto si prende dal template, non da .atlas/CONTRACT.md appena scritto:
+        # sono lo stesso testo, ma sotto --dry-run quel file non viene scritto affatto e
+        # rileggerlo faceva morire l'anteprima con un FileNotFoundError, cioe' proprio
+        # nel modo in cui si controlla un'installazione prima di farla.
+        blocco = f"{BEGIN}\n{template(f'contract.{self.lingua}.md').strip()}\n{END}"
         if path.is_file():
             testo = path.read_text(encoding="utf-8")
             if BEGIN in testo:

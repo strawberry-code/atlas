@@ -8,15 +8,20 @@ cui uscirne. Un guasto previsto deve diventare un messaggio, non uno stack.
 from __future__ import annotations
 
 import json
+import shutil
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "payload"))
 
+from atlascli import install_cmd  # noqa: E402
+from atlascli.errori import ErroreAtlas  # noqa: E402
 from tests.test_motore import Base  # noqa: E402
 
 
@@ -185,6 +190,80 @@ class UscitaUtf8(unittest.TestCase):
         with mock.patch.object(entrypoint.sys, "stdout", object()), \
              mock.patch.object(entrypoint.sys, "stderr", object()):
             entrypoint._uscita_utf8()      # non deve sollevare
+
+
+class _ProgettoVuoto(unittest.TestCase):
+    """Una cartella qualsiasi, com'e' quella su cui si lancia install la prima volta."""
+
+    def setUp(self):
+        self.target = Path(tempfile.mkdtemp())
+
+    def tearDown(self):
+        shutil.rmtree(self.target, ignore_errors=True)
+
+    def args(self, **extra):
+        base = dict(dry_run=True, yes=True, no_claude_md=False, no_hooks=True,
+                    graph=None, slug=None, no_registry=True)
+        base.update(extra)
+        return SimpleNamespace(**base)
+
+    def installer(self, **extra) -> install_cmd.Installer:
+        return install_cmd.Installer(self.target, self.args(**extra), "it")
+
+
+class AnteprimaInstall(_ProgettoVuoto):
+    """--dry-run e' il modo in cui si controlla un'installazione prima di farla: se
+    muore proprio sul progetto pulito, l'anteprima non serve a niente. Moriva perche'
+    contratto() rileggeva .atlas/CONTRACT.md, che in anteprima non viene scritto."""
+
+    def test_l_anteprima_non_muore_e_non_scrive_niente(self):
+        self.installer().contratto()
+        self.assertFalse((self.target / "CLAUDE.md").exists())
+
+    def test_fuori_dall_anteprima_il_contratto_finisce_davvero_in_claude_md(self):
+        self.installer(dry_run=False).contratto()
+        testo = (self.target / "CLAUDE.md").read_text(encoding="utf-8")
+        self.assertIn(install_cmd.BEGIN, testo)
+        self.assertIn(install_cmd.END, testo)
+        self.assertLess(len(install_cmd.BEGIN) + len(install_cmd.END) + 200, len(testo))
+
+    def test_no_claude_md_resta_una_rinuncia(self):
+        self.installer(dry_run=False, no_claude_md=True).contratto()
+        self.assertFalse((self.target / "CLAUDE.md").exists())
+
+
+class ProgettoSenzaSkill(_ProgettoVuoto):
+    """Lo stato in cui uninstall lascia un progetto: config.json c'e' ancora, ed e' la
+    firma, mentre .atlas/skills e' stata portata via. Da li' i comandi devono reggere."""
+
+    def test_i_documenti_si_rifanno_anche_senza_la_cartella_delle_skill(self):
+        (self.target / ".atlas").mkdir()
+        self.installer(dry_run=False).scrive_documenti()      # non deve sollevare
+        self.assertTrue((self.target / ".atlas" / "CONTRACT.md").is_file())
+        self.assertTrue((self.target / ".atlas" / "README.md").is_file())
+
+
+class InstallSenzaTerminale(_ProgettoVuoto):
+    """Install da uno script, da una CI o da un agente: nessuno puo' rispondere alla
+    domanda sul nome del progetto, e input() usciva come EOFError nudo."""
+
+    def setUp(self):
+        super().setUp()
+        (self.target / ".atlas").mkdir()
+
+    def test_stdin_muto_diventa_una_diagnosi_che_dice_come_uscirne(self):
+        inst = self.installer(dry_run=False, yes=False)
+        with mock.patch("builtins.input", side_effect=EOFError):
+            with self.assertRaises(ErroreAtlas) as caso:
+                inst.configura()
+        self.assertIn("--yes", str(caso.exception))
+
+    def test_con_yes_non_chiede_niente_e_prende_il_nome_della_cartella(self):
+        inst = self.installer(dry_run=False)
+        with mock.patch("builtins.input", side_effect=AssertionError("non deve chiedere")):
+            inst.configura()
+        cfg = json.loads((self.target / ".atlas" / "config.json").read_text(encoding="utf-8"))
+        self.assertEqual(self.target.name, cfg["project"])
 
 
 if __name__ == "__main__":

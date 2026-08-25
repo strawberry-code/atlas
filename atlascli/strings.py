@@ -67,6 +67,10 @@ STRINGS: dict[str, dict[str, str]] = {
     "install.config_presente": {"it": "config.json già presente, lasciato com'era",
                                "en": "config.json already present, left as-is"},
     "install.nome_progetto": {"it": "  nome del progetto [{default}]: ", "en": "  project name [{default}]: "},
+    "install.stdin_muto": {"it": "l'installazione chiede il nome del progetto, ma qui non c'è "
+                                 "un terminale per rispondere.\n  Rilancia con --yes per accettare i default.",
+                           "en": "the installation asks for the project name, but there is no terminal "
+                                 "here to answer.\n  Run it again with --yes to accept the defaults."},
     "install.config_creato": {"it": "config.json creato per '{nome}'", "en": "config.json created for '{nome}'"},
     "install.skill_dry_run": {"it": "collegherebbe le skill in .claude/skills/",
                              "en": "would link the skills into .claude/skills/"},
