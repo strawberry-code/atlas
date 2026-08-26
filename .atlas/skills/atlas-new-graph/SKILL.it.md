@@ -46,6 +46,23 @@ Il metodo sta in `atlas-wayfinder`, che dice come si nomina una destinazione, co
 
 Il **modo** è la domanda più importante che fai a ogni nodo: la risposta la può scrivere l'agente da solo (AFK) oppure va costruita con l'umano (HITL)? Nel dubbio è HITL. Un nodo che decide qualcosa di irreversibile è sempre HITL.
 
+## I rami, e chi li lavora
+
+Un ramo non è un colore sulla mappa: è una linea di lavoro che può procedere da sola. Disegnali **il più indipendenti possibile fra loro**, cioè con poche dipendenze incrociate, e senza forzare: se due pezzi di lavoro dipendono davvero l'uno dall'altro, l'arco va messo lo stesso. La separazione è un criterio di disegno, non un vincolo da rispettare a costo di mentire sulle dipendenze.
+
+Serve a una cosa concreta. Due rami indipendenti sono due persone che lavorano nello stesso momento senza toccare gli stessi nodi, e quando il grafo è condiviso fra macchine sono anche due sequenze di chiusure che si fondono senza conflitto. Rami intrecciati producono lo stesso lavoro con in più le collisioni.
+
+Il segnale di un ramo disegnato male è facile da vedere: quasi ogni suo nodo è bloccato da un nodo di un altro ramo. Quello non è un ramo, è la continuazione di quell'altro, e conviene fonderli o spostare il confine finché non regge da solo.
+
+**Le assegnazioni seguono i rami.** Si assegna un ramo intero, non nodi sparsi:
+
+```python
+mutate.assign(g, "anna", branch="L")
+mutate.assign(g, "marco", branch="A")
+```
+
+Sparpagliare nomi su nodi sciolti rende la frontiera illeggibile: nessuno riconosce più il proprio territorio, e due persone finiscono sullo stesso nodo credendo entrambe che fosse libero. L'eccezione ragionevole è il ramo di consegna, che raccoglie il lavoro di tutti: lì un nodo può restare senza owner o averne due.
+
 ## Scrivere lo script
 
 ```sh
