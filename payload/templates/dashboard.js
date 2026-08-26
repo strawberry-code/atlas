@@ -108,11 +108,13 @@
     });
     if (attivo) {
       delete document.body.dataset.filter;
+      try { sessionStorage.removeItem("atlas-filter-state"); } catch (e) { /* vale solo per questo giro */ }
       return;
     }
     document.body.dataset.filter = stato;
     var chip = document.querySelector('.legend .chip[data-state="' + stato + '"]');
     if (chip) chip.classList.add("on");
+    try { sessionStorage.setItem("atlas-filter-state", stato); } catch (e) { /* vale solo per questo giro */ }
   }
   document.addEventListener("click", function (e) {
     if (!e.target.closest) return;
@@ -170,20 +172,31 @@
      entrambe. Il selettore resta ancorato a .legend e .side: sulla mappa anche i
      nodi portano data-owners, e senza ancoraggio aprire un ticket accenderebbe
      pure il filtro della persona a cui quel nodo e' assegnato. */
-  document.addEventListener("click", function (e) {
-    var presa = e.target.closest && e.target.closest(".legend .chip[data-owner], .side li[data-owner]");
-    if (!presa) return;
-    var chi = presa.dataset.owner;
+  function filtraOwner(chi) {
     var attivo = document.body.dataset.owner === chi;
     document.querySelectorAll("[data-owner].on").forEach(function (x) { x.classList.remove("on"); });
     if (attivo) {
       delete document.body.dataset.owner;
+      try { sessionStorage.removeItem("atlas-filter-owner"); } catch (e) { /* vale solo per questo giro */ }
       return;
     }
     document.body.dataset.owner = chi;
     document.querySelectorAll(".legend .chip[data-owner='" + chi + "'], .side li[data-owner='" + chi + "']")
       .forEach(function (x) { x.classList.add("on"); });
+    try { sessionStorage.setItem("atlas-filter-owner", chi); } catch (e) { /* vale solo per questo giro */ }
+  }
+  document.addEventListener("click", function (e) {
+    var presa = e.target.closest && e.target.closest(".legend .chip[data-owner], .side li[data-owner]");
+    if (!presa) return;
+    filtraOwner(presa.dataset.owner);
   });
+  (function ripristinaFiltri() {
+    var stato = null, owner = null;
+    try { stato = sessionStorage.getItem("atlas-filter-state"); } catch (e) { /* niente da ripristinare */ }
+    try { owner = sessionStorage.getItem("atlas-filter-owner"); } catch (e) { /* niente da ripristinare */ }
+    if (stato) filtraStato(stato);
+    if (owner) filtraOwner(owner);
+  })();
 
   /* ---------- markdown minimo: prima si nega l'HTML, poi si concede il markdown ---------- */
   function esc(s) {
@@ -270,6 +283,13 @@
 
   function limita(z) { return Math.min(2.5, Math.max(0.25, z)); }
 
+  /* La dashboard si ricarica da sola a ogni sync (l'EventSource iniettato da
+     serve.py): senza salvare qui, ogni reload azzererebbe zoom e scorrimento. */
+  function salvaVista() {
+    try { sessionStorage.setItem("atlas-map", JSON.stringify({ z: zoomLevel, x: vp.scrollLeft, y: vp.scrollTop })); }
+    catch (e) { /* sessionStorage assente: la vista vale solo per questo giro */ }
+  }
+
   function applicaZoom(z, cx, cy) {
     var k = z / zoomLevel;
     var sx = (vp.scrollLeft + cx) * k - cx;
@@ -279,6 +299,7 @@
     svg.style.height = baseH * z + "px";
     vp.scrollLeft = sx;
     vp.scrollTop = sy;
+    salvaVista();
   }
   /* Lo zoom non salta al valore nuovo: si avvicina, e la strada che copre
      dipende dal tempo passato, non dal numero di frame. Legarla al frame
@@ -309,6 +330,7 @@
     applicaZoom(zoomVoluto, 0, 0);   // inquadrare tutto e' un salto voluto, non una corsa
     vp.scrollLeft = 0;
     vp.scrollTop = 0;
+    salvaVista();
   }
   document.querySelectorAll(".zoom button").forEach(function (b) {
     b.addEventListener("click", function () {
@@ -345,11 +367,24 @@
       vp.classList.remove("trascina");
       vp.removeEventListener("pointermove", muovi);
       vp.removeEventListener("pointerup", fine);
+      salvaVista();
     }
     vp.addEventListener("pointermove", muovi);
     vp.addEventListener("pointerup", fine);
   });
-  if (baseW > vp.clientWidth || baseH > vp.clientHeight) adatta();
+  (function ripristinaVista() {
+    var salvata = null;
+    try { salvata = JSON.parse(sessionStorage.getItem("atlas-map")); } catch (e) { /* niente da ripristinare */ }
+    if (salvata && typeof salvata.z === "number") {
+      zoomLevel = zoomVoluto = limita(salvata.z);
+      svg.style.width = baseW * zoomLevel + "px";
+      svg.style.height = baseH * zoomLevel + "px";
+      vp.scrollLeft = salvata.x || 0;
+      vp.scrollTop = salvata.y || 0;
+      return;
+    }
+    if (baseW > vp.clientWidth || baseH > vp.clientHeight) adatta();
+  })();
 
   /* ---------- side sheet del ticket ---------- */
   var sheet = document.querySelector(".sheet");
