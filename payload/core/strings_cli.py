@@ -62,8 +62,8 @@ STRINGS: dict[str, dict[str, str]] = {
                     "en": "regenerates tickets, map and dashboard"},
     "help.serve": {"it": "serve la dashboard su un server locale, viva",
                    "en": "serves the dashboard on a local server, live"},
-    "help.serve_port": {"it": "porta del server (0 = scegli una porta libera)",
-                        "en": "server port (0 = pick a free port)"},
+    "help.serve_port": {"it": "porta del server (0 = fissa per questo grafo, ricade su una libera se occupata)",
+                        "en": "server port (0 = fixed for this graph, falls back to a free one if taken)"},
     "help.serve_no_open": {"it": "non aprire il browser all'avvio",
                            "en": "do not open the browser on startup"},
     "help.merge_graph": {"it": "fonde tre versioni di graph.json per id di nodo (driver per git)",
@@ -238,6 +238,8 @@ STRINGS: dict[str, dict[str, str]] = {
                       "en": "  dashboard at {url} (graph {slug}); Ctrl-C to stop"},
     "serve.grafo_mancante": {"it": "il grafo non si legge ancora",
                              "en": "the graph is not readable yet"},
+    "serve.porta_occupata": {"it": "  porta {porta} occupata, ne uso una libera (il tema del browser potrebbe non sopravvivere al prossimo riavvio)",
+                             "en": "  port {porta} in use, picking a free one instead (the browser's theme may not survive the next restart)"},
 
     # --- hooks/session_end.py ---
     "hook.rivendicato": {"it": "Atlas: {elenco} resta rivendicato. "

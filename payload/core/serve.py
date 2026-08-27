@@ -20,6 +20,7 @@ http.server, socketserver, threading e webbrowser sono tutti stdlib.
 """
 from __future__ import annotations
 
+import hashlib
 import http.server
 import threading
 import time
@@ -32,6 +33,10 @@ from .strings import t
 
 # quanto spesso il filo di guardia controlla se il grafo e' cambiato (secondi)
 INTERVALLO = 1.0
+
+# fascia di porte usata per la porta deterministica (utente, lontana dai well-known)
+_PORTA_MIN = 20000
+_PORTA_RANGE = 20000
 
 # quanto spesso si rileggono i lucchetti remoti (secondi). Un ls-remote costa
 # ~0.5 s: il filo di guardia resta a 1 s per il grafo, i lucchetti remoti hanno
@@ -239,6 +244,16 @@ def _watch(server: Server) -> None:
         server.fermo.wait(INTERVALLO)
 
 
+def _porta_progetto(ref: Graph) -> int:
+    """Porta deterministica per questo grafo: la stessa a ogni riavvio di
+    'atlas serve', cosi' l'origine http non cambia e le preferenze salvate dal
+    browser in localStorage (tema, vista) sopravvivono. Senza, la porta 0
+    lasciava scegliere al sistema operativo: a ogni riavvio un'origine diversa,
+    e il tema tornava a quello di sistema."""
+    digest = hashlib.sha256(str(ref.dir.resolve()).encode("utf-8")).digest()
+    return _PORTA_MIN + int.from_bytes(digest[:2], "big") % _PORTA_RANGE
+
+
 def _apri(url: str) -> None:
     """Apre il browser di sistema, se c'e': la URL e' gia' stampata, e' un gesto di cortesia."""
     try:
@@ -251,7 +266,16 @@ def cmd_serve(ref: Graph, args) -> int:
     """'atlas serve': tiene la dashboard viva su un server locale."""
     dash = Dashboard(ref)
     dash.aggiorna()                     # la prima pagina parte gia' fresca
-    server = Server(("127.0.0.1", args.port), Handler)
+    porta = args.port
+    if not porta:
+        porta = _porta_progetto(ref)
+        try:
+            server = Server(("127.0.0.1", porta), Handler)
+        except OSError:
+            print(t("serve.porta_occupata", porta=porta))
+            server = Server(("127.0.0.1", 0), Handler)
+    else:
+        server = Server(("127.0.0.1", porta), Handler)
     server.dash = dash
     server.spettatori = Viewers()
     server.fermo = threading.Event()

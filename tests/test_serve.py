@@ -76,6 +76,17 @@ class Rigenerazione(Base):
         self.assertEqual(prima, dash.html())
 
 
+class PortaProgetto(Base):
+    def test_e_deterministica_e_nella_fascia_utente(self):
+        porta = self.serve._porta_progetto(self.ref)
+        self.assertEqual(porta, self.serve._porta_progetto(self.ref))
+        self.assertTrue(self.serve._PORTA_MIN <= porta < self.serve._PORTA_MIN + self.serve._PORTA_RANGE)
+
+    def test_grafi_diversi_danno_porte_diverse(self):
+        altro = self.mutate.create_graph(self.ws, "altro", "Altro grafo", "Verificare la porta.")
+        self.assertNotEqual(self.serve._porta_progetto(self.ref), self.serve._porta_progetto(altro))
+
+
 class Http(Base):
     def _server(self):
         dash = self.serve.Dashboard(self.ref)
