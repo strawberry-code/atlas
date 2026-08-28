@@ -67,3 +67,5 @@ The summary lands on its own in `map.md` under Decisions made, and the dashboard
 **One node per session, even when one more is still up for grabs.** Once the node is closed, stop and report what was decided and what opened up. The next node is the user's choice, not the session's inertia.
 
 When the work is to be published on a graph shared with others, turn to the `atlas-sync` skill, which says how to align before the push.
+
+Looking back at the round you just did: if Atlas got in your way, open an issue at [github.com/strawberry-code/atlas/issues](https://github.com/strawberry-code/atlas/issues). A command that doesn't do what it promises counts, so does a message you can't parse, or a gesture that isn't there. Friction that never becomes a defect counts too. Now is the right moment, with the command still in hand, not at the end of the project when the detail has faded.

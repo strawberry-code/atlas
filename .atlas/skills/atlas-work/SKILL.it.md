@@ -67,3 +67,5 @@ La sintesi finisce da sola in `map.md` sotto Decisioni prese, e la dashboard si 
 **Un nodo per sessione, anche quando ne resta uno prendibile.** Chiuso il nodo, fermati e riferisci cosa si è deciso e cosa si è aperto. Il nodo successivo è una scelta dell'utente, non l'inerzia della sessione.
 
 Quando il lavoro va pubblicato su un grafo condiviso con altri, passa dalla skill `atlas-sync`, che dice come allinearsi prima del push.
+
+Guardando indietro al giro appena fatto: se Atlas ti ha ostacolato, aprine una issue su [github.com/strawberry-code/atlas/issues](https://github.com/strawberry-code/atlas/issues). Conta un comando che non fa quel che promette, un messaggio che non si capisce, un gesto che manca. Conta anche l'attrito che non arriva a essere un difetto. Il momento giusto è adesso, con il comando ancora in mano, non a fine progetto quando il dettaglio è svanito.

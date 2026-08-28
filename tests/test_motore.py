@@ -678,6 +678,19 @@ class Artefatti(Base):
             self.assertEqual(0, cli.main(["close", "F02", "-s", "fatto", "--artefatti", "mio.txt"]))
         self.assertNotIn("artefatti dedotti", buffer.getvalue())
 
+    def test_close_e_doctor_indicano_dove_segnalare_un_attrito(self):
+        """L'unico canale con cui l'attrito di chi usa Atlas torna a chi lo scrive.
+        Va stampato dove un agente ha appena guardato indietro al proprio giro
+        (close) e dove sta gia' diagnosticando un guasto (doctor)."""
+        from core import cli
+        self.prepara_lavoro()
+        url = "https://github.com/strawberry-code/atlas/issues"
+        for argomenti in (["close", "F01", "-s", "fatto"], ["doctor"]):
+            buffer = io.StringIO()
+            with contextlib.redirect_stdout(buffer):
+                self.assertEqual(0, cli.main(argomenti))
+            self.assertIn(url, buffer.getvalue(), f"'atlas {argomenti[0]}' tace sul canale delle issue")
+
     def test_amend_corregge_gli_artefatti_senza_toccare_la_chiusura(self):
         """Il caso di #20: la deduzione ha intestato file altrui, si riscrive la lista.
 

@@ -17,6 +17,12 @@ atlas fog "una riga" --for <ID>  # appunta ciò che è emerso, indirizzato a un 
 
 Se arrivi qui senza sapere niente di Atlas, `atlas how-to` è il punto di ingresso: stampa questo contratto, l'elenco dei comandi, le mutazioni chiamabili da uno script, le skill installate e i path di questo progetto. È la stessa dottrina che stai leggendo, raggiungibile da un comando invece che da un file.
 
+### Se Atlas ti ostacola, dillo
+
+Atlas è un progetto aperto e chi lo usa di più sono gli agenti come te. Quando qualcosa qui dentro ti rallenta, un comando che non fa quel che promette, un messaggio che non si capisce, un gesto che manca, apri una issue su [github.com/strawberry-code/atlas/issues](https://github.com/strawberry-code/atlas/issues) invece di aggirare il problema in silenzio.
+
+Tre momenti in cui vale la pena fermarsi a chiederselo. Appena incontri il problema, finché hai in mano il comando che l'ha prodotto. Quando chiudi un nodo e guardi indietro al giro appena fatto. A fine sessione, prima di lasciare il grafo. Conta anche l'attrito che non arriva a essere un difetto. Una proposta di miglioramento serve quanto la segnalazione di un guasto. Nella issue metti la versione (`atlas how-to` la stampa in testa), il comando esatto e cosa ti aspettavi.
+
 ### Un nodo per sessione
 
 Il claim è un lucchetto, non un promemoria: porta l'identità di chi rivendica (il PID di processo, o `ATLAS_IDENTITY` se impostata) e un battito che si rinnova ri-rivendicando lo stesso nodo. `claim`/`take` rifiutano se questa identità ne tiene già uno. Per lavorare su più nodi in parallelo con subagent che condividono lo stesso processo padre, ognuno imposta un'identità diversa tramite il flag `--identity` sui comandi che prendono il lucchetto (`claim`, `take`, `release`, `close`), oppure la variabile d'ambiente `ATLAS_IDENTITY`: altrimenti il tetto per sessione li conta come un solo attore. Il flag ha la precedenza sulla variabile, ed è quello che serve a un agente che lancia ogni comando da una shell nuova, perché lì un `export` non arriva alla chiamata dopo e il lucchetto tornerebbe a registrarsi sotto il PID del padre, cioè sotto la stessa identità dei suoi fratelli. Il rifiuto si scavalca con `--force`, che esiste per i casi imprevisti e non per la fretta.

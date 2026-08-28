@@ -203,6 +203,7 @@ def cmd_doctor(ws: Workspace, args) -> int:
     commit_ = t("si") if ws.config["git"]["commit_on_close"] else t("no")
     print(t("doctor.git", presente=presente, commit=commit_))
     doctor.show_doctor(ws)
+    print(t("attrito.issue"))
     return 0
 
 
@@ -506,6 +507,7 @@ def dispatch(ws: Workspace, args) -> int:
             refresh(ref, data)
         report.show_status(ref, data)      # stampare non vuole il lock: data e' gia' in memoria
         commit(ws, ref, node, args.tipo or ws.config["git"]["commit_type"])
+        print(t("attrito.issue"))
         return 0
 
     if args.cmd == "amend":

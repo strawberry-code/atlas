@@ -17,6 +17,12 @@ atlas fog "a line" --for <ID>  # notes down what came up, addressed to a node if
 
 If you get here knowing nothing about Atlas, `atlas how-to` is the way in: it prints this contract, the list of commands, the mutations a script can call, the installed skills and this project's paths. Same doctrine you're reading now, reachable from a command instead of a file.
 
+### If Atlas gets in your way, say so
+
+Atlas is an open project, and the agents are the ones who use it most. When something in here slows you down, a command that doesn't do what it promises, a message you can't parse, a gesture that isn't there, open an issue at [github.com/strawberry-code/atlas/issues](https://github.com/strawberry-code/atlas/issues) instead of quietly routing around it.
+
+Three moments worth stopping to ask yourself. The instant you hit the problem, while you still have the command that produced it. When you close a node and look back at the round you just did. At the end of a session, before you leave the graph. Friction that never becomes a defect counts too, and a proposal for an improvement is as welcome as a fault report. Put the version in the issue (`atlas how-to` prints it at the top), the exact command and what you expected.
+
 ### One node per session
 
 A claim is a lock, not a reminder: it carries the claiming identity (the process PID, or `ATLAS_IDENTITY` if set) and a heartbeat that renews by re-claiming the same node. `claim`/`take` refuse if this identity already holds one. To work on several nodes in parallel with subagents that share the same parent process, each one sets a different identity using the `--identity` flag on the commands that take the lock (`claim`, `take`, `release`, `close`), or the `ATLAS_IDENTITY` environment variable: otherwise the per-session cap counts them as a single actor. The flag takes precedence over the environment variable, and it is what an agent needs when every command starts in a fresh shell: there an `export` never reaches the next call, and the lock falls back to the parent PID, which is the very identity its siblings share. The refusal is overridden with `--force`, which exists for the unexpected, not for being in a hurry.

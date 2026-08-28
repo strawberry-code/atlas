@@ -200,6 +200,13 @@ STRINGS: dict[str, dict[str, str]] = {
                     "en": "  {id} amended · fields rewritten by hand: {campi}"},
     "close.artefatti_dedotti": {"it": "  artefatti dedotti da git ({n}): {elenco}",
                                 "en": "  artifacts deduced from git ({n}): {elenco}"},
+    # Il canale con cui l'attrito di chi usa Atlas torna a chi lo scrive. Stampato
+    # dove un agente ha appena guardato indietro al proprio giro (close) e dove sta
+    # gia' diagnosticando un guasto (doctor).
+    "attrito.issue": {"it": "\n  Attrito con Atlas in questo giro? Aprine una issue:\n"
+                            "  https://github.com/strawberry-code/atlas/issues",
+                      "en": "\n  Friction with Atlas this round? Open an issue:\n"
+                            "  https://github.com/strawberry-code/atlas/issues"},
     "claim.fatto": {"it": "  {id} rivendicato · ticket in {path}", "en": "  {id} claimed · ticket at {path}"},
     "release.fatto": {"it": "  {id} tornato alla frontiera", "en": "  {id} back on the frontier"},
     "fog.fatto": {"it": "  appuntato nella nebbia", "en": "  noted in the fog"},
