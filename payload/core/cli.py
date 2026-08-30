@@ -13,7 +13,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import automata, claims, docs, doctor, drift, gitscan, howto, merge, mutate, render as dash, report, scripts, serve, strings, topology
+from . import adapters, automata, claims, docs, doctor, drift, gitscan, howto, merge, mutate, providers, render as dash, report, scripts, serve, strings, topology
 from .config import ENV_IDENTITY, ConfigError, Workspace, workspace
 from .model import fog_line, node_of
 from .mutate import editing, validate
@@ -317,11 +317,17 @@ def cmd_assegna(ws: Workspace, ref, args) -> None:
               else t("unassign.fatto", elenco=elenco))
 
 
+def default_adapter_registry() -> adapters.AdapterRegistry:
+    """Gli unici provider presenti di default in un run locale di Automata."""
+    return adapters.AdapterRegistry((providers.codex_adapter(), providers.claude_adapter()))
+
+
 def cmd_run(ref, args) -> int:
-    """Valida e costruisce il contesto volatile per un run Automata."""
+    """Avvia il ciclo Automata con i provider locali di default."""
     run = automata.start(ref, args.parallelism)
     modalita = t("automata.serial") if run.serial else t("automata.limited")
     print(t("automata.configured", parallelism=run.parallelism, mode=modalita))
+    run.execute(automata.launcher_from_registry(default_adapter_registry()))
     return 0
 
 

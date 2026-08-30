@@ -68,15 +68,33 @@ class AutomataRun(unittest.TestCase):
         self.assertNotIn("parallelism", dopo)
 
     def test_comando_run_richiede_parallelism_e_dichiara_la_serialita(self):
-        from core.cli import main
+        from core import adapters, cli
+
+        self._popola_frontiera(1)
+
+        class Handle:
+            def wait(inner_self):
+                self._chiudi("N01")
+                return adapters.AgentOutcome("closed")
+
+        class Luna:
+            identity = adapters.CODEX_LUNA
+
+            def launch(inner_self, _context):
+                return Handle()
 
         output = io.StringIO()
-        with contextlib.redirect_stdout(output):
-            codice = main(["run", "-g", self.ref.slug, "--parallelism", "1"])
+        with mock.patch.object(cli, "default_adapter_registry",
+                               return_value=adapters.AdapterRegistry([Luna()])):
+            with contextlib.redirect_stdout(output):
+                codice = cli.main(["run", "-g", self.ref.slug, "--parallelism", "1"])
 
         self.assertEqual(0, codice)
         self.assertIn("parallelism=1", output.getvalue())
         self.assertIn("seriale", output.getvalue())
+        stato = json.loads(self.ref.run_state_path.read_text(encoding="utf-8"))
+        self.assertEqual("completed", stato["status"])
+        self.assertEqual("closed", self.store.load(self.ref.json_path)["nodes"][0]["status"])
 
     def test_comando_run_rifiuta_parallelism_non_positivo(self):
         from core.cli import main

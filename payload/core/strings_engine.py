@@ -12,8 +12,8 @@ STRINGS: dict[str, dict[str, str]] = {
     "automata.serial": {"it": "seriale", "en": "serial"},
     "automata.limited": {"it": "parallelo limitato", "en": "limited parallelism"},
     "automata.configured": {
-        "it": "  run Automata configurato: parallelism={parallelism} · {mode} · model vuoto = Codex Luna, fallback Claude Sonnet",
-        "en": "  Automata run configured: parallelism={parallelism} · {mode} · empty model = Codex Luna, Claude Sonnet fallback"},
+        "it": "  run Automata avviato: parallelism={parallelism} · {mode} · model vuoto = Codex Luna, fallback Claude Sonnet",
+        "en": "  Automata run started: parallelism={parallelism} · {mode} · empty model = Codex Luna, Claude Sonnet fallback"},
     "automata.active_claims": {
         "it": "run non terminabile: nodi ancora in lavorazione: {ids}",
         "en": "run cannot terminate: nodes still in progress: {ids}"},

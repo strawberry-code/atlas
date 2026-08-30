@@ -1,5 +1,8 @@
 # Atlas
 
+> [!NOTE]
+> **Ideato dall'autore, realizzato con agenti.** Atlas è ideato, guidato e verificato dal suo autore. Gran parte del lavoro operativo e del codice grezzo è svolta con agenti e strumenti di intelligenza artificiale, incluso Atlas stesso. L'autore definisce l'impianto, orienta le scelte, verifica i risultati e ne assume piena responsabilità.
+
 ![Una carta nautica dove la costa è un grafo di dipendenze: a sinistra i nodi chiusi col sigillo di ceralacca, sulla frontiera illuminata due lucchetti d'ottone, a destra la nebbia di quel che non si sa ancora.](docs/hero.jpg)
 
 *[English version](README.md)*
@@ -13,6 +16,36 @@ Atlas prende il lavoro di un progetto, lo scompone in nodi collegati da dipenden
 Ogni nodo dichiara anche chi scrive la sua risposta. Un nodo **AFK** (away from keyboard) lo lavora l'agente da solo, e l'output finisce sempre in un file: il ticket stesso o l'artefatto che produce. Un nodo **HITL** (human in the loop) si scioglie parlando: la domanda arriva all'utente una alla volta, e la risposta si scrive insieme.
 
 Ha senso installarlo quando un pezzo di lavoro dura più sessioni e ha dipendenze vere fra le sue parti. Un'epic con una decina di task collegati è il caso tipico, un grafo per epic. Se il lavoro sta in una sessione sola, o è una lista senza dipendenze reali, il grafo aggiunge cerimonia invece di struttura.
+
+## Partenza rapida
+
+### Tutto agentico
+
+Installa Atlas nel progetto, poi chiedi al tuo coding agent di creare ed eseguire il grafo. L'agente usa le skill Atlas installate e mantiene il grafo come fonte di verità.
+
+```text
+Tu: Crea un grafo Atlas per costruire un modellino del Millennium Falcon.
+Suddividi il lavoro in nodi AFK con dipendenze reali e lascia vuoto model
+salvo quando sia rilevante.
+
+Tu: Orchestra l'esecuzione con Atlas Automata, un agente Luna alla volta,
+fino alla chiusura di ogni nodo. Riporta il risultato quando il grafo arriva a END.
+```
+
+### Solo CLI
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/strawberry-code/atlas/main/install.sh | sh
+cd /percorso/del/millennium-falcon
+atlas install . --graph millennium-falcon
+atlas new-script costruisci-millennium-falcon
+# aggiungi branch e nodi AFK con mutate.add_branch() e mutate.add_node()
+# nel file generato .atlas/scripts/001-costruisci-millennium-falcon.py
+atlas exec .atlas/scripts/001-costruisci-millennium-falcon.py
+atlas run --parallelism 1
+```
+
+`atlas run --parallelism 1` esegue un nodo AFK disponibile alla volta. Per ispezionare il run usa `atlas run-status` e `atlas run-log`.
 
 ## Come si lavora, in pratica
 

@@ -1,5 +1,8 @@
 # Atlas
 
+> [!NOTE]
+> **Author-led, agent-assisted.** Atlas is conceived, directed, and verified by its author. Much of the operational work and raw code is produced with AI agents and tools, including Atlas itself. The author defines the approach, directs the choices, verifies the results, and takes full responsibility for them.
+
 ![A nautical chart whose coastline is a dependency graph: wax-sealed nodes on the left are closed, two brass padlocks rest on the lit frontier, and the right side dissolves into fog.](docs/hero.jpg)
 
 *[Versione italiana](README.it.md)*
@@ -13,6 +16,35 @@ Atlas takes a project's work, breaks it into nodes connected by dependencies, an
 Every node also declares who writes its answer. An **AFK** node (away from keyboard) is worked by the agent alone, and its output always lands in a file: the ticket itself or the artifact it produces. An **HITL** node (human in the loop) gets resolved by talking it through: the question is put to the user one at a time, and the answer is written together.
 
 It's worth installing when a piece of work spans more than one session and has real dependencies between its parts. An epic with a dozen connected tasks is the typical case, one graph per epic. If the work fits in a single session, or it's really a list without real dependencies, the graph adds ceremony instead of structure.
+
+## Quick start
+
+### Full agentic
+
+Install Atlas in the project, then ask your coding agent to create and run the graph. The agent uses the installed Atlas skills and keeps the graph as its source of truth.
+
+```text
+You: Create an Atlas graph to build a Millennium Falcon model. Break the work
+into AFK nodes with real dependencies and leave model empty unless it matters.
+
+You: Orchestrate its execution with Atlas Automata, one Luna agent at a time,
+until every node is closed. Report the result when the graph reaches END.
+```
+
+### CLI only
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/strawberry-code/atlas/main/install.sh | sh
+cd /path/to/millennium-falcon
+atlas install . --graph millennium-falcon
+atlas new-script build-millennium-falcon
+# add branches and AFK nodes with mutate.add_branch() and mutate.add_node()
+# in the generated .atlas/scripts/001-build-millennium-falcon.py
+atlas exec .atlas/scripts/001-build-millennium-falcon.py
+atlas run --parallelism 1
+```
+
+`atlas run --parallelism 1` executes one available AFK node at a time. Inspect a run with `atlas run-status` and `atlas run-log`.
 
 ## How you work, in practice
 
