@@ -49,6 +49,7 @@ def data_island(ref: Graph, data: dict, front_ids: set[str]) -> str:
             # card si riconoscono l'una nell'altra
             "branchShape": theme.shape_of(ordine_rami.index(n["branch"])),
             "cost": n.get("cost") or "",
+            "model": n.get("model") or "",
             "owner": owners_of(n),
             "md": _ticket_md(ref, n["id"]),
         }

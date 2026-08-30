@@ -56,11 +56,40 @@ def validate(data: dict, vocab: dict) -> None:
             if node[key] not in allowed:
                 raise StateError(t("mutate.vocab_non_valido", id=node["id"],
                                    chiave=key, valore=node[key], ammessi=allowed))
+        if "model" in node and (not isinstance(node["model"], str) or not node["model"].strip()):
+            raise StateError(t("mutate.modello_non_valido", id=node["id"]))
         for dep in node["blockedBy"]:
             if dep not in seen:
                 raise StateError(t("mutate.dipendenza_inesistente", id=node["id"], dep=dep))
             if dep == node["id"]:
                 raise StateError(t("mutate.auto_dipendenza", id=node["id"]))
+    nodi = {node["id"] for node in data["nodes"]}
+    domande = data.get("questions", [])
+    if not isinstance(domande, list):
+        raise StateError(t("mutate.domande_non_lista"))
+    ids: set[str] = set()
+    for domanda in domande:
+        if not isinstance(domanda, dict):
+            raise StateError(t("mutate.domanda_invalida", dettaglio="record non è un oggetto"))
+        richiesti = ("id", "question", "status", "origin", "assumption", "author", "askedAt", "answer")
+        mancanti = [campo for campo in richiesti if campo not in domanda]
+        if mancanti:
+            raise StateError(t("mutate.domanda_invalida", dettaglio="campi mancanti: " + ", ".join(mancanti)))
+        if not isinstance(domanda["id"], str) or not domanda["id"] or domanda["id"] in ids:
+            raise StateError(t("mutate.domanda_invalida", dettaglio="id non valido o duplicato"))
+        ids.add(domanda["id"])
+        if domanda["status"] not in ("open", "answered"):
+            raise StateError(t("mutate.domanda_invalida", dettaglio="stato non valido"))
+        if domanda["origin"] not in nodi:
+            raise StateError(t("mutate.domanda_invalida", dettaglio="nodo d'origine inesistente"))
+        if any(not isinstance(domanda[campo], str) or not domanda[campo].strip()
+               for campo in ("question", "assumption", "author", "askedAt")):
+            raise StateError(t("mutate.domanda_invalida", dettaglio="testo o timestamp non validi"))
+        if domanda["status"] == "open" and domanda["answer"] is not None:
+            raise StateError(t("mutate.domanda_invalida", dettaglio="una domanda aperta non ha risposta"))
+        if domanda["status"] == "answered" and (not isinstance(domanda["answer"], str)
+                                                   or not domanda["answer"].strip()):
+            raise StateError(t("mutate.domanda_invalida", dettaglio="risposta mancante"))
     levels(data)  # solleva sui cicli
 
 

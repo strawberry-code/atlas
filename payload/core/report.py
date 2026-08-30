@@ -3,11 +3,12 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from . import claims, docs
+from . import claims, docs, drift, questions
 from .config import Graph, Workspace
 from .model import (blocked, blocks, claimed, fog_for, frontier, is_done, node_of,
                     owners, owners_of, progress, unowned)
 from .topology import ranked_frontier
+from .run_state import RunState
 from .store import load
 from .strings import t
 
@@ -60,7 +61,51 @@ def show_status(ref: Graph, data: dict) -> None:
             print(t("report.sistema", elenco=", ".join(stanchi)))
 
     show_assegnazioni(ref, data)
+    show_run_status(ref, quiet=True)
     print()
+
+
+def show_run_status(ref: Graph, quiet: bool = False) -> None:
+    """Mostra lo snapshot durevole dell'ultima esecuzione Automata."""
+    stato = RunState.read(ref.run_state_path)
+    if stato is None:
+        if not quiet:
+            print(t("report.run_nessuno"))
+        return
+    if not quiet:
+        print(t("report.run_titolo", id=stato["run_id"], status=stato["status"],
+                parallelism=stato["parallelism"]))
+    else:
+        print(t("report.run_riga", status=stato["status"], id=stato["run_id"]))
+    if stato.get("node"):
+        dettagli = [f"node={stato['node']}"]
+        if stato.get("provider"):
+            dettagli.append(f"provider={stato['provider']}")
+        if stato.get("attempt") is not None:
+            dettagli.append(f"attempt={stato['attempt']}")
+        print("    " + " ".join(dettagli))
+    if stato.get("reason"):
+        print(t("report.run_motivo", reason=stato["reason"]))
+    if stato.get("next_at") is not None:
+        print(t("report.run_prossimo", at=stato["next_at"]))
+    print(t("report.run_frontiera", ids=", ".join(stato.get("frontier", [])) or "-"))
+    for blocker in stato.get("blockers", []):
+        print(t("report.run_blocco", node=blocker["node"],
+                blockers=", ".join(blocker.get("blocked_by", [])) or "-"))
+
+
+def show_run_log(ref: Graph, tail: int | None = None) -> None:
+    """Stampa la cronologia persistente, senza usarla per lo scheduling."""
+    stato = RunState.read(ref.run_state_path)
+    if stato is None:
+        print(t("report.run_nessuno"))
+        return
+    eventi = stato["events"][-tail:] if tail is not None else stato["events"]
+    print(t("report.run_log_titolo", id=stato["run_id"], n=len(eventi)))
+    for evento in eventi:
+        campi = " ".join(f"{key}={value}" for key, value in evento.items()
+                         if key not in ("at", "type"))
+        print(f"    {evento['at']} {evento['type']}" + (f" {campi}" if campi else ""))
 
 
 def show_assegnazioni(ref: Graph, data: dict) -> None:
@@ -119,6 +164,34 @@ def show_fog(ref: Graph, data: dict) -> None:
     print(t("report.nebbia_titolo"))
     for i, voce in enumerate(voci):
         print(f"    [{i}] {voce}")
+
+
+def show_questions(ref: Graph, data: dict) -> None:
+    """Mostra solo le domande ancora aperte, con origine e assunzione visibili."""
+    aperte = questions.open_questions(data)
+    if not aperte:
+        print(t("asks.nessuna"))
+        return
+    print(t("asks.titolo"))
+    for domanda in aperte:
+        print(t("asks.riga", id=domanda["id"], origin=domanda["origin"],
+                author=domanda["author"]))
+        print(f"      {domanda['question']}")
+        print(t("asks.assunzione", assumption=domanda["assumption"]))
+
+
+def show_drift(ref: Graph, data: dict) -> None:
+    """Stampa segnali di drift e il percorso umano per dichiarare un arco."""
+    segnali = drift.missing_edges(ref, data)
+    print(t("drift.titolo", slug=ref.slug))
+    if not segnali:
+        print(t("drift.nessun_segnale"))
+    else:
+        for segnale in segnali:
+            print(t("drift.riga", earlier=segnale["earlier"], later=segnale["later"],
+                    artifacts=", ".join(segnale["artifacts"])))
+    print(t("drift.sola_diagnosi"))
+    print(t("drift.rimedio"))
 
 
 def show_brief(ref: Graph, data: dict, node_id: str) -> None:

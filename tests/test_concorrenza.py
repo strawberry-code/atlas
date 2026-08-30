@@ -204,9 +204,10 @@ class PremessaScaduta(Base):
     def test_il_battito_non_invalida_l_impronta(self):
         """Riprendere un nodo gia' proprio aggiorna l'heartbeat: il claim cambia, il
         nodo no, e l'impronta lo esclude apposta."""
-        impronta = self.prendi()["claim"]["fingerprint"]
-        self.assertEqual(impronta, self.claims.claim(self.ref, "F01")["claim"]["fingerprint"])
-        nodo, _ = self.chiudi()
+        with mock.patch.dict(os.environ, {"ATLAS_IDENTITY": "test-session"}):
+            impronta = self.prendi()["claim"]["fingerprint"]
+            self.assertEqual(impronta, self.claims.claim(self.ref, "F01")["claim"]["fingerprint"])
+            nodo, _ = self.chiudi()
         self.assertEqual("closed", nodo["status"])
 
 

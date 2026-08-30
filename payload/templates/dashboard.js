@@ -419,6 +419,7 @@
     nomi.forEach(function (nome, i) {
       chips.appendChild(chip(esc(i ? nome : sheet.dataset.ownerLabel + " " + nome), "who"));
     });
+    if (n.model) chips.appendChild(chip(esc(n.model)));
     if (n.cost) chips.appendChild(chip(esc(n.cost)));
     titolo.innerHTML = '<span class="sid" data-copy="' + esc(id) + '" title="' + esc(sheet.dataset.copia) +
       '" data-copiato="' + esc(sheet.dataset.copiato) + '">' + esc(id) + "</span>" +

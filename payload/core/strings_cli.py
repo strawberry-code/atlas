@@ -7,7 +7,8 @@ from __future__ import annotations
 
 STRINGS: dict[str, dict[str, str]] = {
     # --- argparse: descrizione e help ---
-    "parser.description": {"it": "Harness di task a grafo.", "en": "Graph-based task harness."},
+    "parser.description": {"it": "Harness di task a grafo con runner Automata.",
+                            "en": "Graph-based task harness with the Automata runner."},
     "opt.graph": {"it": "slug del grafo, se non è quello attivo",
                   "en": "graph slug, if not the active one"},
     "parser.slug_al_posto_del_comando": {
@@ -31,6 +32,9 @@ STRINGS: dict[str, dict[str, str]] = {
     "help.close": {"it": "chiude un nodo con la sua sintesi", "en": "closes a node with its summary"},
     "help.amend": {"it": "corregge artefatti, costo o sintesi di un nodo già chiuso",
                    "en": "fixes artifacts, cost or summary of an already closed node"},
+    "help.ask": {"it": "registra una domanda non bloccante", "en": "records a non-blocking question"},
+    "help.asks": {"it": "mostra le domande aperte", "en": "shows open questions"},
+    "help.answer": {"it": "risponde a una domanda registrata", "en": "answers a recorded question"},
     "help.identity": {"it": "identità che tiene il lucchetto, vince su ATLAS_IDENTITY",
                       "en": "identity holding the lock, overrides ATLAS_IDENTITY"},
     "help.render_all": {"it": "rigenera tutti i grafi del progetto, non solo quello attivo",
@@ -62,6 +66,28 @@ STRINGS: dict[str, dict[str, str]] = {
                     "en": "regenerates tickets, map and dashboard"},
     "help.serve": {"it": "serve la dashboard su un server locale, viva",
                    "en": "serves the dashboard on a local server, live"},
+    "help.run": {"it": "configura un run Automata con parallelismo esplicito",
+                 "en": "configures an Automata run with explicit parallelism"},
+    "help.run_status": {"it": "diagnosi dello stato persistente dell'ultimo run",
+                         "en": "diagnoses the persistent state of the last run"},
+    "help.run_log": {"it": "cronologia persistente degli eventi dell'ultimo run",
+                      "en": "persistent event log of the last run"},
+    "help.run_parallelism": {"it": "limite obbligatorio per questo run (1 = seriale; >1 = parallelo limitato)",
+                              "en": "required for this run (1 = serial; >1 = bounded parallelism)"},
+    "report.run_nessuno": {"it": "  nessun run Automata persistito",
+                            "en": "  no persisted Automata run"},
+    "report.run_titolo": {"it": "  run {id} · stato={status} · parallelism={parallelism}",
+                           "en": "  run {id} · status={status} · parallelism={parallelism}"},
+    "report.run_riga": {"it": "  run Automata: stato={status} · id={id}",
+                         "en": "  Automata run: status={status} · id={id}"},
+    "report.run_motivo": {"it": "    motivo: {reason}", "en": "    reason: {reason}"},
+    "report.run_prossimo": {"it": "    prossimo tentativo: {at}",
+                             "en": "    next attempt: {at}"},
+    "report.run_frontiera": {"it": "    frontiera persistita: {ids}",
+                              "en": "    persisted frontier: {ids}"},
+    "report.run_blocco": {"it": "    blocco residuo: {node} attende {blockers}",
+                           "en": "    residual blocker: {node} waits for {blockers}"},
+    "report.run_log_titolo": {"it": "  eventi run {id} ({n})", "en": "  run events {id} ({n})"},
     "help.serve_port": {"it": "porta del server (0 = fissa per questo grafo, ricade su una libera se occupata)",
                         "en": "server port (0 = fixed for this graph, falls back to a free one if taken)"},
     "help.serve_no_open": {"it": "non aprire il browser all'avvio",
@@ -170,6 +196,18 @@ STRINGS: dict[str, dict[str, str]] = {
                                      "Verifica che non sia una scrittura fuori scopo.",
                               "en": "{id} is closed but these artifacts were modified afterwards: {elenco}. "
                                     "Check it isn't an out-of-scope write."},
+    "doctor.artefatti_mancanti": {"it": "{id} è chiuso ma questi artifacts mancano dal disco: {elenco}. "
+                                          "Ripristinali o correggi la contabilità.",
+                                  "en": "{id} is closed but these artifacts are missing from disk: {elenco}. "
+                                        "Restore them or fix the bookkeeping."},
+    "doctor.artefatti_non_tracciati": {"it": "{id} è chiuso ma questi artifacts non sono tracciati da Git: {elenco}. "
+                                               "Aggiungili o correggi la contabilità.",
+                                       "en": "{id} is closed but these artifacts are not tracked by Git: {elenco}. "
+                                             "Add them or fix the bookkeeping."},
+    "doctor.artefatto_non_ispezionabile": {"it": "avviso: non riesco a ispezionare l'artifact di {id}, path non valido "
+                                                   "{path} ({errore}). Continuo gli altri controlli.",
+                                             "en": "warning: cannot inspect {id}'s artifact, invalid path {path} "
+                                                   "({errore}). Continuing with the other checks."},
     "doctor.conflitto": {"it": "conflitto di merge irrisolto su {nodo}: {campo} ({tipo})",
                          "en": "unresolved merge conflict on {nodo}: {campo} ({tipo})"},
     "doctor.conflitti_rimedio": {"it": "conflitti irrisolti: correggi graph.json a mano e poi "
@@ -200,6 +238,21 @@ STRINGS: dict[str, dict[str, str]] = {
                     "en": "  {id} amended · fields rewritten by hand: {campi}"},
     "close.artefatti_dedotti": {"it": "  artefatti dedotti da git ({n}): {elenco}",
                                 "en": "  artifacts deduced from git ({n}): {elenco}"},
+    "ask.fatto": {"it": "  {id} registrata per {origin} · autore {author}",
+                  "en": "  {id} recorded for {origin} · author {author}"},
+    "answer.fatto": {"it": "  {id} chiusa · domanda di {author}",
+                     "en": "  {id} answered · question by {author}"},
+    "answer.divergente": {"it": "  risposta divergente: riesamina i nodi chiusi dopo la domanda:",
+                           "en": "  divergent answer: review nodes closed after the question:"},
+    "answer.riesame_riga": {"it": "    {id}  {title}", "en": "    {id}  {title}"},
+    "asks.nessuna": {"it": "  nessuna domanda aperta", "en": "  no open questions"},
+    "asks.titolo": {"it": "  domande aperte:", "en": "  open questions:"},
+    "asks.riga": {"it": "    {id} · origine {origin} · autore {author}",
+                  "en": "    {id} · origin {origin} · author {author}"},
+    "asks.assunzione": {"it": "      assunzione: {assumption}",
+                        "en": "      assumption: {assumption}"},
+    "help.drift": {"it": "diagnosi degli archi mancanti senza mutare il grafo",
+                    "en": "diagnoses missing edges without mutating the graph"},
     # Il canale con cui l'attrito di chi usa Atlas torna a chi lo scrive. Stampato
     # dove un agente ha appena guardato indietro al proprio giro (close) e dove sta
     # gia' diagnosticando un guasto (doctor).

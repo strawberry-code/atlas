@@ -24,6 +24,18 @@ Si installa il CLI, si installa in un progetto (crea `.atlas/`, registra il prog
 4. **Si lavora**: se il nodo è AFK lo fa l'agente da solo, se è HITL la skill `atlas-work` porta le domande una alla volta e aspetta.
 5. **Si chiude** con `atlas close <ID> -s "sintesi"`, dopo aver scritto la Risposta nel ticket. Mappa e dashboard si rigenerano da sole.
 
+Per un run Automata, `atlas run-status` mostra lo stato persistente e `atlas run-log` la cronologia degli eventi; `atlas run-log --tail N` limita la diagnosi agli ultimi eventi.
+
+## Atlas Automata
+
+Atlas Automata è il runner meccanico per il lavoro AFK già descritto da un grafo. Ogni run parte con il limite obbligatorio del run, per esempio `atlas run --parallelism 1` per l'esecuzione strettamente seriale oppure un valore maggiore per il parallelismo limitato. Il valore non viene scritto nel grafo. Automata mantiene Atlas come fonte di verità per frontiera, claim, dipendenze e stati terminali; i suoi ledger sono diagnostici, non un secondo scheduler.
+
+Il campo `model` del nodo è opzionale e resta assente o vuoto salvo indicazione dell'autore del grafo. Vuoto significa Codex Luna (`codex-luna`). Un valore esplicito deve corrispondere esattamente a un adapter registrato. Se l'adapter Luna di default non è disponibile, Automata esegue un solo fallback osservabile a Claude Sonnet (`claude`); un modello esplicito non viene mai sostituito in silenzio. Gemini e Code Terra sono identità di adapter aggiuntive supportate.
+
+Ogni provider viene eseguito AFK, fuori sandbox e con bypass dei permessi. Per aggiungere un provider, implementa `AgentAdapter` oppure configura `SubprocessAdapter`, registralo in `AdapterRegistry` e passa il registry a `launcher_from_registry`; la logica del runner per frontiera, parallelismo e terminazione non cambia. Un adapter di processo deve usare una argv validata, stdin chiuso e i flag non interattivi del provider.
+
+Usa `atlas run-status` per leggere gli stati `active`, `waiting`, `failed`, `blocked` o `completed` e il relativo motivo, nodo, provider, tentativo, frontiera e blocker. Usa `atlas run-log` per esaminare claim, selezione del modello, fallback, guasti, backoff, chiusure e aggiornamento della frontiera. Il retry è bounded: timeout, crash, rate limit, provider non disponibile e terminazione ambigua sono ritentabili; gli errori permanenti no. Il backoff cresce da un minuto fino a un'ora. Un claim vivo impedisce un lancio duplicato, e questa versione non riprende il processo provider dopo un'interruzione.
+
 Un modo di orchestrare più nodi insieme, se il progetto ne ha molti prendibili: una sessione "principale" che guarda la frontiera e coordina, i nodi AFK delegati a sotto-agenti che lavorano in parallelo e scrivono i risultati nei rispettivi ticket, i nodi HITL riservati a una sessione dedicata. Non è una funzione del motore, è un modo di usarlo: Atlas resta la fonte di verità su cosa è fatto, chi coordina sopra è libero di organizzarsi come preferisce.
 
 ## Installare il CLI
@@ -80,12 +92,22 @@ atlas amend F01 --artefatti src/a.py # corregge la contabilità di un nodo già 
 atlas render --open                  # dashboard
 atlas serve --no-open                # dashboard su un server locale, viva (Ctrl-C per fermare)
 atlas serve --port 8080              # la stessa, sulla porta che scegli tu
+atlas run --parallelism 1            # run Automata: 1 significa seriale
 atlas doctor                         # controllo di salute: nodi dimenticati, lucchetti fermi, dashboard stantia
 atlas conflicts                      # i conflitti di merge irrisolti del grafo attivo
 atlas conflicts --resolve            # li dichiara risolti, dopo aver corretto graph.json a mano
 ```
 
 Un nodo per sessione. `close` rifiuta se la Risposta è vuota.
+
+Se gli artefatti registrati esistono ma non sono tracciati da Git, `close` mostra un
+avviso con i path da aggiungere o correggere, ma chiude comunque il nodo. Il controllo
+è solo informativo e non si applica ai progetti senza una repo Git; `doctor` continua a
+segnalare anche gli artefatti mancanti.
+
+`--artefatti` prende un solo path per flag e va ripetuto. Atlas rifiuta token con
+spazi o virgole, così un'espansione di variabile in zsh non viene spezzata e salvata
+come più file; i path mancanti vengono segnalati alla chiusura.
 
 ### Un claim da un'altra macchina
 
@@ -157,6 +179,14 @@ atlas render -g YYMMDD-altro-epic # oppure si sceglie sul singolo comando
 ```
 
 Lo slug non si scrive al posto del comando: `atlas YYMMDD-altro-epic render` non esiste. `-g/--graph` vale sia prima sia dopo il comando (`atlas -g YYMMDD-altro-epic render` e `atlas render -g YYMMDD-altro-epic` sono la stessa cosa), e `ATLAS_GRAPH=<slug>` fa lo stesso per tutta la shell.
+
+La diagnosi del drift usa `drift.collector_paths` in `.atlas/config.json` come lista opzionale di path esatti da escludere dai segnali di artefatti condivisi. Non usa estensioni né glob: un documento o un foglio di test può essere un deliverable reale e va escluso solo se è esplicitamente un collettore. La raccolta considera una coppia solo quando entrambi i nodi sono chiusi e il secondo ha un `closedAt` strettamente successivo al primo.
+
+```bash
+atlas drift                         # propone diagnosi, senza modificare il grafo
+```
+
+Ogni segnale mostra i due nodi, gli artefatti condivisi e l'ordine temporale. Atlas non aggiunge archi automaticamente: se il segnale è corretto, un umano deve dichiarare l'arco in uno script con `mutate.link(g, "NODO_SUCCESSIVO", blocked_by="NODO_PRECEDENTE")`, poi eseguire `atlas exec`.
 
 ## Le skill
 

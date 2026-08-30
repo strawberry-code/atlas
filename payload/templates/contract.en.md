@@ -15,6 +15,18 @@ atlas fog "a line" --for <ID>  # notes down what came up, addressed to a node if
 
 `atlas serve` keeps the dashboard alive on `http://127.0.0.1`, regenerates it when `graph.json` changes and pushes a reload to the browser already open; with `lock.remote` active it also shows the other machines' locks.
 
+Automata keeps the latest execution in `run-state.json` beside `graph.json`. `atlas run-status` shows whether the run is active, waiting, failed, blocked or completed, together with its node, provider, attempt, retry, frontier and residual blockers. `atlas run-log` prints the persistent history of claims, providers, fallbacks, waits, backoffs, closures and frontier updates; `--tail N` limits the output. The ledger describes what happened, but stores no processes and does not authorize resuming an agent after an interruption.
+
+### Automata runs
+
+Start each run with `atlas run --parallelism N`. The value is required for that run, `1` means strict serial execution, and a higher value means bounded parallelism. It is runtime configuration and is never written into the graph. The command configures and validates the run; the runner still takes its scheduling and termination decisions from Atlas.
+
+The node field `model` is optional and remains absent or empty unless the graph author specifies it. Empty selects Codex Luna (`codex-luna`). An explicit value must exactly match a registered adapter identity. If the default Luna provider is unavailable, Automata records one fallback to Claude Sonnet (`claude`); an explicit model is never replaced silently. Gemini and Code Terra are additional supported identities.
+
+Every provider launched by Automata is AFK, runs outside the sandbox and bypasses permissions. To add a provider, implement `AgentAdapter` or configure `SubprocessAdapter`, register it in `AdapterRegistry`, and pass that registry to `launcher_from_registry`. The runner does not change. A subprocess adapter must use a validated argv, closed stdin and the provider's non-interactive flags.
+
+Use `atlas run-status` to read the current state and reason. Use `atlas run-log` or `atlas run-log --tail N` to inspect model selection, fallback, claims, failures, backoff, closures and frontier refreshes. Timeout, crash, rate limit, provider unavailability and ambiguous termination are retryable; permanent errors are not. The default retry policy grows from one minute to one hour and is bounded. A live claim prevents a duplicate launch; this version does not resume the provider process after interruption.
+
 If you get here knowing nothing about Atlas, `atlas how-to` is the way in: it prints this contract, the list of commands, the mutations a script can call, the installed skills and this project's paths. Same doctrine you're reading now, reachable from a command instead of a file.
 
 ### If Atlas gets in your way, say so
@@ -31,6 +43,8 @@ A lock is orphaned when the process that took it no longer exists, or stalled wh
 
 **A claim can come from another machine.** When two machines work on the same graph, a remote claim's liveness can't be checked against a local PID: a claim is alive until its `lease_until` expires, and carries `host` and `lease_until`. The default TTL is 3600 seconds, `lease_ttl_seconds` in `config.json`. Your claims' heartbeat renews on its own: on every command that loads the graph, if less than half the TTL is left, the lease is extended. One command per TTL keeps the claim alive, and a burst doesn't rewrite the file. The remote lock is opt-in: with `lock.remote` in `config.json` (a git remote, say `origin`) Atlas coordinates the claim over shared git refs before touching a node, and a node you're working stays untouchable by other machines while the lease is fresh. Without `lock.remote` the behavior is identical to before, all local. Without the network the lock degrades on reads and closes on writes: `status`, `next`, `show` and `brief` show the local state with a "remote unreachable" notice, while `take` on a free node, `close` and `release` refuse to write, because without the ref you can't rule out that another machine holds the node. `take` on your own node degrades: it warns and doesn't extend the lease. `close --force` skips the remote check, and the artifact deduction is skipped with its dedicated notice. When the remote lock is active, the shared-window artifact deduction also sees remote refs taken by other machines during the work.
 
+With `lock.remote`, the remote name is resolved in the project's Git checkout before creating the transport in the service repository; a configured URL is used directly. A missing name is unresolvable configuration and leaves the lock disabled, while an unreachable URL is a transport network error.
+
 ### HITL and AFK
 
 Every node declares who writes its answer.
@@ -41,6 +55,10 @@ Every node declares who writes its answer.
 | working and answering an **AFK** node | yes, it's the node's own work |
 | answering a **HITL** node | no, it's written together with the human: that's what the acronym means |
 | creating nodes, changing `blockedBy`, marking out of scope | never autonomously, and only ever via a script |
+
+`atlas ask` records a non-blocking question and the assumption under which an AFK node may proceed. It is not a HITL decision and does not replace one: `ask` rejects HITL nodes, and the decision remains to be written with the human. `atlas render` shows open questions in the dashboard; after 24 hours from `askedAt` it marks them as aged. `atlas doctor` reports open aged questions, which must be answered or reviewed with `atlas answer`.
+
+`atlas drift` presents readable diagnoses for plausible missing edges, showing the nodes and shared artifacts. It is read-only: it does not modify the graph or add edges automatically. If the signal is correct, a human turns it into a declared edge in a script with `mutate.link(g, "LATER_NODE", blocked_by="EARLIER_NODE")`, then runs `atlas exec`.
 
 An agent that answers a HITL node on its own has broken the most important rule in this contract.
 
@@ -80,7 +98,8 @@ There is one refusal that doesn't depend on what you wrote: the node changed sin
 
 Under Answer there are three light, optional sub-sections: **non-canonical choices** (what you decided on your own, not dictated by the design doc), **declared debt** (what you're deliberately leaving incomplete, and why), and **authorizations received** (if you acted beyond the node's scope on the user's explicit direction, what and when). A verification gate reads them without having to reconstruct the same archaeology from free prose, and the third one makes a "per your request" verifiable instead of merely asserted.
 
-`close` also accepts `-c/--costo` (a rough order of magnitude for what it cost, free text, nothing precise) and `--artefatti` (the files produced, filling in the field the graph already has). Without `--artefatti`, inside a git repository the field fills itself with the files touched since the node was claimed, `.atlas/` ones excluded. Deduction skips, leaving the field empty for you to declare with explicit `--artefatti`, in two cases: if more than one node is claimed at close time, and if another node of the graph was closed or released while this one was in progress, because over that window the two pieces of work overlap and git cannot tell whose each file is. When it does deduce, `close` prints the list of deduced files: look at it, because that is the only moment you notice without going to look. That field is what lets `doctor` spot a write inside the scope of an already closed node; to leave it deliberately empty, pass `--artefatti` with no arguments.
+`close` also accepts `-c/--costo` (a rough order of magnitude for what it cost, free text, nothing precise) and `--artefatti` (the files produced, filling in the field the graph already has). Without `--artefatti`, inside a git repository the field fills itself with the files touched since the node was claimed, `.atlas/` ones excluded. Deduction skips, and `close` refuses: it never silently closes a node with an empty field. This happens if more than one node is claimed at close time, or if another node of the graph was closed or released while this one was in progress, because over that window the two pieces of work overlap and git cannot tell whose each file is. The message states the reason and asks you to declare the artifacts. When it does deduce, `close` prints the list of deduced files: look at it, because that is the only moment you notice without going to look. That field is what lets `doctor` spot a write inside the scope of an already closed node; to intentionally declare no artifacts, pass `--artefatti` with no arguments.
+The explicit flag accepts one path and can be repeated. Tokens containing spaces or commas are rejected so zsh variable expansion cannot split them into multiple artifacts; declared paths that are missing are reported at close time.
 
 If that list holds something that isn't yours, or the cost and the summary came out wrong, the fix is `atlas amend <ID> [--artefatti ...] [--costo ...] [--sintesi ...]`. It rewrites only the fields you pass and leaves everything else alone: the node stays closed, and the closing instant does not move, because that is what `doctor` measures later writes from. The correction stays recorded in the node with who made it and when, so whoever reads it knows that field was set by hand and not deduced. A node still open can't be amended: there the bookkeeping is written by `close`. If a gate releases a node instead of closing it, `-r/--ragione` on `release` records why as an event in the map, not just a silent return to the frontier.
 

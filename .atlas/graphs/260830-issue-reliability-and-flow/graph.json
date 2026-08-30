@@ -1,0 +1,399 @@
+{
+  "schemaVersion": 1,
+  "meta": {
+    "slug": "260830-issue-reliability-and-flow",
+    "title": "Affidabilità e coordinamento di Atlas",
+    "destination": "Tutte le issue GitHub da #22 a #28 sono implementate, verificate e documentate; gli artefatti, i lock e il coordinamento multi-agente sono affidabili.",
+    "updated": "2026-08-30",
+    "notes": ["Tutti i nodi sono AFK e dimensionati per un solo agente Luna 5.6. I rami possono procedere in parallelo quando la frontiera lo consente; ogni ramo confluisce in END."]
+  },
+  "branches": {
+    "A": {
+      "label": "#28 Integrità degli artefatti",
+      "color": "#b91c1c"
+    },
+    "B": {
+      "label": "#27 Deduzione degli artefatti",
+      "color": "#c2410c"
+    },
+    "C": {
+      "label": "#26 Interfaccia --artefatti",
+      "color": "#a16207"
+    },
+    "D": {
+      "label": "#25 Doctor robusto",
+      "color": "#4d7c0f"
+    },
+    "E": {
+      "label": "#24 Lock remoto",
+      "color": "#0f766e"
+    },
+    "F": {
+      "label": "#23 Domande non bloccanti",
+      "color": "#2563eb"
+    },
+    "G": {
+      "label": "#22 Drift del grafo",
+      "color": "#7c3aed"
+    },
+    "Z": {
+      "label": "Consegna",
+      "color": "#475569"
+    }
+  },
+  "nodes": [
+    {
+      "id": "A01",
+      "title": "Doctor verifica presenza e tracciamento degli artefatti",
+      "branch": "A",
+      "type": "task",
+      "mode": "AFK",
+      "status": "closed",
+      "assignee": null,
+      "owner": [],
+      "blockedBy": [],
+      "question": "Estendi doctor perché segnali, senza fermarsi, ogni artefatto di un nodo chiuso che manca dal disco oppure non è tracciato da Git. Aggiungi test di regressione per entrambi i casi e conserva i controlli già esistenti sulle scritture postume.",
+      "answer": "Doctor segnala artefatti mancanti e non tracciati, con regressioni dedicate e controlli sulle scritture postume preservati.",
+      "claim": null,
+      "artifacts": ["payload/core/doctor.py", "payload/core/gitscan.py", "payload/core/strings_cli.py", "tests/test_motore.py"],
+      "createdAt": "2026-08-30T00:08:44+02:00",
+      "cost": "~1 agente Luna, una sessione",
+      "closedBy": "?",
+      "closedAt": "2026-08-30T00:22:05+02:00"
+    },
+    {
+      "id": "A02",
+      "title": "Close avvisa sugli artefatti non tracciati",
+      "branch": "A",
+      "type": "task",
+      "mode": "AFK",
+      "status": "closed",
+      "assignee": null,
+      "owner": [],
+      "blockedBy": ["A01"],
+      "question": "Al momento della chiusura, avvisa quando gli artefatti registrati esistono ma Git non li traccia, così il difetto è rimediabile prima di un comando distruttivo. Copri il comportamento con test CLI e documenta la semantica del solo avviso.",
+      "answer": "Close avvisa sugli artefatti presenti ma non tracciati da Git e prosegue la chiusura",
+      "claim": null,
+      "artifacts": ["payload/core/claims.py", "payload/core/strings_engine.py", "tests/test_motore.py", "README.md", "README.it.md"],
+      "createdAt": "2026-08-30T00:08:44+02:00",
+      "cost": "~1 sessione, test mirati e suite completa",
+      "closedBy": "?",
+      "closedAt": "2026-08-30T00:28:01+02:00"
+    },
+    {
+      "id": "B01",
+      "title": "Close richiede una scelta quando la deduzione salta",
+      "branch": "B",
+      "type": "task",
+      "mode": "AFK",
+      "status": "closed",
+      "assignee": null,
+      "owner": [],
+      "blockedBy": [],
+      "question": "Quando la deduzione degli artefatti non è attendibile per lavoro parallelo, rendi obbligatoria una dichiarazione esplicita: artefatti passati con --artefatti oppure --artefatti senza argomenti per dichiarare intenzionalmente il vuoto. Mantieni compatibili i casi in cui la deduzione riesce e aggiungi test mirati.",
+      "answer": "close ora richiede artefatti espliciti quando la deduzione non è attendibile; deduzione sicura e test aggiornati",
+      "claim": null,
+      "artifacts": ["payload/core/claims.py", "payload/core/strings_engine.py", "tests/test_motore.py", "tests/test_edges.py"],
+      "createdAt": "2026-08-30T00:08:44+02:00",
+      "cost": "~62 test mirati + suite completa",
+      "closedBy": "?",
+      "closedAt": "2026-08-30T00:36:40+02:00"
+    },
+    {
+      "id": "B02",
+      "title": "Contratto e messaggi rendono visibile la mancata deduzione",
+      "branch": "B",
+      "type": "task",
+      "mode": "AFK",
+      "status": "closed",
+      "assignee": null,
+      "owner": [],
+      "blockedBy": ["B01"],
+      "question": "Rendi inequivocabili messaggi, how-to e contratto su quando Atlas non deduce gli artefatti e su come dichiararli. Verifica con test di output che una chiusura non possa più sembrare completa lasciando involontariamente il campo vuoto.",
+      "answer": "Contratto, how-to e messaggi rendono esplicito il rifiuto della chiusura quando la deduzione salta; test di output verificati",
+      "claim": null,
+      "artifacts": ["tests/test_motore.py"],
+      "createdAt": "2026-08-30T00:08:44+02:00",
+      "cost": "circa 20 minuti",
+      "closedBy": "?",
+      "closedAt": "2026-08-30T06:11:26+02:00"
+    },
+    {
+      "id": "C01",
+      "title": "Definisci una raccolta non ambigua per --artefatti",
+      "branch": "C",
+      "type": "task",
+      "mode": "AFK",
+      "status": "closed",
+      "assignee": null,
+      "owner": [],
+      "blockedBy": [],
+      "question": "Correggi close e amend perché raccolgano tutti i path passati, anche con il flag ripetuto, senza scartare silenziosamente le occorrenze precedenti. Fissa in test la grammatica supportata, un path per argomento, e conserva la possibilità di dichiarare una lista vuota intenzionale.",
+      "answer": "Raccolta CLI ripetibile per tutti i path --artefatti in close e amend, con lista vuota intenzionale",
+      "claim": null,
+      "artifacts": ["payload/core/cli.py", "tests/test_motore.py"],
+      "createdAt": "2026-08-30T00:08:44+02:00",
+      "cost": "~1 agente Luna, 42 test mirati e suite completa",
+      "closedBy": "luna-c01",
+      "closedAt": "2026-08-30T00:41:42+02:00"
+    },
+    {
+      "id": "C02",
+      "title": "Rifiuta artefatti malformati prima di salvarli",
+      "branch": "C",
+      "type": "task",
+      "mode": "AFK",
+      "status": "closed",
+      "assignee": null,
+      "owner": [],
+      "blockedBy": ["C01"],
+      "question": "Rifiuta token di artefatto ambigui con spazi o virgole e segnala al chiamante come passare i path correttamente, senza spezzare silenziosamente nomi di file validi. Verifica anche l'esistenza dei path alla chiusura e copri con regressioni le quattro forme d'errore osservate, inclusa l'espansione di variabili in zsh.",
+      "answer": "Artefatti ambigui rifiutati, path mancanti segnalati alla chiusura e quattro regressioni coperte.",
+      "claim": null,
+      "artifacts": ["tests/test_motore.py"],
+      "createdAt": "2026-08-30T00:08:44+02:00",
+      "cost": "1 sessione, 2 test suite",
+      "closedBy": "?",
+      "closedAt": "2026-08-30T06:05:24+02:00"
+    },
+    {
+      "id": "D01",
+      "title": "Doctor degrada gli OSError a diagnosi",
+      "branch": "D",
+      "type": "task",
+      "mode": "AFK",
+      "status": "closed",
+      "assignee": null,
+      "owner": [],
+      "blockedBy": [],
+      "question": "Tratta un OSError durante l'ispezione di un artefatto, incluso ENAMETOOLONG, come un avviso con id del nodo e path non valido invece di lasciare uscire un traceback. Aggiungi una regressione che confermi che doctor completa il resto della diagnosi.",
+      "answer": "Doctor tratta ogni OSError durante l'ispezione di un artifact, incluso ENAMETOOLONG, come avviso diagnostico con nodo, path ed errore; continua l'ispezione degli altri artifact e i controlli successivi. Aggiunta regressione che verifica entrambe le proprietà.",
+      "claim": null,
+      "artifacts": ["payload/core/doctor.py", "payload/core/strings_cli.py", "tests/test_motore.py"],
+      "createdAt": "2026-08-30T00:08:44+02:00",
+      "cost": "Implementazione e verifica: circa 20 minuti, test mirati 2/2 passati; suite tests.test_motore 177 test, 2 failure e 1 error preesistenti su reclaim/liveness e concorrenza.",
+      "closedBy": "?",
+      "closedAt": "2026-08-30T06:17:29+02:00"
+    },
+    {
+      "id": "E01",
+      "title": "Lock remoto risolve il nome del remote nel repository del progetto",
+      "branch": "E",
+      "type": "task",
+      "mode": "AFK",
+      "status": "closed",
+      "assignee": null,
+      "owner": [],
+      "blockedBy": [],
+      "question": "Risolvi lock.remote dal nome configurato, per esempio origin, all'URL Git prima di creare il trasporto nel repository di servizio. Distingui configurazione non risolvibile da errore di rete, aggiorna il contratto e aggiungi test sia per nome sia per URL.",
+      "answer": "Risolto lock.remote dal nome del remote all'URL Git nel checkout del progetto prima di creare il trasporto; gli URL passano direttamente. Configurazione non risolvibile ed errore di rete restano distinti, con contratto e test aggiornati.",
+      "claim": null,
+      "artifacts": ["atlascli/dispatch.py", "atlascli/strings.py", "payload/templates/contract.it.md", "payload/templates/contract.en.md", ".atlas/CONTRACT.md", "tests/test_platform.py"],
+      "createdAt": "2026-08-30T00:08:44+02:00",
+      "cost": "1 agente Luna, test mirati e suite completa",
+      "closedBy": "?",
+      "closedAt": "2026-08-30T06:22:30+02:00"
+    },
+    {
+      "id": "F01",
+      "title": "Registra le domande con assunzione nel grafo",
+      "branch": "F",
+      "type": "task",
+      "mode": "AFK",
+      "status": "closed",
+      "assignee": null,
+      "owner": [],
+      "blockedBy": [],
+      "question": "Aggiungi al grafo un modello minimale e validato per domande, stato, nodo d'origine, assunzione, autore, timestamp e risposta. Implementa le mutazioni necessarie e rifiuta ask sui nodi HITL, così la funzione non aggira il contratto umano.",
+      "answer": "Ledger questions validato, mutazioni ask/answer e rifiuto dei nodi HITL implementati e verificati.",
+      "claim": null,
+      "artifacts": ["tests/test_motore.py"],
+      "createdAt": "2026-08-30T00:08:44+02:00",
+      "cost": "1 sessione, test mirati e suite completa",
+      "closedBy": "?",
+      "closedAt": "2026-08-30T06:29:39+02:00"
+    },
+    {
+      "id": "F02",
+      "title": "Espone ask, asks e answer nella CLI",
+      "branch": "F",
+      "type": "task",
+      "mode": "AFK",
+      "status": "closed",
+      "assignee": null,
+      "owner": [],
+      "blockedBy": ["F01"],
+      "question": "Implementa ask, asks e answer con messaggi coerenti, identità e persistenza transazionale. La lista deve rendere leggibili le domande aperte e answer deve chiudere una domanda senza modificare lo stato del nodo che l'ha generata.",
+      "answer": "CLI ask, asks e answer completata e verificata",
+      "claim": null,
+      "artifacts": ["payload/core/cli.py", "payload/core/report.py", "payload/core/strings_cli.py", "tests/test_motore.py"],
+      "createdAt": "2026-08-30T00:08:44+02:00",
+      "cost": "3 test mirati + suite completa",
+      "closedBy": "luna-f02",
+      "closedAt": "2026-08-30T06:36:48+02:00",
+      "amendments": [
+        {
+          "at": "2026-08-30T06:37:07+02:00",
+          "by": "luna-f02",
+          "fields": ["artifacts"]
+        }
+      ]
+    },
+    {
+      "id": "F03",
+      "title": "Calcola l'impatto di una risposta divergente",
+      "branch": "F",
+      "type": "task",
+      "mode": "AFK",
+      "status": "closed",
+      "assignee": null,
+      "owner": [],
+      "blockedBy": ["F02"],
+      "question": "Quando la risposta umana diverge dall'assunzione, individua e stampa i nodi chiusi dopo la domanda che dipendono dal suo nodo, direttamente o transitivamente. Copri con test le risposte concordi, divergenti e l'assenza di nodi da riesaminare.",
+      "answer": "Calcolo dell'impatto delle risposte divergenti implementato e verificato",
+      "claim": null,
+      "artifacts": ["tests/test_motore.py"],
+      "createdAt": "2026-08-30T00:08:44+02:00",
+      "cost": "3 test mirati + suite completa",
+      "closedBy": "claude",
+      "closedAt": "2026-08-30T06:42:34+02:00"
+    },
+    {
+      "id": "F04",
+      "title": "Rende le domande visibili e governate",
+      "branch": "F",
+      "type": "task",
+      "mode": "AFK",
+      "status": "closed",
+      "assignee": null,
+      "owner": [],
+      "blockedBy": ["F03"],
+      "question": "Aggiungi al dashboard e a doctor la visibilità delle domande aperte e invecchiate, poi allinea contratto, how-to e test integrati. Il risultato deve spiegare che ask traccia un'assunzione in un nodo AFK e non è un surrogato di una decisione HITL.",
+      "answer": "Domande aperte visibili in dashboard e doctor, con marcatura dopo 24 ore e distinzione AFK/HITL",
+      "claim": null,
+      "artifacts": ["payload/core/questions.py", "payload/core/doctor.py", "payload/core/report.py", "payload/core/render_panels.py", "payload/core/strings_docs.py", "payload/core/strings_howto.py", "payload/templates/contract.it.md", "payload/templates/contract.en.md", ".atlas/CONTRACT.md", "tests/test_motore.py"],
+      "createdAt": "2026-08-30T00:08:44+02:00",
+      "cost": "1 sessione, 3 test F04 + suite completa",
+      "closedBy": "luna-f04",
+      "closedAt": "2026-08-30T06:49:50+02:00",
+      "amendments": [
+        {
+          "at": "2026-08-30T06:50:10+02:00",
+          "by": "luna-f04",
+          "fields": ["artifacts"]
+        }
+      ]
+    },
+    {
+      "id": "G01",
+      "title": "Configura i segnali osservati per drift",
+      "branch": "G",
+      "type": "task",
+      "mode": "AFK",
+      "status": "closed",
+      "assignee": null,
+      "owner": [],
+      "blockedBy": [],
+      "question": "Definisci la configurazione minima per escludere file collettori dalla diagnosi e raccogli, con test, le coppie di nodi chiusi che condividono artefatti in un ordine temporale valido. Non escludere per estensione, perché documentazione e fogli di test possono essere deliverable reali.",
+      "answer": "Configurazione dei collettori e raccolta temporale degli artefatti condivisi implementate e verificate",
+      "claim": null,
+      "artifacts": ["payload/core/config.py", "payload/core/drift.py", "tests/test_drift.py", "README.md", "README.it.md", "dist/atlas", "dist/atlas.sha256"],
+      "createdAt": "2026-08-30T00:08:44+02:00",
+      "cost": "4 test G01, suite completa e validate",
+      "closedBy": "luna-g01",
+      "closedAt": "2026-08-30T06:57:55+02:00",
+      "amendments": [
+        {
+          "at": "2026-08-30T06:58:19+02:00",
+          "by": "luna-g01",
+          "fields": ["artifacts"]
+        },
+        {
+          "at": "2026-08-30T06:58:31+02:00",
+          "by": "luna-g01",
+          "fields": ["artifacts"]
+        }
+      ]
+    },
+    {
+      "id": "G02",
+      "title": "Drift deduce soltanto archi mancanti plausibili",
+      "branch": "G",
+      "type": "task",
+      "mode": "AFK",
+      "status": "closed",
+      "assignee": null,
+      "owner": [],
+      "blockedBy": ["G01", "B02", "C02"],
+      "question": "Implementa l'analisi transitiva che segnala un arco mancante quando un nodo successivo tocca un artefatto di un nodo precedente senza già dipenderne. Non implementare la diagnosi degli archi spurii, bocciata dalla prova sul campo, e conserva l'evidenza che giustifica ogni segnalazione.",
+      "answer": "Implementata la diagnosi transitiva degli archi mancanti: segnala solo nodi chiusi successivamente che condividono artefatti senza una dipendenza diretta o transitiva; conserva gli artefatti come evidenza e non diagnostica archi spurii.",
+      "claim": null,
+      "artifacts": ["payload/core/drift.py", "tests/test_drift.py"],
+      "createdAt": "2026-08-30T00:08:44+02:00",
+      "cost": "7 test G02, suite completa 418 test (2 failure e 4 errori preesistenti su reclaim/liveness/concorrenza), atlas validate",
+      "closedBy": "luna-g02",
+      "closedAt": "2026-08-30T07:03:52+02:00"
+    },
+    {
+      "id": "G03",
+      "title": "Espone atlas drift come diagnosi leggibile",
+      "branch": "G",
+      "type": "task",
+      "mode": "AFK",
+      "status": "closed",
+      "assignee": null,
+      "owner": [],
+      "blockedBy": ["G02"],
+      "question": "Integra atlas drift nella CLI, nella documentazione e nella suite usando il caso reale come regressione. Il comando deve proporre diagnosi senza mutare automaticamente il grafo e spiegare come un umano può trasformare un segnale in un arco dichiarato.",
+      "answer": "Esposta diagnosi drift in sola lettura con rimedio umano",
+      "claim": null,
+      "artifacts": ["dist/atlas.sha256"],
+      "createdAt": "2026-08-30T00:08:44+02:00",
+      "cost": "8 test drift, 4 test README, validate, suite con 2 failure e 4 errori preesistenti",
+      "closedBy": "?",
+      "closedAt": "2026-08-30T07:11:35+02:00"
+    },
+    {
+      "id": "END",
+      "title": "Verifica finale e chiusura delle issue",
+      "branch": "Z",
+      "type": "task",
+      "mode": "AFK",
+      "status": "closed",
+      "assignee": null,
+      "owner": [],
+      "blockedBy": ["A02", "B02", "C02", "D01", "E01", "F04", "G03"],
+      "question": "Esegui la suite completa, i controlli doctor e le verifiche manuali minime dei nuovi flussi; completa la documentazione rimasta e confronta ogni requisito delle issue #22-#28 con il codice consegnato. Chiudi o aggiorna le issue solo quando l'evidenza della verifica è riportabile senza riserve.",
+      "answer": "Verifica finale completata: suite, doctor, validate, verifiche manuali e confronto requisiti #22-#28 registrati nella Risposta di END.md. Issue #22-#28 chiuse con evidenza. Limiti preesistenti e claim orfano documentati; nessun commit, push o agente aggiuntivo.",
+      "claim": null,
+      "artifacts": [".atlas/graphs/260830-issue-reliability-and-flow/tickets/END.md"],
+      "createdAt": "2026-08-30T00:08:44+02:00",
+      "cost": null,
+      "closedBy": "?",
+      "closedAt": "2026-08-30T07:23:07+02:00"
+    }
+  ],
+  "fog": [],
+  "outOfScope": [],
+  "releases": [
+    {
+      "id": "A01",
+      "title": "Doctor verifica presenza e tracciamento degli artefatti",
+      "reason": "ripristino del claim orfano lasciato dall’esecuzione interrotta",
+      "at": "2026-08-30T00:17:28+02:00"
+    },
+    {
+      "id": "F04",
+      "title": "Rende le domande visibili e governate",
+      "reason": "claim orfano della sessione precedente",
+      "at": "2026-08-30T06:49:43+02:00"
+    },
+    {
+      "id": "G01",
+      "title": "Configura i segnali osservati per drift",
+      "reason": "claim orfano preesistente",
+      "at": "2026-08-30T06:57:48+02:00"
+    }
+  ],
+  "questions": []
+}

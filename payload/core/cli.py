@@ -13,7 +13,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import claims, docs, doctor, gitscan, howto, merge, mutate, render as dash, report, scripts, serve, strings
+from . import automata, claims, docs, doctor, drift, gitscan, howto, merge, mutate, render as dash, report, scripts, serve, strings, topology
 from .config import ENV_IDENTITY, ConfigError, Workspace, workspace
 from .model import fog_line, node_of
 from .mutate import editing, validate
@@ -148,6 +148,27 @@ def _rinomina(ws: Workspace, da_fare: list[tuple[Path, Path]]) -> None:
         _movi(ws, da, temp)
     for _, temp, a in ponte:
         _movi(ws, temp, a)
+
+
+def _artefatti_cli(valori: list[str | None] | None) -> list[str] | None:
+    """Converte la grammatica CLI di ``--artefatti`` nella lista del motore.
+
+    Ogni flag raccoglie al massimo un path, quindi il flag puo' essere ripetuto
+    senza perdere i valori precedenti. L'unica occorrenza senza path e' la
+    dichiarazione esplicita della lista vuota.
+    """
+    if valori is None:
+        return None
+    if any(valore is None for valore in valori):
+        if len(valori) == 1:
+            return []
+        raise StateError("--artefatti senza path non puo' essere combinato con altri path")
+    percorsi = [valore for valore in valori if valore is not None]
+    ambigui = [percorso for percorso in percorsi
+               if any(c.isspace() for c in percorso) or "," in percorso]
+    if ambigui:
+        raise StateError(t("close.artifacts_ambiguous", elenco=", ".join(ambigui)))
+    return percorsi
 
 
 def _movi(ws: Workspace, da: Path, a: Path) -> None:
@@ -296,6 +317,14 @@ def cmd_assegna(ws: Workspace, ref, args) -> None:
               else t("unassign.fatto", elenco=elenco))
 
 
+def cmd_run(ref, args) -> int:
+    """Valida e costruisce il contesto volatile per un run Automata."""
+    run = automata.start(ref, args.parallelism)
+    modalita = t("automata.serial") if run.serial else t("automata.limited")
+    print(t("automata.configured", parallelism=run.parallelism, mode=modalita))
+    return 0
+
+
 def _identity(p: argparse.ArgumentParser) -> None:
     """Il flag comune ai comandi che prendono o mollano il lucchetto.
 
@@ -327,11 +356,11 @@ def _grafo(p: argparse.ArgumentParser) -> None:
 _RINNOVA_BATTITO = frozenset((
     "status", "next", "show", "brief",
     "claim", "take", "release", "close", "amend",
-    "fog", "assign", "unassign", "render",
+    "ask", "asks", "answer", "fog", "assign", "unassign", "render",
 ))
 
 COMANDI = ("status", "next", "graphs", "use", "show", "brief", "claim", "take", "release",
-           "close", "fog", "assign", "unassign", "whoami", "render", "serve", "merge-graph",
+           "close", "ask", "asks", "answer", "drift", "fog", "assign", "unassign", "whoami", "render", "serve", "run", "run-status", "run-log", "merge-graph",
            "conflicts", "new", "new-script", "exec", "renumber", "validate", "doctor", "how-to")
 
 
@@ -351,6 +380,8 @@ class Parser(argparse.ArgumentParser):
         return super().parse_args(args, namespace)
 
     def error(self, message: str) -> None:
+        if "unrecognized arguments" in message and "--artefatti" in getattr(self, "_token", []):
+            message += f"\n{t('close.artifacts_cli_usage')}"
         primo = next((a for a in getattr(self, "_token", []) if not a.startswith("-")), None)
         if primo and primo in _slug_noti():
             message = f"{message}\n{t('parser.slug_al_posto_del_comando', slug=primo)}"
@@ -398,11 +429,18 @@ def aggiungi_comandi(sub) -> None:
     p.add_argument("node"); p.add_argument("-s", "--sintesi", required=True)
     p.add_argument("-t", "--tipo", default=None); p.add_argument("--force", action="store_true")
     p.add_argument("-c", "--costo", default=None)
-    p.add_argument("--artefatti", nargs="*", default=None); _identity(p); _grafo(p)
+    p.add_argument("--artefatti", action="append", nargs="?", default=None); _identity(p); _grafo(p)
     p = sub.add_parser("amend", help=t("help.amend"))
-    p.add_argument("node"); p.add_argument("--artefatti", nargs="*", default=None)
+    p.add_argument("node"); p.add_argument("--artefatti", action="append", nargs="?", default=None)
     p.add_argument("-c", "--costo", default=None); p.add_argument("-s", "--sintesi", default=None)
     _identity(p); _grafo(p)
+    p = sub.add_parser("ask", help=t("help.ask")); p.add_argument("node")
+    p.add_argument("-q", "--question", required=True); p.add_argument("-a", "--assumption", required=True)
+    _identity(p); _grafo(p)
+    _grafo(sub.add_parser("asks", help=t("help.asks")))
+    p = sub.add_parser("answer", help=t("help.answer")); p.add_argument("question")
+    p.add_argument("-r", "--response", required=True); _identity(p); _grafo(p)
+    _grafo(sub.add_parser("drift", help=t("help.drift")))
     p = sub.add_parser("fog", help=t("help.fog"))
     p.add_argument("riga", nargs="?", default=None)
     p.add_argument("--for", dest="destinatario", default=None)
@@ -428,6 +466,13 @@ def aggiungi_comandi(sub) -> None:
     p = sub.add_parser("serve", help=t("help.serve"))
     p.add_argument("--port", type=int, default=0, help=t("help.serve_port"))
     p.add_argument("--no-open", dest="apri", action="store_false", help=t("help.serve_no_open")); _grafo(p)
+
+    _grafo(sub.add_parser("run-status", help=t("help.run_status")))
+    p = sub.add_parser("run-log", help=t("help.run_log")); p.add_argument("--tail", type=int, default=None)
+    _grafo(p)
+    p = sub.add_parser("run", help=t("help.run"))
+    p.add_argument("--parallelism", required=True, type=automata.parse_parallelism,
+                   help=t("help.run_parallelism")); _grafo(p)
 
     p = sub.add_parser("merge-graph", help=t("help.merge_graph"))
     p.add_argument("base", help=t("help.merge_base"))
@@ -491,16 +536,27 @@ def dispatch(ws: Workspace, args) -> int:
         return cmd_conflicts(ws, ref, args)
     if args.cmd == "serve":
         return serve.cmd_serve(ref, args)
+    if args.cmd == "run":
+        return cmd_run(ref, args)
+    if args.cmd == "run-status":
+        report.show_run_status(ref)
+        return 0
+    if args.cmd == "run-log":
+        if args.tail is not None and args.tail < 0:
+            raise StateError("--tail must be non-negative")
+        report.show_run_log(ref, args.tail)
+        return 0
 
     if args.cmd == "close":
-        node, avviso = claims.close(ref, args.node, args.sintesi, args.force, cost=args.costo, artifacts=args.artefatti)
+        artefatti = _artefatti_cli(args.artefatti)
+        node, avviso = claims.close(ref, args.node, args.sintesi, args.force, cost=args.costo, artifacts=artefatti)
         print(t("close.fatto", id=node["id"]))
         if avviso:
             print(f"  {avviso}")
         # Solo quando li ha dedotti il motore: chi passa --artefatti sa gia' cosa ha
         # scritto, chi non lo passa scopre l'attribuzione qui invece che rileggendo
         # il grafo giorni dopo.
-        if args.artefatti is None and node.get("artifacts"):
+        if artefatti is None and node.get("artifacts"):
             print(t("close.artefatti_dedotti", n=len(node["artifacts"]),
                     elenco=", ".join(node["artifacts"])))
         with read_transaction(ref.json_path) as data:
@@ -511,13 +567,41 @@ def dispatch(ws: Workspace, args) -> int:
         return 0
 
     if args.cmd == "amend":
+        artefatti = _artefatti_cli(args.artefatti)
         with mutate.editing(ref) as g:
-            node = mutate.amend(g, args.node, artifacts=args.artefatti,
+            node = mutate.amend(g, args.node, artifacts=artefatti,
                                 cost=args.costo, summary=args.sintesi)
             corretti = node["amendments"][-1]["fields"]
         with read_transaction(ref.json_path) as data:
             refresh(ref, data)
         print(t("amend.fatto", id=args.node, campi=", ".join(corretti)))
+        return 0
+
+    if args.cmd == "ask":
+        with mutate.editing(ref) as g:
+            domanda = mutate.ask(g, args.node, args.question, args.assumption)
+        print(t("ask.fatto", id=domanda["id"], origin=domanda["origin"], author=domanda["author"]))
+        return 0
+
+    if args.cmd == "asks":
+        report.show_questions(ref, load(ref.json_path))
+        return 0
+
+    if args.cmd == "answer":
+        with mutate.editing(ref) as g:
+            domanda = mutate.answer(g, args.question, args.response)
+        print(t("answer.fatto", id=domanda["id"], author=domanda["author"]))
+        if domanda["answer"] != domanda["assumption"]:
+            data = load(ref.json_path)
+            riesame = topology.closed_downstream_after(data, domanda["origin"], domanda["askedAt"])
+            if riesame:
+                print(t("answer.divergente"))
+                for node in riesame:
+                    print(t("answer.riesame_riga", id=node["id"], title=node["title"]))
+        return 0
+
+    if args.cmd == "drift":
+        report.show_drift(ref, load(ref.json_path))
         return 0
 
     if args.cmd == "take":

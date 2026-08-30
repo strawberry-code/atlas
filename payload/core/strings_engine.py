@@ -6,6 +6,41 @@ strings_cli.py e strings_docs.py per il resto del catalogo.
 from __future__ import annotations
 
 STRINGS: dict[str, dict[str, str]] = {
+    "automata.parallelism_invalid": {
+        "it": "parallelism deve essere un intero positivo",
+        "en": "parallelism must be a positive integer"},
+    "automata.serial": {"it": "seriale", "en": "serial"},
+    "automata.limited": {"it": "parallelo limitato", "en": "limited parallelism"},
+    "automata.configured": {
+        "it": "  run Automata configurato: parallelism={parallelism} · {mode} · model vuoto = Codex Luna, fallback Claude Sonnet",
+        "en": "  Automata run configured: parallelism={parallelism} · {mode} · empty model = Codex Luna, Claude Sonnet fallback"},
+    "automata.active_claims": {
+        "it": "run non terminabile: nodi ancora in lavorazione: {ids}",
+        "en": "run cannot terminate: nodes still in progress: {ids}"},
+    "automata.blocked": {
+        "it": "run bloccato: nessun nodo eleggibile, restano aperti: {ids}",
+        "en": "run blocked: no eligible node, open nodes remain: {ids}"},
+    "automata.hitl": {
+        "it": "nodo {id} HITL: un run AFK non puo' rispondere al posto dell'umano",
+        "en": "node {id} is HITL: an AFK run cannot answer for the human"},
+    "automata.not_terminal": {
+        "it": "il nodo {id} non e' terminale dopo l'attesa: stato '{status}'",
+        "en": "node {id} is not terminal after waiting: status '{status}'"},
+    "automata.adapter_outcome": {
+        "it": "adapter del nodo {id} ha terminato con esito '{status}': {detail}",
+        "en": "adapter for node {id} terminated with '{status}': {detail}"},
+    "automata.already_started": {
+        "it": "il nodo {id} e' gia' stato avviato da questo run",
+        "en": "node {id} was already started by this run"},
+    "automata.retry_active": {
+        "it": "retry non avviato: il nodo {id} ha ancora un agente attivo",
+        "en": "retry not started: node {id} still has an active agent"},
+    "automata.retry_exhausted": {
+        "it": "run non riuscito: retry esauriti o errore permanente sui nodi: {ids}",
+        "en": "run failed: retries exhausted or permanent error on nodes: {ids}"},
+    "automata.invalid_termination": {
+        "it": "run non terminabile: la frontiera e' vuota ma restano nodi non terminali",
+        "en": "run cannot terminate: the frontier is empty but non-terminal nodes remain"},
     # --- claims.py ---
     "claim.non_aperto": {"it": "{id} non è aperto: sta a '{stato}'",
                          "en": "{id} is not open: it's at '{stato}'"},
@@ -31,6 +66,12 @@ STRINGS: dict[str, dict[str, str]] = {
                                           "  dichiarali con --artefatti",
                                     "en": "artifacts not deduced: several nodes are in progress at once,\n"
                                           "  declare them with --artefatti"},
+    "close.artifacts_required": {"it": "non posso chiudere: la deduzione degli artefatti non è attendibile.\n"
+                                        "  {dettaglio}\n"
+                                        "  Scegli esplicitamente con --artefatti, anche senza argomenti per dichiarare il vuoto.",
+                                  "en": "cannot close: artifact deduction is not reliable.\n"
+                                        "  {dettaglio}\n"
+                                        "  Choose explicitly with --artefatti, even without arguments to declare none."},
     "close.artifacts_finestra_condivisa": {"it": "artefatti non dedotti: {altro} è stato chiuso o rilasciato\n"
                                                  "  mentre questo nodo era in lavorazione, e i file dedotti\n"
                                                  "  sarebbero anche i suoi. Dichiarali con --artefatti",
@@ -49,6 +90,20 @@ STRINGS: dict[str, dict[str, str]] = {
                                           "en": "artifacts not deduced: the claim timestamp of {id} is unreadable\n"
                                                 "  ('{at}'). Fix it in graph.json or declare the files with\n"
                                                 "  --artefatti"},
+    "close.artifacts_non_tracciati": {"it": "avviso: questi artefatti esistono ma non sono tracciati da Git: {elenco}.\n"
+                                               "  Aggiungili a Git o correggi la contabilità; la chiusura prosegue.",
+                                       "en": "warning: these artifacts exist but are not tracked by Git: {elenco}.\n"
+                                               "  Add them to Git or fix the bookkeeping; closing continues."},
+    "close.artifacts_mancanti": {"it": "avviso: questi artefatti non esistono nel progetto: {elenco}.\n"
+                                          "  Controlla i path dichiarati; la chiusura prosegue.",
+                                  "en": "warning: these artifacts do not exist in the project: {elenco}.\n"
+                                          "  Check the declared paths; closing continues."},
+    "close.artifacts_ambiguous": {"it": "artefatti ambigui rifiutati: {elenco}.\n"
+                                             "  Passa un solo path per --artefatti e ripeti il flag; non usare spazi o virgole nel token.",
+                                   "en": "ambiguous artifacts rejected: {elenco}.\n"
+                                             "  Pass one path per --artefatti and repeat the flag; do not use spaces or commas in the token."},
+    "close.artifacts_cli_usage": {"it": "Passa un solo path per --artefatti e ripeti il flag per ogni file.",
+                                   "en": "Pass one path per --artefatti and repeat the flag for each file."},
     "close.premessa_scaduta": {"it": "{id} è cambiato da quando l'hai preso.\n"
                                      "  La tua risposta potrebbe poggiare su una premessa che non c'è più:\n"
                                      "  rileggi il nodo con 'atlas show {id}' e richiudi, oppure usa --force\n"
@@ -101,6 +156,8 @@ STRINGS: dict[str, dict[str, str]] = {
                                "en": "{id} is on a branch that doesn't exist: {branch}"},
     "mutate.vocab_non_valido": {"it": "{id} ha {chiave}='{valore}', fuori da {ammessi}",
                                "en": "{id} has {chiave}='{valore}', outside {ammessi}"},
+    "mutate.modello_non_valido": {"it": "{id} ha un modello non valido: serve testo non vuoto",
+                                   "en": "{id} has an invalid model: non-empty text is required"},
     "model.nodo_inesistente": {"it": "{id} non esiste nel grafo", "en": "{id} does not exist in the graph"},
     "model.ciclo": {"it": "ciclo di dipendenze su {id}", "en": "dependency cycle on {id}"},
     "mutate.dipendenza_inesistente": {"it": "{id} è bloccato da {dep}, che non esiste",
@@ -114,6 +171,17 @@ STRINGS: dict[str, dict[str, str]] = {
                                  "en": "nothing to fix on {id}: pass at least one of\n"
                                        "  --artefatti, --costo and --sintesi"},
     "mutate.auto_dipendenza": {"it": "{id} dipende da se stesso", "en": "{id} depends on itself"},
+    "mutate.ask_hitl": {"it": "non posso registrare una domanda su {id}: il nodo è HITL; serve l'umano",
+                        "en": "cannot record a question on {id}: the node is HITL; it needs the human"},
+    "mutate.ask_campo_vuoto": {"it": "il campo {campo} non può essere vuoto",
+                                "en": "{campo} cannot be empty"},
+    "mutate.domanda_inesistente": {"it": "la domanda {id} non esiste", "en": "question {id} does not exist"},
+    "mutate.domanda_gia_risposta": {"it": "la domanda {id} ha già una risposta",
+                                     "en": "question {id} already has an answer"},
+    "mutate.domande_non_lista": {"it": "il registro delle domande non è una lista",
+                                  "en": "the question ledger is not a list"},
+    "mutate.domanda_invalida": {"it": "domanda non valida: {dettaglio}",
+                                 "en": "invalid question: {dettaglio}"},
     "mutate.nome_non_valido": {"it": "'{nome}' non è un nome utilizzabile: serve del testo "
                                      "su una riga sola, al massimo {max} caratteri",
                                "en": "'{nome}' is not a usable name: it takes some text "

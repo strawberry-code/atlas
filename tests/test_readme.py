@@ -23,6 +23,10 @@ sys.path.insert(0, str(ROOT / "payload"))   # build_parser tira dentro i comandi
 from atlascli import dispatch  # noqa: E402
 
 IT, EN = ROOT / "README.it.md", ROOT / "README.md"
+CONTRACT_IT = ROOT / "payload" / "templates" / "contract.it.md"
+CONTRACT_EN = ROOT / "payload" / "templates" / "contract.en.md"
+README_TEMPLATE_IT = ROOT / "payload" / "templates" / "readme.it.md"
+README_TEMPLATE_EN = ROOT / "payload" / "templates" / "readme.en.md"
 
 
 def _dal_codice(path: Path) -> tuple[set[str], set[str]]:
@@ -86,6 +90,38 @@ class Readme(unittest.TestCase):
 
     def test_le_due_lingue_hanno_la_stessa_struttura(self):
         self.assertEqual(_titoli(IT), _titoli(EN), "una sezione e' stata aggiunta o tolta a meta'")
+
+    def test_automata_e_documentato_in_entrambi_i_readme(self):
+        requisiti = {
+            "README.md": ("Atlas Automata", "--parallelism", "Codex Luna", "Claude Sonnet",
+                           "AdapterRegistry", "outside the sandbox", "retryable"),
+            "README.it.md": ("Atlas Automata", "--parallelism", "Codex Luna", "Claude Sonnet",
+                              "AdapterRegistry", "fuori sandbox", "ritentabili"),
+        }
+        for path in (IT, EN):
+            testo = path.read_text(encoding="utf-8")
+            for requisito in requisiti[path.name]:
+                with self.subTest(readme=path.name, requisito=requisito):
+                    self.assertIn(requisito, testo)
+            self.assertNotIn("�", testo)
+
+    def test_i_template_documentano_automata_in_entrambi_i_contratti_e_readme(self):
+        requisiti = {
+            CONTRACT_EN: ("Automata runs", "Codex Luna", "Claude Sonnet", "AgentAdapter",
+                          "outside the sandbox", "retryable"),
+            CONTRACT_IT: ("Run Automata", "Codex Luna", "Claude Sonnet", "AgentAdapter",
+                          "fuori sandbox", "ritentabili"),
+            README_TEMPLATE_EN: ("Automata runs", "--parallelism N", "Codex Luna", "Claude Sonnet",
+                                 "AdapterRegistry", "retryable"),
+            README_TEMPLATE_IT: ("Run Automata", "--parallelism N", "Codex Luna", "Claude Sonnet",
+                                 "AdapterRegistry", "ritentabili"),
+        }
+        for path, attesi in requisiti.items():
+            testo = path.read_text(encoding="utf-8")
+            for atteso in attesi:
+                with self.subTest(template=path.name, requisito=atteso):
+                    self.assertIn(atteso, testo)
+            self.assertNotIn("�", testo)
 
 
 if __name__ == "__main__":

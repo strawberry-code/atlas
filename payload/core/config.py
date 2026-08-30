@@ -26,6 +26,7 @@ DEFAULTS = {
               "idle_hours": 4, "max_claims_per_session": 1,
               "lease_ttl_seconds": 3600},
     "lock": {"remote": None},
+    "drift": {"collector_paths": []},
     "git": {"commit_on_close": False, "commit_type": "feat", "stage": "node-paths"},
     "vocab": {"types": ["grilling", "research", "prototype", "task"],
               "modes": ["HITL", "AFK"],
@@ -88,6 +89,14 @@ class Graph:
     @property
     def json_path(self) -> Path:
         return self.dir / "graph.json"
+
+    @property
+    def retry_state_path(self) -> Path:
+        return self.dir / "retry-state.json"
+
+    @property
+    def run_state_path(self) -> Path:
+        return self.dir / "run-state.json"
 
     @property
     def map_path(self) -> Path:

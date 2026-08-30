@@ -56,9 +56,21 @@ STRINGS: dict[str, dict[str, str]] = {
                                       "en": "    {id} {titolo}: still {stato}, no answer to read yet"},
     "report.brief_nebbia": {"it": "\n  Nebbia che lo nomina:", "en": "\n  Fog that names it:"},
     "report.brief_rilasci": {"it": "\n  Rilasci precedenti su questo nodo:", "en": "\n  Earlier releases of this node:"},
+    "drift.titolo": {"it": "\n  Diagnosi drift · {slug}", "en": "\n  Drift diagnosis · {slug}"},
+    "drift.nessun_segnale": {"it": "  nessun arco mancante plausibile", "en": "  no plausible missing edge"},
+    "drift.riga": {"it": "    {earlier} → {later} · artefatti condivisi: {artifacts}",
+                   "en": "    {earlier} → {later} · shared artifacts: {artifacts}"},
+    "drift.sola_diagnosi": {"it": "  diagnosi soltanto: il grafo non è stato modificato.",
+                            "en": "  diagnosis only: the graph was not modified."},
+    "drift.rimedio": {"it": "  Se il segnale è corretto, un umano dichiara l'arco in uno script con "
+                              "mutate.link(g, \"<later>\", blocked_by=\"<earlier>\"), poi esegue 'atlas exec'.",
+                       "en": "  If the signal is correct, a human declares the edge in a script with "
+                              "mutate.link(g, \"<later>\", blocked_by=\"<earlier>\"), then runs 'atlas exec'."},
     "report.next_titolo": {"it": "\n  Frontiera, ordinata per impatto:", "en": "\n  Frontier, ranked by impact:"},
     "report.next_riga": {"it": "    {id}  {titolo}  · sblocca {sblocca} · cammino residuo {cammino}",
                          "en": "    {id}  {titolo}  · unlocks {sblocca} · {cammino} steps to the end"},
+    "doctor.domande_aperte": {"it": "domande aperte: {elenco}. Quelle marcate come invecchiate hanno almeno 24 ore; rispondi con 'atlas answer' o riesaminale.",
+                               "en": "open questions: {elenco}. Those marked aged are at least 24 hours old; answer with 'atlas answer' or review them."},
 
     # --- doctor.py (avvisi diagnostici) ---
     "doctor.owner_non_canonico": {"it": "{id}: l'assegnazione sul file non è in forma "
@@ -81,6 +93,9 @@ STRINGS: dict[str, dict[str, str]] = {
     "render.frontiera": {"it": "frontiera", "en": "frontier"},
     "render.frontiera_vuota": {"it": "niente di prendibile: o è tutto chiuso, o è tutto bloccato",
                               "en": "nothing up for grabs: it's either all closed or all blocked"},
+    "render.domande": {"it": "domande aperte", "en": "open questions"},
+    "render.domanda_aperta": {"it": "aperta", "en": "open"},
+    "render.domanda_invecchiata": {"it": "invecchiata", "en": "aged"},
     "render.rami": {"it": "rami", "en": "branches"},
     "render.assegnazioni": {"it": "assegnazioni", "en": "assignments"},
     "render.non_assegnati": {"it": "non assegnati", "en": "unassigned"},

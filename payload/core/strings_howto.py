@@ -44,6 +44,10 @@ STRINGS: dict[str, dict[str, str]] = {
                                 "    4. atlas close <ID> -s \"la sintesi in una riga\"\n"
                                 "    5. quel che è emerso e non ha un nodo: atlas fog \"una riga\" --for <ID>\n\n"
                                 "  Un nodo per sessione. La risposta di un nodo HITL si scrive con l'umano, mai da soli.\n"
+                                "  Se Atlas non può dedurre gli artefatti, close rifiuta: ripeti --artefatti per ogni path,\n"
+                                "  oppure usa --artefatti senza path per dichiarare intenzionalmente nessun artefatto.\n"
+                                "  'atlas drift' propone archi mancanti come diagnosi, ma non modifica il grafo.\n"
+                                "  Se il segnale è corretto, un umano lo dichiara in uno script con mutate.link, poi usa 'atlas exec'.\n"
                                 "  'atlas doctor' prima di dichiarare finito un grafo.",
                           "en": "    1. atlas status              the frontier: what's takeable right now\n"
                                 "    2. atlas take <ID>           claims it and prints its context, before touching anything\n"
@@ -51,6 +55,10 @@ STRINGS: dict[str, dict[str, str]] = {
                                 "    4. atlas close <ID> -s \"the one-line summary\"\n"
                                 "    5. what came up and has no node: atlas fog \"one line\" --for <ID>\n\n"
                                 "  One node per session. A HITL node's answer is written with the human, never alone.\n"
+                                "  If Atlas cannot deduce artifacts, close refuses: repeat --artefatti for every path,\n"
+                                "  or use --artefatti without a path to intentionally declare no artifacts.\n"
+                                "  'atlas drift' proposes missing edges as diagnosis, but does not modify the graph.\n"
+                                "  If the signal is correct, a human declares it in a script with mutate.link, then runs 'atlas exec'.\n"
                                 "  Run 'atlas doctor' before calling a graph finished."},
 
     # --- una riga per ogni mutazione chiamabile da uno script ---
@@ -65,6 +73,10 @@ STRINGS: dict[str, dict[str, str]] = {
     "howto.mutate.link": {"it": "aggiunge una dipendenza: node_id resta fermo finché blocked_by non chiude",
                           "en": "adds a dependency: node_id waits until blocked_by closes"},
     "howto.mutate.unlink": {"it": "toglie una dipendenza", "en": "removes a dependency"},
+    "howto.mutate.ask": {"it": "registra in un nodo AFK una domanda e l'assunzione, non sostituisce una decisione HITL",
+                          "en": "records a question and assumption in an AFK node; it does not replace a HITL decision"},
+    "howto.mutate.answer": {"it": "chiude una domanda registrata senza cambiare lo stato del nodo d'origine",
+                             "en": "answers a recorded question without changing the originating node's state"},
     "howto.mutate.drop": {"it": "fuori scopo: il nodo esce dal percorso ma sblocca chi lo aspettava",
                           "en": "out of scope: the node leaves the path but still unblocks whoever waited for it"},
     "howto.mutate.amend": {"it": "corregge artefatti, costo e sintesi di un nodo già chiuso, senza toccare la chiusura",

@@ -15,6 +15,7 @@ import sys
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -98,11 +99,12 @@ class LeaseCampi(Base):
         self.assertEqual("closed", nodo["status"])
 
     def test_reclaim_rinnova_il_lease(self):
-        self.popola()
-        self.claims.claim(self.ref, "F01")
-        prima = self.model.node_of(self.store.load(self.ref.json_path), "F01")["claim"]["lease_until"]
-        self.claims.claim(self.ref, "F01")
-        dopo = self.model.node_of(self.store.load(self.ref.json_path), "F01")["claim"]["lease_until"]
+        with mock.patch.dict(os.environ, {"ATLAS_IDENTITY": "test-session"}):
+            self.popola()
+            self.claims.claim(self.ref, "F01")
+            prima = self.model.node_of(self.store.load(self.ref.json_path), "F01")["claim"]["lease_until"]
+            self.claims.claim(self.ref, "F01")
+            dopo = self.model.node_of(self.store.load(self.ref.json_path), "F01")["claim"]["lease_until"]
         self.assertGreaterEqual(dopo, prima)
 
     def test_claim_state_locale_usa_il_pid(self):
@@ -221,9 +223,10 @@ class LeaseRemoto(Base):
         self.assertEqual("open", nodo["status"])
 
     def test_reclaim_rinnova_anche_la_ref_remota(self):
-        self.popola()
-        self.claims.claim(self.ref, "F01")
-        self.claims.claim(self.ref, "F01")
+        with mock.patch.dict(os.environ, {"ATLAS_IDENTITY": "test-session"}):
+            self.popola()
+            self.claims.claim(self.ref, "F01")
+            self.claims.claim(self.ref, "F01")
         self.assertEqual(1, len(self.stub.chiamate["rinnova"]))
 
     def test_reclaim_rifiuta_se_la_ref_e_di_un_altro(self):

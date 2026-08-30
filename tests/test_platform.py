@@ -11,6 +11,7 @@ import io
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -184,6 +185,26 @@ class Dispatch(unittest.TestCase):
             self.assertIsNone(dispatch.progetto_qui(Path(tempfile.gettempdir())))
         finally:
             shutil.rmtree(base, ignore_errors=True)
+
+    @mock.patch("atlascli.dispatch.subprocess.run")
+    def test_lock_remote_nome_si_risolve_nel_repository_del_progetto(self, run):
+        run.return_value = SimpleNamespace(stdout="git@github.com:org/servizio.git\n")
+        progetto = self.home / "progetto"
+        url = dispatch._risolvi_remote(progetto, "origin")
+        self.assertEqual("git@github.com:org/servizio.git", url)
+        run.assert_called_once_with(
+            ["git", "-C", str(progetto), "remote", "get-url", "origin"],
+            check=True, capture_output=True, text=True)
+
+    @mock.patch("atlascli.dispatch.subprocess.run")
+    def test_lock_remote_url_si_passa_direttamente_al_trasporto(self, run):
+        url = "https://github.com/org/servizio.git"
+        self.assertEqual(url, dispatch._risolvi_remote(self.home, url))
+        run.assert_not_called()
+
+    @mock.patch("atlascli.dispatch.subprocess.run", side_effect=subprocess.CalledProcessError(2, "git"))
+    def test_lock_remote_nome_inesistente_e_configurazione_non_risolta(self, run):
+        self.assertIsNone(dispatch._risolvi_remote(self.home, "upstream"))
 
     def test_comando_sconosciuto_esce_con_errore(self):
         """Con un elenco unico se ne occupa argparse, che esce con 2 e stampa l'usage."""

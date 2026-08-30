@@ -95,6 +95,24 @@ def changed_since(root: Path, artifact_path: str, closed_at: str) -> bool | None
     return False
 
 
+def tracked(root: Path, artifact_path: str) -> bool | None:
+    """Dice se *artifact_path* e' nell'indice git della repo, se possibile.
+
+    ``False`` significa che Git conosce la repo ma non quel file; ``None`` significa
+    che il controllo non e' applicabile, perche' il progetto non e' una repo Git o il
+    comando non si puo' eseguire. Distinguere i due casi permette a doctor di non
+    scambiare un progetto non versionato per un artefatto smarrito.
+    """
+    if not (root / ".git").exists():
+        return None
+    try:
+        esito = subprocess.run(["git", "ls-files", "--error-unmatch", "--", artifact_path],
+                               cwd=root, capture_output=True, text=True)
+    except OSError:
+        return None
+    return esito.returncode == 0 and artifact_path in esito.stdout.splitlines()
+
+
 def move(root: Path, src: Path, dst: Path) -> bool:
     """Rinomina con 'git mv' se il file e' tracciato, torna False se git non se ne occupa.
 

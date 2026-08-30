@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from . import claims, docs, gitscan, remotelock
+from . import claims, docs, gitscan, questions, remotelock
 from .config import ConfigError, Graph, Workspace
 from .model import by_id, claimed, is_done, istante, owners_of
 from .report import ETICHETTA
@@ -15,6 +15,11 @@ from .topology import convergence
 def doctor_avvisi(data: dict, ref: Graph, agente: dict) -> list[str]:
     """Avvisi sulla salute di un grafo: non bloccano niente, segnalano soltanto."""
     avvisi = []
+
+    if domande := questions.open_questions(data):
+        vecchie = {q["id"] for q in questions.aged_questions(data)}
+        avvisi.append(t("doctor.domande_aperte", elenco=", ".join(
+            q["id"] + (" (invecchiata)" if q["id"] in vecchie else "") for q in domande)))
 
     # Un merge che non ha saputo risolvere lascia il campo conflicts nel grafo
     # (A02): e' il caso in cui doctor serve di piu', perche' git ha gia' dichiarato
@@ -55,22 +60,35 @@ def doctor_avvisi(data: dict, ref: Graph, agente: dict) -> list[str]:
         chiuso = nodo.get("closedAt")
         if nodo["status"] != "closed" or not chiuso or not nodo.get("artifacts"):
             continue
+        mancanti = []
+        non_tracciati = []
         tocchi = []
         for a in nodo["artifacts"]:
-            if not (ref.workspace.project_root / a).is_file():
-                continue
-            # Usa git se siamo in una repo per verificare se il file e' davvero cambiato.
-            # Se gitscan non puo' verificare (repo non git O rev-list vuoto), fallback all'mtime.
-            result = gitscan.changed_since(ref.workspace.project_root, a, chiuso)
-            if result is True:
-                tocchi.append(a)
-            elif result is None:
-                # Fallback all'mtime: il file e' stato scritto dopo la chiusura.
-                soglia = istante(chiuso)
-                if soglia is None:
-                    continue        # senza un istante leggibile non c'e' confronto da fare
-                if datetime.fromtimestamp((ref.workspace.project_root / a).stat().st_mtime).astimezone() > soglia:
+            try:
+                if not (ref.workspace.project_root / a).is_file():
+                    mancanti.append(a)
+                    continue
+                if gitscan.tracked(ref.workspace.project_root, a) is False:
+                    non_tracciati.append(a)
+                # Usa git se siamo in una repo per verificare se il file e' davvero cambiato.
+                # Se gitscan non puo' verificare (repo non git O rev-list vuoto), fallback all'mtime.
+                result = gitscan.changed_since(ref.workspace.project_root, a, chiuso)
+                if result is True:
                     tocchi.append(a)
+                elif result is None:
+                    # Fallback all'mtime: il file e' stato scritto dopo la chiusura.
+                    soglia = istante(chiuso)
+                    if soglia is None:
+                        continue        # senza un istante leggibile non c'e' confronto da fare
+                    if datetime.fromtimestamp((ref.workspace.project_root / a).stat().st_mtime).astimezone() > soglia:
+                        tocchi.append(a)
+            except OSError as errore:
+                avvisi.append(t("doctor.artefatto_non_ispezionabile", id=nodo["id"],
+                                path=a, errore=errore))
+        if mancanti:
+            avvisi.append(t("doctor.artefatti_mancanti", id=nodo["id"], elenco=", ".join(mancanti)))
+        if non_tracciati:
+            avvisi.append(t("doctor.artefatti_non_tracciati", id=nodo["id"], elenco=", ".join(non_tracciati)))
         if tocchi:
             avvisi.append(t("doctor.ambito_toccato", id=nodo["id"], elenco=", ".join(tocchi)))
 

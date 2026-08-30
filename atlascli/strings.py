@@ -187,6 +187,9 @@ STRINGS: dict[str, dict[str, str]] = {
                                     "  It belongs to Claude Code, not to Atlas: fix it yourself, "
                                     "or install with --no-hooks."},
     "errore.non_oggetto": {"it": "il contenuto non è un oggetto JSON", "en": "the content is not a JSON object"},
+    "errore.remote_non_risolto": {
+        "it": "lock.remote '{remote}' non è un remote Git risolvibile nella copia del progetto; lucchetto remoto disattivato",
+        "en": "lock.remote '{remote}' is not a Git remote resolvable in the project checkout; remote lock disabled"},
 
     # --- registry.py ---
     "registry.slug_occupato": {"it": "'{slug}' è già registrato per {path}: usa --slug per un nome diverso",

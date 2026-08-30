@@ -31,6 +31,7 @@ esiti: list[tuple[bool, str]] = []
 # Il registro globale della sandbox in corso: locale() ne ha bisogno, e passarlo a ogni
 # chiamata riempirebbe di rumore le verifiche, che sono la parte da leggere.
 _config_sandbox: Path | None = None
+E2E_IDENTITY = "e2e-session"
 
 
 def verifica(condizione: bool, cosa: str) -> None:
@@ -61,7 +62,8 @@ def payload_pyc() -> list[str]:
 def locale(cwd: Path, *args: str) -> subprocess.CompletedProcess:
     """I comandi del grafo: dalla 0.7 li fa lo stesso eseguibile, dentro il progetto."""
     return subprocess.run([sys.executable, str(CLI), *args], cwd=cwd,
-                          env=dict(os.environ, ATLAS_CONFIG=str(_config_sandbox)),
+                          env=dict(os.environ, ATLAS_CONFIG=str(_config_sandbox),
+                                   ATLAS_IDENTITY=E2E_IDENTITY),
                           capture_output=True, text=True)
 
 
@@ -89,7 +91,7 @@ def main() -> int:
     atlas_home = Path(tempfile.mkdtemp())
     atlas_config = atlas_home / "atlas.json"
     _config_sandbox = atlas_config
-    env = dict(os.environ, ATLAS_CONFIG=str(atlas_config))
+    env = dict(os.environ, ATLAS_CONFIG=str(atlas_config), ATLAS_IDENTITY=E2E_IDENTITY)
     try:
         prepara(target)
         print(f"\n  progetto finto in {target} · ATLAS_CONFIG in {atlas_config}\n")

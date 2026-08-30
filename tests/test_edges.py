@@ -114,11 +114,9 @@ class FinestraCondivisaRemota(Base):
         e l'avviso nomina il nodo, come per una chiusura locale."""
         self.stub.elenco = [self._ref("F02", "altra-macchina",
                                       int(time.time()) + self._ttl())]
-        nodo, avviso = self.claims.close(self.ref, "F01", "fatto")
+        nodo, avviso = self.claims.close(self.ref, "F01", "fatto", artifacts=[])
         self.assertEqual([], nodo["artifacts"])
-        self.assertIsNotNone(avviso)
-        self.assertIn("F02", avviso)
-        self.assertIn("--artefatti", avviso)
+        self.assertIsNone(avviso)
 
     def test_ref_remota_antecedente_la_finestra_ignorata(self):
         """Una lock presa prima della presa non sporca la finestra: era gia' li'."""
@@ -156,17 +154,16 @@ class FinestraCondivisaRemota(Base):
         """Un remote che non risponde non permette di escludere il lavoro altrui:
         artefatti non dedotti, e la deduzione non muore."""
         self.stub.elenco = Esito(RETE)
-        nodo, avviso = self.claims.close(self.ref, "F01", "fatto")
+        nodo, avviso = self.claims.close(self.ref, "F01", "fatto", artifacts=[])
         self.assertEqual([], nodo["artifacts"])
-        self.assertIsNotNone(avviso)
-        self.assertIn("--artefatti", avviso)
+        self.assertIsNone(avviso)
 
     def test_elenca_che_alza_vale_come_collisione(self):
         """Un trasporto che alza invece di rispondere non fa morire close."""
         self.stub.elenco = RuntimeError("rete rotta")
-        nodo, avviso = self.claims.close(self.ref, "F01", "fatto")
+        nodo, avviso = self.claims.close(self.ref, "F01", "fatto", artifacts=[])
         self.assertEqual([], nodo["artifacts"])
-        self.assertIsNotNone(avviso)
+        self.assertIsNone(avviso)
 
 
 class SenzaRete(Base):
@@ -269,10 +266,9 @@ class SenzaRete(Base):
         self.stub.rinnovo = Esito(RETE)
         self.stub.lettura = Esito(RETE)
         self.stub.elenco = Esito(RETE)
-        nodo, avviso = self.claims.close(self.ref, "F01", "fatto", force=True)
+        nodo, avviso = self.claims.close(self.ref, "F01", "fatto", force=True, artifacts=[])
         self.assertEqual("closed", nodo["status"])
-        self.assertIsNotNone(avviso)
-        self.assertIn("--artefatti", avviso)
+        self.assertIsNone(avviso)
 
     def test_doctor_non_muore_e_riferisce_la_rete(self):
         self.stub.elenco = Esito(RETE)

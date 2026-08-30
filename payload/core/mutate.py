@@ -15,6 +15,7 @@ from .editor import Editor, editing, now, validate    # noqa: F401  (superficie 
 from .lifecycle import amend, drop, reopen, restore_closure    # noqa: F401  (idem)
 from .store import OPEN, SCHEMA_VERSION, StateError, write_new
 from .strings import t
+from .identity import identity
 
 
 # --- struttura -------------------------------------------------------------
@@ -27,13 +28,16 @@ def add_branch(g: Editor, key: str, label: str, color: str = "#64748b") -> None:
 
 def add_node(g: Editor, id: str, title: str, branch: str, question: str,
              type: str = "task", mode: str = "AFK",
-             blockedBy: list[str] | tuple[str, ...] = (), artifacts: list[str] = ()) -> dict:
+             blockedBy: list[str] | tuple[str, ...] = (), artifacts: list[str] = (),
+             model: str | None = None) -> dict:
     if id in g.ids():
         raise StateError(t("mutate.nodo_esiste", id=id))
     node = {"id": id, "title": title, "branch": branch, "type": type, "mode": mode,
             "status": OPEN, "assignee": None, "owner": [], "blockedBy": list(blockedBy),
             "question": question, "answer": None, "claim": None,
             "artifacts": list(artifacts), "createdAt": now()}
+    if model is not None:
+        node["model"] = model
     g.data["nodes"].append(node)
     return node
 
@@ -68,6 +72,42 @@ def unlink(g: Editor, node_id: str, blocked_by: str) -> None:
     if blocked_by not in node["blockedBy"]:
         raise StateError(t("mutate.non_bloccato", id=node_id, blocked_by=blocked_by))
     node["blockedBy"].remove(blocked_by)
+
+
+def _next_question_id(g: Editor) -> str:
+    numeri = [int(q["id"][1:]) for q in g.data.get("questions", [])
+              if isinstance(q.get("id"), str) and re.fullmatch(r"Q\d+", q["id"])]
+    return f"Q{max(numeri, default=0) + 1:03d}"
+
+
+def ask(g: Editor, origin: str, question: str, assumption: str) -> dict:
+    """Record an AFK question without changing the originating node's state."""
+    node = g.node(origin)
+    if node["mode"] == "HITL":
+        raise StateError(t("mutate.ask_hitl", id=origin))
+    if not isinstance(question, str) or not question.strip():
+        raise StateError(t("mutate.ask_campo_vuoto", campo="question"))
+    if not isinstance(assumption, str) or not assumption.strip():
+        raise StateError(t("mutate.ask_campo_vuoto", campo="assumption"))
+    record = {"id": _next_question_id(g), "question": question.strip(), "status": "open",
+              "origin": origin, "assumption": assumption.strip(), "author": identity(),
+              "askedAt": now(), "answer": None}
+    g.data.setdefault("questions", []).append(record)
+    return record
+
+
+def answer(g: Editor, question_id: str, response: str) -> dict:
+    """Answer a recorded question; the originating node remains untouched."""
+    try:
+        record = next(q for q in g.data.get("questions", []) if q["id"] == question_id)
+    except StopIteration:
+        raise StateError(t("mutate.domanda_inesistente", id=question_id)) from None
+    if record["status"] != "open":
+        raise StateError(t("mutate.domanda_gia_risposta", id=question_id))
+    if not isinstance(response, str) or not response.strip():
+        raise StateError(t("mutate.ask_campo_vuoto", campo="answer"))
+    record.update(status="answered", answer=response.strip())
+    return record
 
 
 # --- contorno --------------------------------------------------------------
@@ -133,6 +173,7 @@ def create_graph(ws: Workspace, slug: str, title: str, destination: str,
                  "updated": now()[:10], "notes": notes or []},
         "branches": branches or {"A": {"label": t("mutate.ramo_default_label"), "color": "#4f46e5"}},
         "nodes": [], "fog": [], "outOfScope": [],
+        "questions": [],
     }
     validate(data, ws.config["vocab"])
     write_new(ref.json_path, data)

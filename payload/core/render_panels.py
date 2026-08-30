@@ -10,7 +10,7 @@ import re
 from datetime import datetime
 from html import escape
 
-from . import claims, remotelock, render_owners, theme
+from . import claims, questions, remotelock, render_owners, theme
 from .config import Graph
 from .model import progress
 from .strings import t
@@ -146,6 +146,16 @@ def panels(ref: Graph, data: dict, front: list[dict], presi: list[dict],
         _blocco_avanzamento(data, fatti, totale),
         _blocco_lista(t("render.frontiera"), voci_front, t("render.frontiera_vuota"), hl="frontier"),
     ]
+    aperte = questions.open_questions(data)
+    if aperte:
+        vecchie = {q["id"] for q in questions.aged_questions(data)}
+        voci_domande = [
+            f'<li><b>{escape(q["id"])}</b> {escape(q["question"])}'
+            f'<span class="tag">{escape(q["origin"])} · '
+            f'{t("render.domanda_invecchiata") if q["id"] in vecchie else t("render.domanda_aperta")}</span></li>'
+            for q in aperte
+        ]
+        blocchi.append(_blocco_lista(t("render.domande"), voci_domande, ""))
     if presi:
         voci = [
             f'<li data-node="{n["id"]}"><b>{n["id"]}</b> {escape(n["title"])}'

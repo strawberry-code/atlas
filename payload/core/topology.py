@@ -7,7 +7,7 @@ gli indici si costruiscono una volta sola per chi deve interrogare tutto il graf
 """
 from __future__ import annotations
 
-from .model import blocker_of, by_id, frontier
+from .model import blocker_of, by_id, frontier, istante
 from .store import DROPPED, StateError
 from .strings import t
 
@@ -98,6 +98,24 @@ def _discendenti(uscenti: dict[str, list[str]], node_id: str) -> set[str]:
 def downstream(graph: dict, node_id: str) -> set[str]:
     """Tutti i nodi che aspettano, direttamente o no, la chiusura di questo."""
     return _discendenti(successors(graph), node_id)
+
+
+def closed_downstream_after(graph: dict, node_id: str, after: str) -> list[dict]:
+    """Closed dependants of ``node_id`` completed after a question was asked.
+
+    The question can only invalidate work that both depends on its origin and was
+    closed later.  Invalid timestamps are deliberately excluded: guessing their
+    order would turn a diagnostic into a false positive.
+    """
+    soglia = istante(after)
+    if soglia is None:
+        return []
+    impacted = downstream(graph, node_id)
+    return [node for node in graph["nodes"]
+            if node["id"] in impacted
+            and node.get("status") == "closed"
+            and (closed := istante(node.get("closedAt"))) is not None
+            and closed > soglia]
 
 
 def _cammini_residui(graph: dict, uscenti: dict[str, list[str]]) -> dict[str, int]:

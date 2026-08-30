@@ -75,6 +75,106 @@ class Base(unittest.TestCase):
 
 
 class Forma(Base):
+    def test_ask_registra_modello_minimale_e_answer_non_tocca_nodo(self):
+        self.popola()
+        with mock.patch.dict(os.environ, {"ATLAS_IDENTITY": "luna"}):
+            with self.mutate.editing(self.ref) as g:
+                domanda = self.mutate.ask(g, "F01", "Quale scelta?", "Assumo che il contratto sia stabile.")
+                risposta = self.mutate.answer(g, domanda["id"], "La scelta documentata.")
+        self.assertEqual({"id", "question", "status", "origin", "assumption", "author", "askedAt", "answer"},
+                         set(risposta))
+        self.assertEqual("answered", risposta["status"])
+        self.assertEqual("luna", risposta["author"])
+        self.assertEqual("open", self.store.load(self.ref.json_path)["nodes"][0]["status"])
+
+    def test_ask_rifiuta_nodo_hitl(self):
+        self.popola()
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.edit_node(g, "F01", mode="HITL")
+        with self.assertRaises(self.store.StateError) as caso:
+            with self.mutate.editing(self.ref) as g:
+                self.mutate.ask(g, "F01", "?", "assunzione")
+        self.assertIn("HITL", str(caso.exception))
+        self.assertEqual([], self.store.load(self.ref.json_path)["questions"])
+
+    def test_cli_ask_registra_identita_e_persistenza(self):
+        self.popola()
+        from core.cli import main
+        codice = main(["ask", "F01", "-q", "Quale scelta?", "-a", "contratto stabile",
+                       "--identity", "luna-f02"])
+        self.assertEqual(0, codice)
+        domanda = self.store.load(self.ref.json_path)["questions"][0]
+        self.assertEqual("luna-f02", domanda["author"])
+        self.assertEqual("open", domanda["status"])
+
+    def test_cli_asks_mostra_solo_domande_aperte(self):
+        self.popola()
+        from core.cli import main
+        main(["ask", "F01", "-q", "Aperta?", "-a", "assunzione", "--identity", "luna-f02"])
+        main(["ask", "F01", "-q", "Chiusa?", "-a", "assunzione", "--identity", "luna-f02"])
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.answer(g, "Q002", "Risposta")
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            codice = main(["asks"])
+        self.assertEqual(0, codice)
+        self.assertIn("Q001", output.getvalue())
+        self.assertNotIn("Q002", output.getvalue())
+        self.assertIn("Aperta?", output.getvalue())
+
+    def test_cli_answer_preserva_stato_nodo_origine(self):
+        self.popola()
+        from core.cli import main
+        main(["ask", "F01", "-q", "Quale scelta?", "-a", "assunzione", "--identity", "luna-f02"])
+        prima = self.model.node_of(self.store.load(self.ref.json_path), "F01").copy()
+        codice = main(["answer", "Q001", "-r", "Scelta documentata", "--identity", "luna-f02"])
+        self.assertEqual(0, codice)
+        dopo = self.model.node_of(self.store.load(self.ref.json_path), "F01")
+        self.assertEqual(prima, dopo)
+        self.assertEqual("answered", self.store.load(self.ref.json_path)["questions"][0]["status"])
+
+    def _domanda_con_chiusi(self):
+        self.popola()
+        with self.mutate.editing(self.ref) as g:
+            domanda = self.mutate.ask(g, "F01", "Quale scelta?", "assunzione")
+            domanda["askedAt"] = "2026-08-30T06:00:00+02:00"
+            g.node("F02").update(status="closed", closedAt="2026-08-30T06:01:00+02:00")
+            g.node("F03").update(status="closed", closedAt="2026-08-30T06:02:00+02:00")
+        return domanda
+
+    def test_cli_answer_stampa_i_chiusi_dipendenti_se_divergente(self):
+        self._domanda_con_chiusi()
+        from core.cli import main
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            main(["answer", "Q001", "-r", "risposta diversa", "--identity", "luna-f03"])
+        testo = output.getvalue()
+        self.assertIn("risposta divergente", testo)
+        self.assertLess(testo.index("F02"), testo.index("F03"))
+
+    def test_cli_answer_non_stampa_impact_se_concorde(self):
+        self._domanda_con_chiusi()
+        from core.cli import main
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            main(["answer", "Q001", "-r", "assunzione", "--identity", "luna-f03"])
+        self.assertNotIn("risposta divergente", output.getvalue())
+
+    def test_cli_answer_non_stampa_impact_se_non_ci_sono_chiusi(self):
+        self.popola()
+        from core.cli import main
+        main(["ask", "F01", "-q", "Quale scelta?", "-a", "assunzione", "--identity", "luna-f03"])
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            main(["answer", "Q001", "-r", "risposta diversa", "--identity", "luna-f03"])
+        self.assertNotIn("risposta divergente", output.getvalue())
+
+    def test_domanda_invalida_non_passa_la_validazione(self):
+        self.popola()
+        with self.assertRaises(self.store.StateError):
+            with self.mutate.editing(self.ref) as g:
+                g.data["questions"].append({"id": "Q001", "status": "open"})
+
     def test_frontiera_solo_i_nodi_sbloccati(self):
         data = self.popola()
         self.assertEqual(["F01"], [n["id"] for n in self.model.frontier(data)])
@@ -101,6 +201,28 @@ class Forma(Base):
             with self.mutate.editing(self.ref) as g:
                 self.mutate.add_branch(g, "F", "Fondamenta")
                 self.mutate.add_node(g, id="F01", branch="F", title="X", question="?", type="epico")
+
+    def test_modello_non_specificato_non_entra_nel_nodo(self):
+        with self.mutate.editing(self.ref) as g:
+            node = self.mutate.add_node(g, id="F01", branch="A", title="X", question="?")
+        self.assertNotIn("model", node)
+        self.assertNotIn("model", self.store.load(self.ref.json_path)["nodes"][0])
+
+    def test_modello_esplicito_si_serializza(self):
+        with self.mutate.editing(self.ref) as g:
+            node = self.mutate.add_node(g, id="F01", branch="A", title="X", question="?",
+                                        model="gpt-5")
+        self.assertEqual("gpt-5", node["model"])
+        self.assertEqual("gpt-5", self.store.load(self.ref.json_path)["nodes"][0]["model"])
+
+    def test_modello_non_valido_non_passa_la_validazione(self):
+        with self.assertRaises(self.store.StateError):
+            with self.mutate.editing(self.ref) as g:
+                self.mutate.add_node(g, id="F01", branch="A", title="X", question="?", model=" ")
+        with self.assertRaises(self.store.StateError):
+            with self.mutate.editing(self.ref) as g:
+                self.mutate.add_node(g, id="F02", branch="A", title="X", question="?", model=42)
+        self.assertEqual([], self.store.load(self.ref.json_path)["nodes"])
 
     def test_id_duplicato(self):
         self.popola()
@@ -238,12 +360,13 @@ class Lucchetti(Base):
             self.claims.claim(self.ref, "F02")
 
     def test_tetto_di_un_nodo_per_sessione(self):
-        self.popola()
-        with self.mutate.editing(self.ref) as g:
-            self.mutate.unlink(g, "F02", blocked_by="F01")
-        self.claims.claim(self.ref, "F01")
-        with self.assertRaises(self.store.StateError):
-            self.claims.claim(self.ref, "F02")
+        with mock.patch.dict(os.environ, {"ATLAS_IDENTITY": "test-session"}):
+            self.popola()
+            with self.mutate.editing(self.ref) as g:
+                self.mutate.unlink(g, "F02", blocked_by="F01")
+            self.claims.claim(self.ref, "F01")
+            with self.assertRaises(self.store.StateError):
+                self.claims.claim(self.ref, "F02")
 
     def test_close_pretende_la_risposta_scritta(self):
         self.popola()
@@ -296,9 +419,10 @@ class Lucchetti(Base):
         self.assertEqual("claimed", self.model.node_of(data, "F02")["status"])
 
     def test_riclamare_il_proprio_nodo_rinfresca_il_lucchetto(self):
-        self.popola()
-        self.claims.claim(self.ref, "F01")
-        node = self.claims.claim(self.ref, "F01")
+        with mock.patch.dict(os.environ, {"ATLAS_IDENTITY": "test-session"}):
+            self.popola()
+            self.claims.claim(self.ref, "F01")
+            node = self.claims.claim(self.ref, "F01")
         self.assertEqual("claimed", node["status"])
 
     def test_riclamare_da_unaltra_identita_solleva(self):
@@ -416,9 +540,49 @@ class Artefatti(Base):
         for url in ("cdn", "googleapis", "unpkg"):
             self.assertNotIn(url, html)
 
+    def test_dashboard_mostra_il_modello_richiesto(self):
+        self.popola()
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.edit_node(g, "F01", model="gpt-5")
+        self.render_tutto()
+        html = self.ref.dashboard_path.read_text(encoding="utf-8")
+        isola = html.split('<script type="application/json" id="atlas-data">', 1)[1].split("</script>", 1)[0]
+        dati = json.loads(isola.replace("<\\/", "</"))
+        self.assertEqual("gpt-5", dati["nodes"]["F01"]["model"])
+        self.assertEqual("", dati["nodes"]["F02"]["model"])
+        self.assertIn("if (n.model)", html)
+
     def test_dashboard_regge_un_grafo_vuoto(self):
         self.render_tutto()
         self.assertIn("<svg", self.ref.dashboard_path.read_text(encoding="utf-8"))
+
+    def test_dashboard_mostra_domande_aperte_e_invecchiate(self):
+        self.popola()
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.ask(g, "F01", "Quale scelta?", "assumo stabilità")
+        with self.store.transaction(self.ref.json_path) as data:
+            data["questions"][0]["askedAt"] = (datetime.now().astimezone() - timedelta(hours=25)).isoformat()
+        self.render_tutto()
+        html = self.ref.dashboard_path.read_text(encoding="utf-8")
+        self.assertIn("domande aperte", html)
+        self.assertIn("invecchiata", html)
+
+    def test_doctor_segnala_domanda_aperta_invecchiata(self):
+        self.popola()
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.ask(g, "F01", "Quale scelta?", "assumo stabilità")
+        with self.store.transaction(self.ref.json_path) as data:
+            data["questions"][0]["askedAt"] = (datetime.now().astimezone() - timedelta(hours=25)).isoformat()
+        avvisi = self.doctor.doctor_avvisi(self.store.load(self.ref.json_path), self.ref, self.ws.config["agent"])
+        self.assertTrue(any("Q001" in a and "invecchiata" in a and "24" in a for a in avvisi))
+
+    def test_doctor_mostra_domanda_aperta_non_invecchiata(self):
+        self.popola()
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.ask(g, "F01", "Quale scelta?", "assumo stabilità")
+        avvisi = self.doctor.doctor_avvisi(self.store.load(self.ref.json_path), self.ref, self.ws.config["agent"])
+        self.assertTrue(any("Q001" in a and "domande aperte" in a for a in avvisi))
+        self.assertFalse(any("invecchiata" in a for a in avvisi))
 
     def test_dashboard_avvisa_se_il_grafo_non_converge(self):
         self.popola()
@@ -525,6 +689,58 @@ class Artefatti(Base):
         node, _ = self.claims.close(self.ref, "F01", "fatto", artifacts=["esplicito.txt"])
         self.assertEqual(["esplicito.txt"], node["artifacts"])
 
+    def test_close_avvisa_path_artefatto_mancante(self):
+        self.prepara_lavoro()
+        node, avviso = self.claims.close(self.ref, "F01", "fatto", artifacts=["sparito.txt"])
+        self.assertEqual(["sparito.txt"], node["artifacts"])
+        self.assertIn("non esistono nel progetto", avviso)
+
+    def test_close_cli_avvisa_artefatti_presenti_non_tracciati(self):
+        """Un artefatto esplicito non tracciato avvisa, ma non impedisce close."""
+        from core import cli
+        self.prepara_lavoro()
+        artefatto = self.tmp / "non-tracciato.txt"
+        artefatto.write_text("contenuto", encoding="utf-8")
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            self.assertEqual(0, cli.main(["close", "F01", "-s", "fatto",
+                                          "--artefatti", "non-tracciato.txt"]))
+        self.assertIn("non-tracciato.txt", buffer.getvalue())
+        self.assertIn("non sono tracciati da Git", buffer.getvalue())
+        self.assertIn("la chiusura prosegue", buffer.getvalue())
+        self.assertEqual("closed", self.model.node_of(self.store.load(self.ref.json_path), "F01")["status"])
+
+    def test_close_cli_raccoglie_artefatti_con_flag_ripetuto(self):
+        """La grammatica CLI e' un path per flag, ripetibile senza perdita."""
+        from core import cli
+        self.prepara_lavoro()
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(0, cli.main(["close", "F01", "-s", "fatto",
+                                          "--artefatti", "uno.txt",
+                                          "--artefatti", "due.txt"]))
+        node = self.model.node_of(self.store.load(self.ref.json_path), "F01")
+        self.assertEqual(["uno.txt", "due.txt"], node["artifacts"])
+
+    def test_close_cli_rifiuta_artefatto_con_spazio(self):
+        from core import cli
+        with self.assertRaises(self.store.StateError) as caso:
+            cli._artefatti_cli(["uno due.txt"])
+        self.assertIn("ambigui", str(caso.exception))
+
+    def test_close_cli_rifiuta_artefatto_con_virgola(self):
+        from core import cli
+        with self.assertRaises(self.store.StateError) as caso:
+            cli._artefatti_cli(["uno,due.txt"])
+        self.assertIn("ambigui", str(caso.exception))
+
+    def test_close_cli_non_accetta_espansione_zsh_in_un_solo_flag(self):
+        from core import cli
+        with contextlib.redirect_stderr(io.StringIO()) as errore:
+            with self.assertRaises(SystemExit):
+                cli.build_parser().parse_args(["close", "F01", "-s", "fatto",
+                                               "--artefatti", "uno.txt", "due.txt"])
+        self.assertIn("ripeti il flag", errore.getvalue())
+
     def test_artifacts_lista_vuota_svuota_il_campo(self):
         self.prepara_lavoro()
         node, _ = self.claims.close(self.ref, "F01", "fatto", artifacts=[])
@@ -539,7 +755,7 @@ class Artefatti(Base):
         self.assertEqual([], node["artifacts"])
 
     def test_artifacts_non_dedotti_con_piu_nodi_rivendicati(self):
-        """Con due nodi rivendicati insieme, la deduzione scatta solo se --artefatti è esplicito."""
+        """Con due nodi rivendicati insieme, close impone --artefatti esplicito."""
         self.prepara_lavoro()
         # Rimuovi la dipendenza fra F02 e F01 in modo che F02 possa essere rivendicato in parallelo
         with self.mutate.editing(self.ref) as g:
@@ -550,17 +766,39 @@ class Artefatti(Base):
         finally:
             os.environ.pop("ATLAS_IDENTITY", None)
         (self.tmp / "secondo-file.txt").write_text("output2", encoding="utf-8")
-        node, avviso = self.claims.close(self.ref, "F01", "fatto")
-        self.assertEqual([], node["artifacts"], "con piu' nodi in parallelo, artifacts deve restare vuoto")
-        self.assertIsNotNone(avviso, "deve esserci un avviso sulla deduzione saltata")
-        self.assertIn("--artefatti", avviso)
+        with self.assertRaises(self.store.StateError) as caso:
+            self.claims.close(self.ref, "F01", "fatto")
+        self.assertIn("--artefatti", str(caso.exception))
+        node, avviso = self.claims.close(self.ref, "F01", "fatto", artifacts=[])
+        self.assertEqual([], node["artifacts"])
+        self.assertIsNone(avviso)
+
+    def test_close_cli_rende_visibile_il_rifiuto_della_deduzione(self):
+        """Il fallimento non deve sembrare una chiusura riuscita con lista vuota."""
+        from core import cli
+        self.prepara_lavoro()
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.unlink(g, "F02", blocked_by="F01")
+        os.environ["ATLAS_IDENTITY"] = "esecutore-2"
+        try:
+            self.claims.claim(self.ref, "F02")
+        finally:
+            os.environ.pop("ATLAS_IDENTITY", None)
+        errore = io.StringIO()
+        with contextlib.redirect_stderr(errore):
+            codice = cli.main(["close", "F01", "-s", "fatto"])
+        self.assertEqual(1, codice)
+        self.assertIn("non posso chiudere", errore.getvalue())
+        self.assertIn("--artefatti", errore.getvalue())
+        self.assertIn("dichiarare il vuoto", errore.getvalue())
+        self.assertEqual("claimed", self.model.node_of(self.store.load(self.ref.json_path), "F01")["status"])
 
     def test_artifacts_deduzione_con_un_nodo_rivendicato(self):
         """Con un solo nodo rivendicato, la deduzione scatta regolarmente."""
         self.prepara_lavoro()
         node, avviso = self.claims.close(self.ref, "F01", "fatto")
         self.assertIn("prodotto.txt", node["artifacts"], "la deduzione deve funzionare con un solo nodo")
-        self.assertIsNone(avviso, "non deve esserci avviso quando la deduzione riesce")
+        self.assertIn("non sono tracciati da Git", avviso)
 
     def test_artifacts_non_dedotti_nodo_aperto_mentre_altri_rivendicati(self):
         """Un nodo aperto che si chiude mentre un altro è rivendicato non deduce gli artefatti.
@@ -583,10 +821,11 @@ class Artefatti(Base):
         # Scrivi un file (simulando il lavoro)
         (self.tmp / "prodotto.txt").write_text("output", encoding="utf-8")
         # Chiudi F01 senza rivendicarlo (rimane open), senza --artefatti
-        node, avviso = self.claims.close(self.ref, "F01", "fatto")
-        self.assertEqual([], node["artifacts"], "nodo aperto in parallelo con altri rivendicati non deduce")
-        self.assertIsNotNone(avviso, "deve esserci avviso quando altri nodi sono rivendicati")
-        self.assertIn("--artefatti", avviso)
+        with self.assertRaises(self.store.StateError) as caso:
+            self.claims.close(self.ref, "F01", "fatto")
+        self.assertIn("--artefatti", str(caso.exception))
+        node, _ = self.claims.close(self.ref, "F01", "fatto", artifacts=[])
+        self.assertEqual([], node["artifacts"])
 
     def sgancia(self, node_id: str, blocked_by: str):
         with self.mutate.editing(self.ref) as g:
@@ -611,11 +850,13 @@ class Artefatti(Base):
         self.rispondi("F02")
         self.altra_sessione(lambda: self.claims.claim(self.ref, "F02"))
         (self.tmp / "roba-altrui.txt").write_text("output2", encoding="utf-8")
-        self.altra_sessione(lambda: self.claims.close(self.ref, "F02", "fatto da un altro"))
-        node, avviso = self.claims.close(self.ref, "F01", "fatto")
-        self.assertEqual([], node["artifacts"], "il lavoro di F02 non va intestato a F01")
-        self.assertIsNotNone(avviso, "la deduzione saltata va dichiarata")
-        self.assertIn("F02", avviso, "l'avviso deve nominare il nodo che ha condiviso la finestra")
+        self.altra_sessione(lambda: self.claims.close(
+            self.ref, "F02", "fatto da un altro", artifacts=["roba-altrui.txt"]))
+        with self.assertRaises(self.store.StateError) as caso:
+            self.claims.close(self.ref, "F01", "fatto")
+        self.assertIn("F02", str(caso.exception), "l'errore deve nominare il nodo")
+        node, _ = self.claims.close(self.ref, "F01", "fatto", artifacts=[])
+        self.assertEqual([], node["artifacts"])
 
     def test_artifacts_dedotti_se_l_altra_chiusura_precede_la_presa(self):
         """Il caso sequenziale, che deve restare dedotto: chiudo F02, poi prendo F01."""
@@ -637,7 +878,7 @@ class Artefatti(Base):
         (self.tmp / "prodotto.txt").write_text("output", encoding="utf-8")
         node, avviso = self.claims.close(self.ref, "F01", "fatto")
         self.assertIn("prodotto.txt", node["artifacts"], "una chiusura precedente non sporca la finestra")
-        self.assertIsNone(avviso)
+        self.assertIn("non sono tracciati da Git", avviso)
 
     def test_artifacts_non_dedotti_se_un_altro_nodo_e_rilasciato_dentro_la_finestra(self):
         """Un rilascio motivato dentro la finestra vale come una chiusura: l'altra
@@ -646,18 +887,23 @@ class Artefatti(Base):
         self.sgancia("F02", "F01")
         self.altra_sessione(lambda: self.claims.claim(self.ref, "F02"))
         self.altra_sessione(lambda: self.claims.release(self.ref, "F02", reason="cambio piano"))
-        node, avviso = self.claims.close(self.ref, "F01", "fatto")
+        with self.assertRaises(self.store.StateError) as caso:
+            self.claims.close(self.ref, "F01", "fatto")
+        self.assertIn("F02", str(caso.exception))
+        node, _ = self.claims.close(self.ref, "F01", "fatto", artifacts=[])
         self.assertEqual([], node["artifacts"])
-        self.assertIn("F02", avviso)
 
     def test_artifacts_non_dedotti_con_istante_di_presa_illeggibile(self):
         """Un claim.at scritto a mano non deve far morire close, ne' dedurre alla cieca."""
         self.prepara_lavoro()
         with self.store.transaction(self.ref.json_path) as data:
             self.model.node_of(data, "F01")["claim"]["at"] = "ieri"
-        node, avviso = self.claims.close(self.ref, "F01", "fatto", force=True)
+        with self.assertRaises(self.store.StateError) as caso:
+            self.claims.close(self.ref, "F01", "fatto", force=True)
+        self.assertIn("ieri", str(caso.exception))
+        node, avviso = self.claims.close(self.ref, "F01", "fatto", force=True, artifacts=[])
         self.assertEqual([], node["artifacts"])
-        self.assertIn("ieri", avviso)
+        self.assertIsNone(avviso)
 
     def test_close_stampa_i_file_dedotti(self):
         """Chi chiude vede subito cosa gli e' stato intestato, invece di scoprirlo
@@ -750,6 +996,18 @@ class Artefatti(Base):
         self.assertIn("corretto", buffer.getvalue())
         node = self.model.node_of(self.store.load(self.ref.json_path), "F01")
         self.assertEqual(["solo-mio.txt"], node["artifacts"])
+
+    def test_amend_cli_raccoglie_artefatti_con_flag_ripetuto(self):
+        from core import cli
+        self.prepara_lavoro()
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(0, cli.main(["close", "F01", "-s", "fatto",
+                                          "--artefatti", "iniziale.txt"]))
+            self.assertEqual(0, cli.main(["amend", "F01",
+                                          "--artefatti", "uno.txt",
+                                          "--artefatti", "due.txt"]))
+        node = self.model.node_of(self.store.load(self.ref.json_path), "F01")
+        self.assertEqual(["uno.txt", "due.txt"], node["artifacts"])
 
     def test_amend_svuota_il_campo_con_artefatti_senza_argomenti(self):
         """La stessa convenzione di close: --artefatti nudo dichiara 'nessuno'."""
@@ -1537,7 +1795,7 @@ class Avanzamento(Base):
         for node_id in ("F02", "F03"):
             self.rispondi(node_id)
             self.claims.claim(self.ref, node_id)
-            self.claims.close(self.ref, node_id, "fatto")
+            self.claims.close(self.ref, node_id, "fatto", artifacts=[])
         fatti, totale = self.model.progress(self.store.load(self.ref.json_path))
         self.assertEqual(fatti, totale)
 
@@ -1779,6 +2037,56 @@ class Doctor(Base):
         avvisi = self.doctor.doctor_avvisi(data, self.ref, self.ws.config["agent"])
         self.assertTrue(any("F01" in a and "prodotto.txt" in a for a in avvisi))
 
+    def test_artefatto_mancante_segnalato(self):
+        """Un artefatto dichiarato alla chiusura puo' sparire dopo un comando
+        distruttivo: doctor deve nominarlo senza interrompere gli altri controlli."""
+        self.popola()
+        self.rispondi("F01")
+        self.claims.claim(self.ref, "F01")
+        _, _ = self.claims.close(self.ref, "F01", "fatto", artifacts=["sparito.txt"])
+        data = self.store.load(self.ref.json_path)
+        avvisi = self.doctor.doctor_avvisi(data, self.ref, self.ws.config["agent"])
+        self.assertTrue(any("F01" in a and "sparito.txt" in a and "mancano" in a for a in avvisi))
+
+    def test_artefatto_non_tracciato_segnalato(self):
+        """Un artefatto presente ma non nell'indice Git e' recuperabile prima di
+        un clean, quindi doctor deve renderlo esplicito."""
+        self.popola()
+        self.git_init()
+        self.rispondi("F01")
+        self.claims.claim(self.ref, "F01")
+        artefatto = self.ws.project_root / "non-tracciato.txt"
+        artefatto.write_text("contenuto", encoding="utf-8")
+        _, _ = self.claims.close(self.ref, "F01", "fatto", artifacts=["non-tracciato.txt"])
+        data = self.store.load(self.ref.json_path)
+        avvisi = self.doctor.doctor_avvisi(data, self.ref, self.ws.config["agent"])
+        self.assertTrue(any("F01" in a and "non-tracciato.txt" in a and "non sono tracciati" in a
+                            for a in avvisi))
+
+    def test_artefatto_con_oserror_non_blocca_la_diagnosi(self):
+        """Un path non ispezionabile e' un avviso, non un traceback: gli altri
+        artefatti e i controlli successivi devono comunque essere diagnosticati."""
+        self.popola()
+        self.rispondi("F01")
+        self.claims.claim(self.ref, "F01")
+        _, _ = self.claims.close(self.ref, "F01", "fatto",
+                                 artifacts=["nome-troppo-lungo.txt", "sparito.txt"])
+        data = self.store.load(self.ref.json_path)
+        is_file = Path.is_file
+
+        def is_file_con_path_non_valido(*args):
+            path = args[0] if args else None
+            if path is not None and path.name == "nome-troppo-lungo.txt":
+                raise OSError("[Errno 36] File name too long")
+            return is_file(path) if path is not None else False
+
+        with mock.patch.object(Path, "is_file", autospec=True, side_effect=is_file_con_path_non_valido):
+            avvisi = self.doctor.doctor_avvisi(data, self.ref, self.ws.config["agent"])
+
+        self.assertTrue(any("F01" in a and "nome-troppo-lungo.txt" in a and "non riesco a ispezionare" in a
+                            for a in avvisi))
+        self.assertTrue(any("F01" in a and "sparito.txt" in a and "mancano" in a for a in avvisi))
+
     def test_non_convergenza_avvisata_finche_il_grafo_vive(self):
         """L'avviso serve a scovare un ramo che non confluisce nel finale: a grafo
         finito non ha piu' niente da dire, e ripetuto insegna solo a ignorarlo."""
@@ -1791,14 +2099,14 @@ class Doctor(Base):
         # chiudere il ramo sciolto non lo aggancia: finche' il grafo vive, resta segnalato
         self.rispondi("F03")
         self.claims.claim(self.ref, "F03")
-        _, _ = self.claims.close(self.ref, "F03", "fatto")
+        _, _ = self.claims.close(self.ref, "F03", "fatto", artifacts=[])
         avvisi = self.doctor.doctor_avvisi(self.store.load(self.ref.json_path), self.ref, self.ws.config["agent"])
         self.assertTrue([a for a in avvisi if "F03" in a])
 
         for nodo_id in ("F01", "F02"):
             self.rispondi(nodo_id)
             self.claims.claim(self.ref, nodo_id)
-            _, _ = self.claims.close(self.ref, nodo_id, "fatto")
+            _, _ = self.claims.close(self.ref, nodo_id, "fatto", artifacts=[])
         avvisi = self.doctor.doctor_avvisi(self.store.load(self.ref.json_path), self.ref, self.ws.config["agent"])
         self.assertFalse([a for a in avvisi if "F03" in a])
 
@@ -1854,14 +2162,16 @@ class Doctor(Base):
     def test_show_status_con_nodo_rivendicato(self):
         """show_status deve stampare correttamente i nodi rivendicati con lo stato tradotto.
         Questo test scopre bug come la perdita di ETICHETTA durante i refactoring."""
-        self.popola()
-        self.rispondi("F01")
-        self.claims.claim(self.ref, "F01")
-        data = self.store.load(self.ref.json_path)
+        with mock.patch.dict(os.environ, {"ATLAS_IDENTITY": "test-session"}):
+            self.popola()
+            self.rispondi("F01")
+            self.claims.claim(self.ref, "F01")
+            data = self.store.load(self.ref.json_path)
 
         buffer = io.StringIO()
-        with contextlib.redirect_stdout(buffer):
-            self.report.show_status(self.ref, data)
+        with mock.patch.object(self.claims, "alive", return_value=True):
+            with contextlib.redirect_stdout(buffer):
+                self.report.show_status(self.ref, data)
         uscita = buffer.getvalue()
 
         # Verifica che la riga del nodo rivendicato sia presente e contenga:
@@ -2016,6 +2326,13 @@ class HowTo(Base):
         self.assertIn(f".atlas/graphs/{self.ref.slug}/tickets", uscita)  # i path, relativi al progetto
         for n in range(1, 7):
             self.assertIn(f"─── {n}.", uscita)
+
+    def test_l_uso_dice_cosa_fare_se_la_deduzione_salta(self):
+        self.popola()
+        uscita = self.stampa()
+        self.assertIn("close rifiuta", uscita)
+        self.assertIn("ripeti --artefatti per ogni path", uscita)
+        self.assertIn("--artefatti senza path", uscita)
 
     def test_elenca_solo_le_mutazioni_da_script(self):
         nomi = [r.strip() for r in self.howto.mutazioni() if r.strip().startswith("mutate.")]

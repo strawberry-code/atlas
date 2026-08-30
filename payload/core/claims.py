@@ -408,6 +408,27 @@ def _artefatti(ref: Graph, node_id: str) -> tuple[list[str] | None, str | None]:
     return gitscan.touched(ref.workspace.project_root, preso) or None, None
 
 
+def _avviso_artefatti_non_tracciati(ref: Graph, artifacts: list[str] | None) -> str | None:
+    """Avvisa senza bloccare se gli artefatti registrati sono fuori dall'indice Git.
+
+    Il controllo riguarda solo file presenti: un artefatto mancante resta materia di
+    doctor. Un progetto senza Git non offre una semantica di tracciamento, quindi non
+    va trattato come un errore.
+    """
+    if not artifacts:
+        return None
+    root = ref.workspace.project_root
+    mancanti = [a for a in artifacts if not (root / a).is_file()]
+    non_tracciati = [a for a in artifacts
+                     if (root / a).is_file() and gitscan.tracked(root, a) is False]
+    avvisi = []
+    if mancanti:
+        avvisi.append(t("close.artifacts_mancanti", elenco=", ".join(mancanti)))
+    if non_tracciati:
+        avvisi.append(t("close.artifacts_non_tracciati", elenco=", ".join(non_tracciati)))
+    return "\n".join(avvisi) or None
+
+
 def _verifica_chiusura(node: dict, node_id: str, agent: dict) -> None:
     """Il nodo si chiude solo se la liveness lo permette, locale o remota.
 
@@ -452,13 +473,18 @@ def close(ref: Graph, node_id: str, summary: str, force: bool = False,
           cost: str | None = None, artifacts: list[str] | None = None) -> tuple[dict, str | None]:
     """Chiude un nodo. Il possesso da parte di una sessione morta non e' un ostacolo.
 
-    Restituisce una tupla (nodo, avviso) dove avviso e' None se la deduzione degli
-    artefatti e' avvenuta regolarmente, oppure un messaggio di avvertimento se e'
-    stata saltata perche' piu' nodi sono in lavorazione insieme."""
+    Restituisce una tupla (nodo, avviso). Quando la deduzione automatica non e'
+    attendibile, la chiusura richiede una dichiarazione esplicita degli artefatti:
+    anche una lista vuota significa intenzionalmente 'nessun artefatto'."""
     agent = ref.workspace.config["agent"]
     avviso = None
     if artifacts is None:
         artifacts, avviso = _artefatti(ref, node_id)
+        if avviso:
+            raise StateError(t("close.artifacts_required", dettaglio=avviso))
+    non_tracciati = _avviso_artefatti_non_tracciati(ref, artifacts)
+    if non_tracciati:
+        avviso = non_tracciati if avviso is None else avviso + "\n" + non_tracciati
     with transaction(ref.json_path) as data:
         node = node_of(data, node_id)
         if is_done(node):

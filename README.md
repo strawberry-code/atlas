@@ -24,6 +24,18 @@ Install the CLI, install it in a project (creates `.atlas/`, registers the proje
 4. **Work it**: if the node is AFK, the agent does it alone; if it's HITL, the `atlas-work` skill asks its questions one at a time and waits.
 5. **Close it** with `atlas close <ID> -s "summary"`, after writing the Answer section in the ticket. The map and dashboard regenerate on their own.
 
+For an Automata run, `atlas run-status` shows the persistent state and `atlas run-log` shows the event history; `atlas run-log --tail N` limits the diagnosis to the latest events.
+
+## Atlas Automata
+
+Atlas Automata is the mechanical runner for AFK work already described by a graph. Start each run with the required per-run limit, for example `atlas run --parallelism 1` for strict serial execution or a higher value for bounded parallelism. The value is not written into the graph. Automata keeps Atlas as the source of truth for the frontier, claims, dependencies and terminal states; its ledgers are diagnostic state, not a second scheduler.
+
+The node field `model` is optional and stays absent or empty unless the graph author specifies it. Empty means Codex Luna (`codex-luna`). An explicit value must match a registered adapter exactly. If the default Luna adapter is unavailable, Automata makes one observable fallback to Claude Sonnet (`claude`); an explicit model is never silently replaced. Gemini and Code Terra are additional supported adapter identities.
+
+Every provider runs AFK, outside the sandbox and with permission bypass. To add a provider, implement `AgentAdapter` or configure `SubprocessAdapter`, register it in `AdapterRegistry`, and pass the registry to `launcher_from_registry`; the runner's frontier, parallelism and termination logic do not change. A subprocess adapter must use a validated argv, closed stdin and the provider's non-interactive flags.
+
+Use `atlas run-status` to read `active`, `waiting`, `failed`, `blocked` or `completed` and its reason, node, provider, attempt, frontier and blockers. Use `atlas run-log` to inspect claims, model selection, fallback, failures, backoff, closures and frontier refresh. Retry is bounded: timeout, crash, rate limit, provider unavailability and ambiguous termination are retryable; permanent errors are not. Backoff grows from one minute up to one hour. A live claim prevents a duplicate launch, and this version does not resume a provider process after interruption.
+
 One way to orchestrate several nodes at once, if the project has many available: a "main" session that watches the frontier and coordinates, AFK nodes delegated to sub-agents that work in parallel and write their results into their own tickets, HITL nodes reserved for a dedicated session. This isn't a feature of the engine, it's just one way of using it: Atlas stays the source of truth on what's done, whoever's coordinating on top is free to organize however they like.
 
 ## Installing the CLI
@@ -80,12 +92,22 @@ atlas amend F01 --artefatti src/a.py # fixes the bookkeeping of an already close
 atlas render --open                  # dashboard
 atlas serve --no-open                # dashboard on a local server, live (Ctrl-C to stop)
 atlas serve --port 8080              # same, on a port you choose
+atlas run --parallelism 1            # Automata run: 1 means serial
 atlas doctor                         # health check: dangling nodes, stale locks, stale dashboard
 atlas conflicts                      # the active graph's unresolved merge conflicts
 atlas conflicts --resolve            # declare them resolved, once graph.json is fixed by hand
 ```
 
 One node per session. `close` refuses if the Answer is empty.
+
+If recorded artifacts exist but are not tracked by Git, `close` prints a warning with
+the paths to add or correct, but still closes the node. This is informational only and
+does not apply to projects without a Git repository; `doctor` continues to report
+missing artifacts as well.
+
+`--artefatti` accepts one path per flag and the flag can be repeated. Atlas rejects
+tokens containing spaces or commas, so zsh variable expansion cannot silently split
+and save multiple files; missing paths are reported at close time.
 
 ### Claims from another machine
 
@@ -159,6 +181,14 @@ atlas render -g YYMMDD-other-epic # or pick it on the single command
 ```
 
 The slug does not go where the command goes: `atlas YYMMDD-other-epic render` doesn't exist. `-g/--graph` works both before and after the command (`atlas -g YYMMDD-other-epic render` and `atlas render -g YYMMDD-other-epic` are the same thing), and `ATLAS_GRAPH=<slug>` does the same for the whole shell.
+
+Drift diagnosis accepts an optional `drift.collector_paths` list in `.atlas/config.json`. Entries are exact paths excluded from shared-artifact signals; extensions and globs are not supported. Documentation and test sheets can be real deliverables, so they are excluded only when explicitly configured as collectors. A pair is reported only when both nodes are closed and the second node has a strictly later `closedAt` timestamp.
+
+```bash
+atlas drift                         # proposes diagnosis, without changing the graph
+```
+
+Each signal shows the two nodes, their shared artifacts and the temporal order. Atlas never adds edges automatically: if the signal is correct, a human declares the edge in a script with `mutate.link(g, "LATER_NODE", blocked_by="EARLIER_NODE")`, then runs `atlas exec`.
 
 ## The skills
 

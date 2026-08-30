@@ -33,6 +33,12 @@ atlas how-to     # the full briefing: contract, commands, mutations, paths
 atlas status     # where the work stands, and what can be picked up now
 ```
 
+## Automata runs
+
+`atlas run --parallelism N` configures one Automata run; `N` is required for every run, `1` is strict serial execution, and higher values are bounded parallelism. The node `model` field is optional: empty means Codex Luna, with one fallback to Claude Sonnet when Luna is unavailable. Providers run AFK, outside the sandbox and with permission bypass.
+
+Use `atlas run-status` for the persistent state and reason, and `atlas run-log --tail N` for recent claims, providers, fallback, failures, backoff, closures and frontier refreshes. Timeout, crash, rate limit, provider unavailability and ambiguous termination are retryable; permanent errors are not. Add a provider by registering an `AgentAdapter` or `SubprocessAdapter` in `AdapterRegistry`; the runner does not change.
+
 If `atlas` isn't found after installing, add `~/.local/bin` to your `PATH`.
 
 The project lives at [github.com/strawberry-code/atlas](https://github.com/strawberry-code/atlas).
