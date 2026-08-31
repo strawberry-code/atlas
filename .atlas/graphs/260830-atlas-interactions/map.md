@@ -36,7 +36,9 @@ Una riga per nodo chiuso, in ordine di chiusura: quanto basta per giudicarne la 
 Quel che è emerso e non ha ancora un nodo. Si appunta con `atlas fog "una riga"`.
 
 <!-- atlas:auto -->
-_niente, per ora._
+- La quota Codex e' esaurita fino al 30 settembre 2026: i run di questo periodo lavorano con Claude via fallback automatico, senza toccare il campo model dei nodi.
+- per B01: Finche' i canali di avviso non esistono, una card aperta da Automata non la vede nessuno: il runner ora la lascia scadere in 15 minuti e chiude con la sua diagnosi.
+- per C01: La coda degli eventi delle Interazioni vive in memoria di processo: una risposta scritta nel grafo da un altro processo sveglia il runner solo alla sua rilettura, ogni 30 secondi.
 
 ## Fuori scopo
 
