@@ -38,6 +38,37 @@ class ProviderUnavailableError(RuntimeError):
     """Il provider non puo' accettare o proseguire il lavoro richiesto."""
 
 
+# Le firme con cui un CLI agentico dice che non puo' lavorare: quota finita,
+# limite di frequenza, credenziali assenti. Non sono errori del lavoro: ritentare
+# lo stesso provider ripete la stessa risposta finche' il budget non finisce,
+# mentre il fallback su un altro modello fa avanzare il grafo.
+INDISPONIBILITA = (
+    "usage limit", "quota", "rate limit", "rate-limit", "429", "too many requests",
+    "upgrade to", "not logged in", "please log in", "please sign in", "login first",
+    "unauthorized", "authentication failed",
+)
+
+
+def coda_diagnostica(detail: str | None, righe: int = 6) -> str:
+    """Le ultime righe non vuote di un output di provider, in minuscolo.
+
+    Un CLI agentico stampa in coda il motivo per cui si e' fermato, ma prima
+    stampa l'eco del prompt, che contiene la domanda del nodo: cercare una firma
+    nell'output intero vuol dire leggere il ticket, e un nodo che parla di rate
+    limit verrebbe scambiato per un provider a quota finita.
+    """
+    if not detail:
+        return ""
+    pulite = [riga for riga in str(detail).splitlines() if riga.strip()]
+    return "\n".join(pulite[-righe:]).lower()
+
+
+def provider_indisponibile(detail: str | None) -> bool:
+    """Vero se la coda dell'output dice che il provider non ha potuto lavorare."""
+    coda = coda_diagnostica(detail)
+    return any(firma in coda for firma in INDISPONIBILITA)
+
+
 @dataclass(frozen=True)
 class AgentOutcome:
     """Esito osservabile della terminazione di un agente."""

@@ -131,6 +131,14 @@ class AutomataRun(unittest.TestCase):
             json.dumps({"project": "prova", "agent": {"max_claims_per_session": limite}}),
             encoding="utf-8")
 
+    def _risolutore(self):
+        """Il waiter condiviso, legato al grafo di questo test."""
+        from core import interactions
+
+        from tests import waiter_risolutore
+
+        return waiter_risolutore(self.ref, self.mutate, interactions)
+
     def _chiudi(self, node_id):
         path = self.ref.ticket_path(node_id)
         path.write_text(path.read_text(encoding="utf-8") + "\nRisposta eseguita.\n", encoding="utf-8")
@@ -213,7 +221,8 @@ class AutomataRun(unittest.TestCase):
         policy = retry.RetryPolicy(max_attempts=1, initial_delay=0)
         with mock.patch.dict(os.environ, {"ATLAS_IDENTITY": "Luna"}), self.assertRaises(self.automata.RunnerError):
             self.automata.start(self.ref, 1, retry_policy=policy).execute(
-                lambda run, node: node["id"], wait_for)
+                lambda run, node: node["id"], wait_for,
+                interaction_waiter=self._risolutore())
 
         # Il lucchetto torna giu': un nodo lasciato 'claimed' da un agente morto
         # non e' piu' prendibile da nessuno, nemmeno dal run successivo.
@@ -283,7 +292,8 @@ class AutomataRun(unittest.TestCase):
         policy = retry.RetryPolicy(max_attempts=1, initial_delay=0)
 
         with mock.patch.dict(os.environ, {"ATLAS_IDENTITY": "Luna"}), self.assertRaises(self.automata.RunnerError):
-            self.automata.start(self.ref, 1, retry_policy=policy).execute(lambda run, node: None)
+            self.automata.start(self.ref, 1, retry_policy=policy).execute(
+                lambda run, node: None, interaction_waiter=self._risolutore())
 
         # N02 dipende da N01: nessuno dei due avanza, ma il lucchetto e' rilasciato.
         stati = {n["id"]: n["status"] for n in self.store.load(self.ref.json_path)["nodes"]}
@@ -403,6 +413,57 @@ class AutomataRun(unittest.TestCase):
         self.assertEqual(adapters.CODEX_LUNA, visti["assignee"])
         self.assertEqual("claimed", visti["ripreso"])
 
+    def test_quota_finita_su_luna_passa_a_claude_e_riassegna_il_lucchetto(self):
+        """Regressione del run del 2026-08-31.
+
+        Codex esauriva la quota fino al mese dopo e Automata ritentava lo stesso
+        provider otto volte, mentre il fallback a Claude, promesso a ogni avvio,
+        non scattava perche' l'uscita valeva come errore del lavoro.
+        """
+        from core import adapters
+
+        self._popola_frontiera(1)
+        visti = {}
+
+        class Handle:
+            def __init__(inner, outcome):
+                inner.outcome = outcome
+
+            def wait(inner):
+                return inner.outcome
+
+        class Luna:
+            identity = adapters.CODEX_LUNA
+
+            def launch(inner, _context):
+                return Handle(adapters.AgentOutcome(
+                    "provider-unavailable",
+                    "ERROR: You've hit your usage limit. Upgrade to Plus, "
+                    "or try again at Sep 30th, 2026 9:35 AM."))
+
+        class Claude:
+            identity = adapters.CLAUDE
+
+            def launch(inner, _context):
+                visti["lanciato"] = True
+                self._chiudi("N01")
+                return Handle(adapters.AgentOutcome("closed"))
+
+        registry = adapters.AdapterRegistry([Luna(), Claude()])
+        with mock.patch.dict(os.environ, {"ATLAS_IDENTITY": "runner"}):
+            risultato = self.automata.start(self.ref, 1).execute(
+                self.automata.launcher_from_registry(registry), lambda handle: handle.wait())
+
+        self.assertEqual(("N01",), risultato.terminal_nodes)
+        self.assertTrue(visti["lanciato"], "il fallback non ha lanciato Claude")
+        eventi = json.loads(self.ref.run_state_path.read_text(encoding="utf-8"))["events"]
+        self.assertEqual(1, sum(e["type"] == "fallback" for e in eventi))
+        # Nessun tentativo bruciato: la quota finita non e' un guasto da ritentare
+        # sullo stesso provider, e questo e' il punto della regressione.
+        self.assertEqual(0, sum(e["type"] == "attempt-failed" for e in eventi))
+        self.assertEqual(adapters.CLAUDE, [e["provider"] for e in eventi
+                                           if e["type"] == "provider-selected"][-1])
+
     def test_un_nodo_che_non_si_chiude_non_ferma_gli_altri_rami(self):
         """Il budget esaurito e' del nodo, non del run.
 
@@ -421,7 +482,8 @@ class AutomataRun(unittest.TestCase):
         with mock.patch.dict(os.environ, {"ATLAS_IDENTITY": "Luna"}), self.assertRaises(
                 self.automata.RunnerError) as errore:
             self.automata.start(self.ref, 1, retry_policy=policy).execute(
-                lambda run, node: node["id"], wait_for)
+                lambda run, node: node["id"], wait_for,
+                interaction_waiter=self._risolutore())
 
         self.assertIn("N02", str(errore.exception))
         stati = {n["id"]: n["status"] for n in self.store.load(self.ref.json_path)["nodes"]}
@@ -469,21 +531,85 @@ class AutomataRun(unittest.TestCase):
         with mock.patch.dict(os.environ, {"ATLAS_IDENTITY": "Luna"}), self.assertRaises(
                 self.automata.RunnerError) as errore:
             self.automata.start(self.ref, 1, retry_policy=policy).execute(
-                lambda run, node: node["id"], wait_for)
+                lambda run, node: node["id"], wait_for,
+                interaction_waiter=self._risolutore())
 
         self.assertIn("N01", str(errore.exception))
         stati = {n["id"]: n["status"] for n in self.store.load(self.ref.json_path)["nodes"]}
         self.assertEqual({"N01": "open", "N02": "closed"}, stati)
 
-    def test_execute_rifiuta_un_nodo_hitl_senza_claimarlo(self):
+    def test_un_avviso_di_guasto_scade_prima_di_una_decisione_umana(self):
+        """La finestra della card dipende da cosa chiede.
+
+        Un run notturno che si ferma non deve tenere occupato un terminale fino al
+        giorno dopo per un avviso che nessuno sta guardando, mentre una decisione
+        umana puo' aspettare la giornata di chi deve prenderla.
+        """
+        from datetime import datetime
+
+        guasto = datetime.fromisoformat(self.automata._scadenza(1000.0, "run-stopped"))
+        decisione = datetime.fromisoformat(self.automata._scadenza(1000.0, "decision-required"))
+        base = datetime.fromtimestamp(1000.0).astimezone().replace(microsecond=0)
+
+        self.assertEqual(self.automata.SCADENZA_GUASTO, guasto - base)
+        self.assertEqual(self.automata.SCADENZA_DECISIONE, decisione - base)
+        self.assertLess(guasto, decisione)
+
+    def test_una_interazione_che_nessuno_raccoglie_scade_e_non_appende_il_run(self):
+        """Un run AFK non puo' restare fermo su una domanda che nessuno vede.
+
+        La coda degli eventi vive in memoria di processo: una risposta scritta nel
+        grafo da un altro comando non la pubblica nessuno qui, quindi senza la
+        scadenza della card il runner aspetterebbe per sempre, in silenzio.
+        """
+        from core import retry
+
+        self._popola_frontiera(1)
+        scadute = []
+
+        def nessuna_risposta(graph, run_id, timeout=None):
+            # Nessuno raccoglie la card: la porto oltre la sua scadenza, come
+            # farebbe il tempo in un run notturno, e non pubblico nessun evento.
+            with self.mutate.editing(self.ref) as state:
+                for card in state.data["interactions"]:
+                    if card["status"] == "open":
+                        card["expiresAt"] = "2020-01-01T00:00:00+01:00"
+                        scadute.append(card["id"])
+            return None
+
+        policy = retry.RetryPolicy(max_attempts=1, initial_delay=0)
+        with mock.patch.dict(os.environ, {"ATLAS_IDENTITY": "Luna"}), self.assertRaises(
+                self.automata.RunnerError):
+            self.automata.start(self.ref, 1, retry_policy=policy).execute(
+                lambda run, node: None, interaction_waiter=nessuna_risposta)
+
+        self.assertTrue(scadute, "il runner non ha nemmeno aperto la card")
+        card = self.store.load(self.ref.json_path)["interactions"][0]
+        self.assertEqual("expired", card["status"])
+        eventi = json.loads(self.ref.run_state_path.read_text(encoding="utf-8"))["events"]
+        self.assertIn("interaction-closed", [e["type"] for e in eventi])
+
+    def test_execute_apre_una_interazione_hitl_e_si_risveglia_sulla_risposta(self):
+        from core import interactions
+
         with self.mutate.editing(self.ref) as g:
             self.mutate.add_node(g, "H01", "Domanda umana", "A", "decidere", mode="HITL")
         self.docs.write_stubs(self.ref, self.store.load(self.ref.json_path))
 
+        def answer(graph, run_id, timeout=None):
+            with self.mutate.editing(self.ref) as state:
+                card = next(item for item in state.data["interactions"]
+                            if item["graph"] == graph and item["runId"] == run_id)
+                interactions.resolve_interaction(state, card["id"], "confirm")
+            return interactions.wait_for_resolution(graph, run_id)
+
         with mock.patch.dict(os.environ, {"ATLAS_IDENTITY": "Luna"}), self.assertRaises(self.automata.RunnerError):
-            self.automata.start(self.ref, 1).execute(lambda run, node: None)
+            self.automata.start(self.ref, 1).execute(lambda run, node: None,
+                                                     interaction_waiter=answer)
 
         self.assertEqual("open", self.store.load(self.ref.json_path)["nodes"][0]["status"])
+        card = self.store.load(self.ref.json_path)["interactions"][0]
+        self.assertEqual(("decision-required", "resolved"), (card["event"], card["status"]))
 
 
 if __name__ == "__main__":

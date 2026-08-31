@@ -177,10 +177,15 @@ class RetryRunnerTest(unittest.TestCase):
         def wait_for(_handle):
             return self.automata.AgentOutcome("permanent-error", "invalid request")
 
+        from core import interactions
+
+        from tests import waiter_risolutore
+
         with mock.patch.dict(os.environ, {"ATLAS_IDENTITY": "Luna"}):
             with self.assertRaises(self.automata.RunnerError):
                 self.automata.start(self.ref, 1, retry_policy=policy).execute(
-                    launcher, wait_for=wait_for, sleeper=lambda _seconds: None)
+                    launcher, wait_for=wait_for, sleeper=lambda _seconds: None,
+                    interaction_waiter=waiter_risolutore(self.ref, self.mutate, interactions))
 
         self.assertEqual(["N01"], tentativi)
         self.assertEqual("terminal", json.loads(self.ref.retry_state_path.read_text())["nodes"]["N01"]["status"])

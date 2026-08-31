@@ -12,7 +12,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from .adapters import AgentOutcome, ProviderUnavailableError
+from .adapters import (AgentOutcome, ProviderUnavailableError, coda_diagnostica,
+                       provider_indisponibile)
 from .store import StateError, scrivi_atomico
 
 
@@ -43,7 +44,13 @@ class PermanentError(RuntimeError):
 
 
 def _da_dettaglio(dettaglio: str | None) -> FailureKind:
-    testo = (dettaglio or "").lower()
+    # Si guarda la coda dell'output, non il testo intero: prima dell'errore c'e'
+    # l'eco del prompt, cioe' la domanda del nodo, e una firma cercata li' dentro
+    # classifica il lavoro invece del guasto (vedi adapters.coda_diagnostica).
+    testo = coda_diagnostica(dettaglio)
+    if provider_indisponibile(dettaglio) and not any(
+            parola in testo for parola in ("429", "rate limit", "rate-limit", "too many requests")):
+        return "provider-unavailable"
     if any(parola in testo for parola in ("429", "rate limit", "rate-limit", "too many requests")):
         return "rate-limit"
     if "timeout" in testo or "timed out" in testo:

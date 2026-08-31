@@ -30,6 +30,7 @@ class Editor:
 
     def __init__(self, ref: Graph, data: dict, vocab: dict):
         self.ref, self.data, self.vocab = ref, data, vocab
+        self._after_commit: list[object] = []
 
     @property
     def slug(self) -> str:
@@ -40,6 +41,10 @@ class Editor:
 
     def ids(self) -> list[str]:
         return [n["id"] for n in self.data["nodes"]]
+
+    def after_commit(self, event: object) -> None:
+        """Consegna un evento solo dopo che graph.json e' diventato canonico."""
+        self._after_commit.append(event)
 
 
 def validate(data: dict, vocab: dict) -> None:
@@ -98,6 +103,7 @@ def validate(data: dict, vocab: dict) -> None:
 @contextmanager
 def editing(ref: Graph, vocab: dict | None = None):
     """Transazione unica per tutta la durata di uno script di mutazione."""
+    committed: list[object] = []
     with transaction(ref.json_path) as data:
         editor = Editor(ref, data, vocab or ref.workspace.config["vocab"])
         # La transazione riscrive il file intero: la prima mutazione qualsiasi
@@ -108,3 +114,8 @@ def editing(ref: Graph, vocab: dict | None = None):
         yield editor
         validate(data, editor.vocab)
         data["meta"]["updated"] = now()[:10]
+        committed = editor._after_commit
+    if committed:
+        from .interactions import publish
+        for event in committed:
+            publish(event)

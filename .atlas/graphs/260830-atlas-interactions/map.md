@@ -28,6 +28,8 @@ Una riga per nodo chiuso, in ordine di chiusura: quanto basta per giudicarne la 
 - **A02** Definisci il contratto UX e delle Interazioni: Contratto Interaction definito: tre eventi, quattro stati, capability dichiarate e card senza dettagli di trasporto. · [ticket](tickets/A02.md)
 - **A03** Implementa ledger e schema Interaction: Ledger Interaction atomico e idempotente nel graph.json, con audit, contesto e scadenza. · [ticket](tickets/A03.md)
 - **A04** Implementa lifecycle e risposta validata rilasciato: run Automata del 2026-08-30 interrotto: il nodo non fu mai lavorato · [ticket](tickets/A04.md)
+- **A04** Implementa lifecycle e risposta validata: Lifecycle Interaction transazionale, risposta validata e audit completo implementati · [ticket](tickets/A04.md)
+- **A05** Collega Automata alle Interazioni: Interazioni Automata e risveglio event-driven · [ticket](tickets/A05.md)
 
 ## Non ancora specificato
 

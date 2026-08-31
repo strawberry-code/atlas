@@ -42,6 +42,44 @@ class ProviderProcessTest(unittest.TestCase):
         self.assertIn("handle $(unsafe) && value", prompt)
 
     @mock.patch.object(providers.subprocess, "Popen")
+    def test_quota_finita_vale_provider_assente_non_errore_del_lavoro(self, popen):
+        """Regressione del run del 2026-08-31: quota Codex esaurita per un mese.
+
+        Uscendo come 'error' il runner ritentava lo stesso provider otto volte e
+        il fallback a Claude, promesso a ogni avvio, non scattava mai.
+        """
+        uscita = (
+            "OpenAI Codex v0.151.0\nworkdir: /progetto\nuser\n"
+            "Work only on Atlas node D01... Node question: applica retry bounded.\n"
+            "hook: UserPromptSubmit Completed\n"
+            "ERROR: You've hit your usage limit. Upgrade to Plus to continue using "
+            "Codex (https://chatgpt.com/explore/plus), or try again at Sep 30th, 2026 9:35 AM."
+        )
+        popen.return_value = SimpleNamespace(returncode=1, communicate=lambda: (uscita, ""))
+
+        outcome = providers.codex_adapter().launch(self.context).wait()
+
+        self.assertEqual("provider-unavailable", outcome.status)
+
+    @mock.patch.object(providers.subprocess, "Popen")
+    def test_un_ticket_che_parla_di_rate_limit_non_e_un_provider_assente(self, popen):
+        """La firma si cerca nella coda, non nell'eco del prompt.
+
+        Il detail contiene la domanda del nodo: cercarla nel testo intero faceva
+        passare per provider a quota finita un nodo che parla di rate limit.
+        """
+        self.context.node["question"] = "implementa un rate limit con 429 e quota per utente"
+        eco = providers._prompt(self.context)
+        uscita = (f"OpenAI Codex v0.151.0\nuser\n{eco}\n"
+                  "thinking\nERROR: the test suite failed, three assertions are red.")
+        popen.return_value = SimpleNamespace(returncode=1, communicate=lambda: (uscita, ""))
+
+        outcome = providers.codex_adapter().launch(self.context).wait()
+
+        self.assertEqual("error", outcome.status)
+        self.assertNotIn("rate limit", outcome.detail)
+
+    @mock.patch.object(providers.subprocess, "Popen")
     def test_lancio_non_interattivo_e_argomenti_non_passano_dalla_shell(self, popen):
         process = SimpleNamespace(returncode=0, communicate=lambda: ("out", ""))
         popen.return_value = process

@@ -5,8 +5,9 @@ import argparse
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 
-from . import claims
+from . import claims, interactions, mutate
 from .adapters import (
     DEFAULT_MODEL,
     FALLBACK_MODEL,
@@ -42,6 +43,13 @@ class ClosureEvent:
 
 
 Waiter = Callable[[object], ClosureEvent | tuple[ClosureEvent, ...] | AgentOutcome | None]
+InteractionWaiter = Callable[[str, str, float | None], "interactions.ResolutionEvent | None"]
+
+# Ogni quanto il runner smette di aspettare l'evento e torna a guardare il grafo.
+# Il canale in-process resta quello che lo sveglia subito; questa e' la rete di
+# sicurezza per una risposta arrivata da un altro processo, che quel canale non
+# vede, e per una card che nessuno raccoglie.
+RILETTURA_INTERAZIONE = 30.0
 
 
 class RunnerError(StateError):
@@ -82,7 +90,8 @@ class Run:
 
     def execute(self, launcher: Launcher, wait_for: Waiter | None = None,
                 now: Callable[[], float] = time.time,
-                sleeper: Callable[[float], None] = time.sleep) -> RunResult:
+                sleeper: Callable[[float], None] = time.sleep,
+                interaction_waiter: InteractionWaiter | None = None) -> RunResult:
         """Esegue il ciclo bounded della frontiera Atlas.
 
         Il runner riempie gli slot disponibili fino a ``parallelism`` e conserva gli
@@ -97,7 +106,7 @@ class Run:
         registrata dalle primitive Atlas usate dal lavoro lanciato; dopo ogni attesa
         il grafo viene riletto prima di scegliere altro lavoro.
         """
-        return execute(self, launcher, wait_for, now, sleeper)
+        return execute(self, launcher, wait_for, now, sleeper, interaction_waiter)
 
 
 def start(graph: Graph, parallelism: object, retry_policy: RetryPolicy | None = None,
@@ -148,6 +157,11 @@ def launcher_from_registry(registry: AdapterRegistry, logger: RunLogger | None =
                 "adapter is not configured"
             ) from errore
         select(run, node, FALLBACK_MODEL, "fallback")
+        # Il lucchetto resta intestato al provider di default, che l'aveva preso
+        # il runner prima di sapere del fallback. Riscriverlo qui vorrebbe dire
+        # far toccare il grafo al launcher, che sceglie e lancia e basta: chi ha
+        # lavorato davvero lo dicono l'evento fallback nel ledger e closedBy sul
+        # nodo, scritto dall'agente che chiude.
         return adapter.launch(LaunchContext(run=run, node=node))
 
     def launch(run: Run, node: dict) -> object:
@@ -219,7 +233,8 @@ def parse_parallelism(value: str) -> int:
 
 def execute(run: Run, launcher: Launcher, wait_for: Waiter | None = None,
             now: Callable[[], float] = time.time,
-            sleeper: Callable[[float], None] = time.sleep) -> RunResult:
+            sleeper: Callable[[float], None] = time.sleep,
+            interaction_waiter: InteractionWaiter | None = None) -> RunResult:
     """Esegue il run e rende persistente anche ogni terminazione diagnostica."""
     data = load(run.graph.json_path)
     nuovo = run.run_state.start(run.parallelism, [node["id"] for node in frontier(data)], now())
@@ -230,7 +245,7 @@ def execute(run: Run, launcher: Launcher, wait_for: Waiter | None = None,
                node=None, provider=None, attempt=None, failure=None, next_at=None)
     _frontier_event(run, data, now())
     try:
-        return _execute(run, launcher, wait_for, now, sleeper)
+        return _execute(run, launcher, wait_for, now, sleeper, interaction_waiter)
     except RunnerError as errore:
         status = "blocked" if "run bloccato" in str(errore) else "failed"
         _event(run, "run-blocked" if status == "blocked" else "run-failed",
@@ -240,7 +255,8 @@ def execute(run: Run, launcher: Launcher, wait_for: Waiter | None = None,
 
 def _execute(run: Run, launcher: Launcher, wait_for: Waiter | None = None,
              now: Callable[[], float] = time.time,
-             sleeper: Callable[[float], None] = time.sleep) -> RunResult:
+             sleeper: Callable[[float], None] = time.sleep,
+             interaction_waiter: InteractionWaiter | None = None) -> RunResult:
     """Esegue il run con retry persistenti senza uscire dalla frontiera Atlas."""
     terminali: list[str] = []
     attivi: list[tuple[str, object, int]] = []
@@ -255,7 +271,9 @@ def _execute(run: Run, launcher: Launcher, wait_for: Waiter | None = None,
             if not candidati:
                 break
             candidato = candidati[0]
-            if candidato["mode"] != "AFK":
+            if candidato["mode"] != "AFK" or candidato["type"] == "gate":
+                event = "gate-required" if candidato["type"] == "gate" else "decision-required"
+                _attendi_interazione(run, candidato, event, interaction_waiter, now())
                 raise RunnerError(t("automata.hitl", id=candidato["id"]))
             if candidato["id"] in run._started and not run.retry_state.pending(candidato["id"]):
                 raise RunnerError(t("automata.already_started", id=candidato["id"]))
@@ -319,17 +337,117 @@ def _execute(run: Run, launcher: Launcher, wait_for: Waiter | None = None,
             raise RunnerError(t("automata.active_claims", ids=", ".join(n["id"] for n in presi)))
         if falliti := [node_id for node_id in run.retry_state.records()
                        if run.retry_state.terminal(node_id)]:
+            _attendi_interazione(run, node_of(data, falliti[0]), "run-stopped",
+                                 interaction_waiter, now(), ", ".join(falliti))
             raise RunnerError(t("automata.retry_exhausted", ids=", ".join(falliti)))
         if aperti := blocked(data):
             _frontier_event(run, data, now(), status="blocked",
                             reason=f"residual blockers: {', '.join(n['id'] for n in aperti)}")
+            _attendi_interazione(run, aperti[0], "run-stopped", interaction_waiter, now(),
+                                 ", ".join(n["id"] for n in aperti))
             raise RunnerError(t("automata.blocked", ids=", ".join(n["id"] for n in aperti)))
         if not all(is_done(n) for n in data["nodes"]):
             raise RunnerError(t("automata.invalid_termination"))
         _frontier_event(run, data, now())
+        if any(node["id"] == "END" for node in data["nodes"]):
+            _apri_interazione(run, node_of(data, "END"), "run-ended", now())
         _event(run, "run-completed", status="completed", reason="valid termination",
                node=None, provider=None, attempt=None, failure=None, next_at=None)
         return RunResult(tuple(terminali))
+
+
+# Quanto resta aperta una card, secondo cosa chiede a chi la legge.
+SCADENZA_GUASTO = timedelta(minutes=15)
+SCADENZA_DECISIONE = timedelta(days=1)
+
+
+def _scadenza(timestamp: float, event: str) -> str:
+    """La finestra di una card dipende da cosa chiede.
+
+    Una decisione umana puo' aspettare la giornata di chi deve prenderla. Un
+    avviso di guasto no: il run e' gia' finito e la card dice solo cosa e'
+    successo, quindi un run notturno che nessuno sta guardando deve poter chiudere
+    in fretta invece di tenere occupato un terminale fino al giorno dopo. Finche'
+    il canale che avvisa una persona non esiste, la finestra lunga e' tempo in cui
+    non succede niente.
+    """
+    durata = SCADENZA_GUASTO if event == "run-stopped" else SCADENZA_DECISIONE
+    return (datetime.fromtimestamp(timestamp).astimezone().replace(microsecond=0)
+            + durata).isoformat()
+
+
+def _card(event: str, node: dict, detail: str | None = None) -> tuple[str, list[dict]]:
+    if event == "run-ended":
+        return (f"{node['title']} e' terminato.",
+                [{"id": "acknowledge", "label": "Preso atto", "effect": "acknowledged"}])
+    if event == "run-stopped":
+        return (f"Il lavoro si e' fermato: {detail or node['id']}.", [
+            {"id": "retry", "label": "Riprova", "effect": "retry"},
+            {"id": "cancel", "label": "Annulla", "effect": "cancel"},
+        ])
+    return (f"Serve una decisione per {node['id']}.", [
+        {"id": "confirm", "label": "Conferma", "effect": "resume"},
+        {"id": "decline", "label": "Rifiuta", "effect": "cancel"},
+    ])
+
+
+def _apri_interazione(run: Run, node: dict, event: str, timestamp: float,
+                      detail: str | None = None) -> dict:
+    """Scrive la card nella stessa sorgente di verita' che svegliera' il run."""
+    summary, actions = _card(event, node, detail)
+    with mutate.editing(run.graph) as graph:
+        return interactions.open_interaction(
+            graph, run_id=run.run_state.run_id, node_id=node["id"], event=event,
+            summary=summary, allowed_actions=actions, expires_at=_scadenza(timestamp, event),
+            idempotency_key=f"{run.run_state.run_id}:{node['id']}:{event}")
+
+
+def _attendi_interazione(run: Run, node: dict, event: str,
+                         waiter: InteractionWaiter | None, timestamp: float,
+                         detail: str | None = None) -> dict:
+    """Sospende il solo runner finche' Atlas conferma una risposta, o la card scade.
+
+    L'evento in-process e' la via veloce, ma non l'unica possibile: la coda vive
+    in memoria di questo processo, quindi una risposta data dalla dashboard o da
+    un altro comando non la pubblicherebbe nessuno qui. Perche' un run AFK non
+    resti appeso per sempre su una domanda che nessuno vede, l'attesa torna a
+    guardare il grafo a intervalli e si arrende alla scadenza dichiarata nella
+    card, che il modello prevede fin dalla sua apertura.
+    """
+    card = _apri_interazione(run, node, event, timestamp, detail)
+    _event(run, "interaction-opened", status="waiting", node=node["id"],
+           reason=event, interaction=card["id"])
+    wait = waiter or interactions.wait_for_resolution
+    while True:
+        ricevuto = wait(run.graph.slug, run.run_state.run_id, RILETTURA_INTERAZIONE)
+        if ricevuto is not None and ricevuto.interaction_id != card["id"]:
+            continue                       # un'altra card: non e' la nostra risposta
+        record = _card_corrente(run, card["id"])
+        if record["status"] != "open":
+            break
+        if interactions.is_expired(record):
+            record = _scadi_interazione(run, card["id"])
+            break
+    if record["status"] == "resolved":
+        _event(run, "interaction-resolved", status="active", node=node["id"],
+               reason=record["resolution"]["effect"], interaction=card["id"])
+    else:
+        _event(run, "interaction-closed", status="active", node=node["id"],
+               reason=record["status"], interaction=card["id"])
+    return record
+
+
+def _card_corrente(run: Run, interaction_id: str) -> dict:
+    """Lo stato della card secondo il grafo, non secondo la coda degli eventi."""
+    with read_transaction(run.graph.json_path) as data:
+        return next(item for item in data["interactions"] if item["id"] == interaction_id)
+
+
+def _scadi_interazione(run: Run, interaction_id: str) -> dict:
+    """Chiude la card che nessuno ha raccolto entro la sua scadenza."""
+    with mutate.editing(run.graph) as graph:
+        interactions.expire_interactions(graph)
+    return _card_corrente(run, interaction_id)
 
 
 def _raw_wait(handle: object, wait_for: Waiter | None) -> object:

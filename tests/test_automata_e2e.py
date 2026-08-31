@@ -98,6 +98,15 @@ class AutomataEndToEnd(unittest.TestCase):
     def wait_for(self, handle):
         return handle.wait()
 
+    def risolutore(self):
+        """Risponde alla card con cui il runner si ferma: senza, il test attende
+        la scadenza dell'Interazione, cioe' un giorno."""
+        from core import interactions
+
+        from tests import waiter_risolutore
+
+        return waiter_risolutore(self.ref, self.mutate, interactions)
+
     def test_retries_timeout_crash_rate_limit_provider_and_ambiguous(self):
         failures = {
             "N01": [TimeoutError("provider timed out"), self.adapters.AgentOutcome("closed")],
@@ -179,7 +188,8 @@ class AutomataEndToEnd(unittest.TestCase):
                 self.automata().RunnerError):
             self.automata().start(
                 self.ref, 1, retry_policy=self.retry.RetryPolicy(max_attempts=1, initial_delay=0)
-            ).execute(self.automata().launcher_from_registry(registry), self.wait_for)
+            ).execute(self.automata().launcher_from_registry(registry), self.wait_for,
+                      interaction_waiter=self.risolutore())
 
         self.assertEqual("failed", json.loads(self.ref.run_state_path.read_text())["status"])
         self.assertEqual("terminal", json.loads(self.ref.retry_state_path.read_text())[

@@ -6,8 +6,8 @@ import subprocess
 from collections.abc import Mapping, Sequence
 
 from .adapters import (AgentHandle, AgentOutcome, LaunchContext, LaunchPolicy,
-                       ProviderUnavailableError, CODEX_LUNA, CLAUDE, CODE_TERRA,
-                       GEMINI)
+                       ProviderUnavailableError, provider_indisponibile,
+                       CODEX_LUNA, CLAUDE, CODE_TERRA, GEMINI)
 
 
 PROMPT = "{prompt}"
@@ -16,20 +16,38 @@ PROMPT = "{prompt}"
 class ProcessHandle:
     """Handle che drena l'output del figlio e traduce il suo exit status."""
 
-    def __init__(self, process: subprocess.Popen[str]) -> None:
+    def __init__(self, process: subprocess.Popen[str], echo: str | None = None) -> None:
         self._process = process
+        self._echo = echo
 
     def wait(self) -> AgentOutcome:
         try:
             stdout, stderr = self._process.communicate()
         except OSError as errore:
             return AgentOutcome("ambiguous", str(errore))
-        detail = (stderr or stdout or "").strip() or None
+        detail = self._senza_eco((stderr or stdout or "").strip()) or None
         if self._process.returncode == 0:
             return AgentOutcome("closed", detail)
         if self._process.returncode is not None and self._process.returncode < 0:
             return AgentOutcome("crash", detail or f"signal {-self._process.returncode}")
+        if provider_indisponibile(detail):
+            # Il processo e' partito ed e' uscito male, ma non per il lavoro: la
+            # quota e' finita o mancano le credenziali. E' l'unico exit status
+            # storto che deve valere come provider assente, perche' e' quello che
+            # fa scattare il fallback invece di otto rilanci identici.
+            return AgentOutcome("provider-unavailable", detail)
         return AgentOutcome("error", detail or f"exit status {self._process.returncode}")
+
+    def _senza_eco(self, uscita: str) -> str:
+        """Toglie dall'output l'eco del prompt che gli abbiamo dato noi.
+
+        Un CLI agentico ristampa il briefing prima di lavorare, e il briefing
+        contiene la domanda del nodo: lasciarcelo vuol dire cercare le firme di
+        guasto dentro il ticket, e un nodo che parla di rate limit passerebbe per
+        un provider a quota finita. L'eco lo riconosciamo esattamente, perche' e'
+        la stringa che abbiamo passato in argv.
+        """
+        return uscita.replace(self._echo, " ") if self._echo else uscita
 
 
 class SubprocessAdapter:
@@ -72,7 +90,7 @@ class SubprocessAdapter:
             raise ProviderUnavailableError(
                 f"provider {self.identity!r} could not be started: {errore}"
             ) from errore
-        return ProcessHandle(process)
+        return ProcessHandle(process, echo=_prompt(context))
 
 
 ProcessAdapter = SubprocessAdapter
