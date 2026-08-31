@@ -135,13 +135,26 @@ def _replace_placeholders(argument: str, values: Mapping[str, str]) -> str:
 
 
 def _prompt(context: LaunchContext) -> str:
+    """Il briefing del figlio: il nodo e' gia' suo, e non c'e' nessuno da interrogare.
+
+    Il lucchetto lo ha gia' preso il runner, con l'identita' di questo provider:
+    ordinare qui un 'atlas take' chiedeva all'agente di prendere un nodo che
+    risultava gia' preso, e la scelta fra rubare il lucchetto e fermarsi restava
+    sua. Fermarsi in AFK vuol dire un run morto su una domanda che nessuno
+    leggera', quindi il divieto di chiedere conferma e' parte del briefing.
+    """
     node_id = str(context.node["id"])
     question = str(context.node.get("question", ""))
     ticket = context.run.graph.ticket_path(node_id)
     return (
         f"Work only on Atlas node {node_id} in graph {context.run.graph.slug}. "
-        f"Read {ticket}, run 'atlas take {node_id}' before working, write its Answer, "
-        f"and close it when the work is verified. Node question: {question}"
+        f"The runner already claimed {node_id} for you: do not run 'atlas take' or "
+        f"'atlas release' on it, the node is yours. Read {ticket}, do the work, write "
+        f"the Answer section of the ticket, then close the node with "
+        f"'atlas close {node_id} -s \"<summary>\"', adding '--artefatti <path>' once per "
+        f"file if Atlas asks you to declare them. You are running unattended: never "
+        f"stop to ask for confirmation or authorization, decide and finish the work. "
+        f"Node question: {question}"
     )
 
 

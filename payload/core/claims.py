@@ -19,7 +19,7 @@ from datetime import datetime, timedelta
 
 from . import docs, gitscan, remotelock
 from .config import ENV_HOST, Graph
-from .identity import alive, e_mio, holder, identity, nota, session
+from .identity import alive, e_mio, holder, identity, mio_come, nota, session
 from .model import by_id, fingerprint, is_done, istante, node_of, claimed
 from .remotelock import (ACQUISITO, GARA, NON_SCADUTO, NON_TUO, RETE, TENUTO,
                          fresco, nome_lock, scadenza_epoch)
@@ -55,7 +55,16 @@ def _mio(node: dict) -> bool:
     si rinfrescerebbero i lucchetti a vicenda: deve combaciare anche il host. Un claim
     senza host (scritto prima del lease) e' locale per costruzione e resta nostro.
     """
-    if not e_mio(node):
+    return _mio_come(node, identity())
+
+
+def _mio_come(node: dict, me: str) -> bool:
+    """_mio per un'identita' dichiarata: stessa identita' e stessa macchina.
+
+    Il host deve combaciare come in _mio, altrimenti due macchine che rivendicano
+    per conto dello stesso provider si rinfrescherebbero il lucchetto a vicenda.
+    """
+    if not mio_come(node, me):
         return False
     host_claim = holder(node).get("host")
     return host_claim is None or host_claim == _host()
@@ -231,14 +240,30 @@ def _assicura_remoto(ref: Graph, node_id: str, ttl: int) -> None:
     raise StateError(t("claim.remoto_gara", id=node_id))
 
 
-def claim(ref: Graph, node_id: str, assignee: str | None = None, force: bool = False) -> dict:
+def claim(ref: Graph, node_id: str, assignee: str | None = None, force: bool = False,
+          on_behalf_of: str | None = None) -> dict:
+    """Prende il lucchetto, o lo rinnova se e' gia' nostro.
+
+    on_behalf_of scrive nel claim l'identita' dell'agente che lavorera' il nodo,
+    non quella del processo che lo prende. Serve ad Automata, che rivendica prima
+    di lanciare il provider: senza, il figlio troverebbe il proprio nodo tenuto da
+    uno sconosciuto e dovrebbe scegliere fra rubare il lucchetto e fermarsi, e in
+    AFK fermarsi vuol dire un run morto su un nodo che nessuno sta guardando.
+    """
     agent = ref.workspace.config["agent"]
     ttl = agent["lease_ttl_seconds"]
     pid, sid = session()
-    me = identity()
+    me = on_behalf_of or identity()
+    if on_behalf_of:
+        # Il PID e la sessione sono di chi prende il lucchetto, e chi prende non e'
+        # chi lavora: scriverli qui creava un claim che si dichiara vivo con il
+        # processo sbagliato, e la liveness sul PID e' proprio cio' che impedisce a
+        # un altro di chiuderlo. Per un claim preso per conto d'altri la lente resta
+        # il lease, che scade da solo se il lavoro non arriva mai.
+        pid, sid = None, None
     with transaction(ref.json_path) as data:
         node = node_of(data, node_id)
-        if node["status"] == CLAIMED and _mio(node):
+        if node["status"] == CLAIMED and _mio_come(node, me):
             if remotelock.attivo():
                 if not _rinnova_remoto(ref, node_id, ttl):
                     # Il nodo e' gia' nostro e la rete non risponde: il reclaim non

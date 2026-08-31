@@ -13,5 +13,6 @@ __pycache__/
 .atlas/graphs/*/graph.json.lock
 .atlas/graphs/*/.graph.json.tmp
 .atlas/graphs/*/retry-state.json
+.atlas/graphs/*/run-state.json
 .atlas/current
 .atlas/whoami

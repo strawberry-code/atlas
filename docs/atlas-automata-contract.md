@@ -54,6 +54,13 @@ Ogni nodo avviato deve essere protetto dal claim Atlas. Un nodo già chiuso,
 fuori ambito, rivendicato da un altro agente o non presente nella frontiera non
 può essere avviato una seconda volta dallo stesso run.
 
+Il claim lo prende il runner prima di lanciare il provider, e lo prende per
+conto di quel provider: il lucchetto porta l'identità dell'agente che lavorerà
+il nodo, non quella del processo che avvia il run. L'agente lanciato riceve
+quindi un nodo già suo e non deve rivendicarlo di nuovo. Un claim preso per
+conto d'altri non registra PID né sessione del runner, perché il processo che
+lavorerà non è quello: la sua liveness è il lease, che scade da solo.
+
 ### 3. Ogni agente è AFK
 
 Automata avvia ogni agente senza richiedere input umano durante il run. Il
@@ -124,7 +131,7 @@ resume completo di un agente dopo un'interruzione.
 
 Lo stato `active` significa che il runner sta valutando la frontiera o ha agenti in esecuzione. `waiting` significa che un retry ha un prossimo istante utile, mentre `failed` indica un errore senza ulteriore tentativo possibile. `blocked` indica che la frontiera è vuota ma restano nodi aperti o claim che impediscono l'avanzamento. Solo `completed` è un successo, e richiede le condizioni di terminazione valide.
 
-Il retry predefinito è bounded e usa un backoff esponenziale da 60 secondi fino a 3600 secondi. Sono ritentabili timeout, crash, rate limit, provider non disponibile e terminazione ambigua. Un errore permanente esaurisce il budget senza rilancio. L'indisponibilità del provider Luna attiva prima un solo fallback a Claude Sonnet quando il modello del nodo è vuoto; non trasforma un errore del lavoro e non sostituisce una richiesta esplicita. `run-status` mostra il prossimo tentativo e il motivo, mentre `run-log` permette di seguire classificazione, attesa e rilancio. Un claim vivo blocca il duplicato; dopo un'interruzione il processo provider non viene ripreso.
+Il retry predefinito è bounded e usa un backoff esponenziale da 60 secondi fino a 3600 secondi. Sono ritentabili timeout, crash, rate limit, provider non disponibile e terminazione ambigua. Un agente che termina senza lasciare il nodo terminale è una terminazione ambigua di quel nodo, con un tetto di tentativi più stretto del budget generale: un rilancio identico raramente cambia esito e il costo lo paga la quota del provider. L'esaurimento del budget di un nodo non ferma il run, che continua sui rami che non dipendono da quel nodo; il verdetto finale nomina tutti i nodi esauriti. Un errore permanente esaurisce il budget senza rilancio. L'indisponibilità del provider Luna attiva prima un solo fallback a Claude Sonnet quando il modello del nodo è vuoto; non trasforma un errore del lavoro e non sostituisce una richiesta esplicita. `run-status` mostra il prossimo tentativo e il motivo, mentre `run-log` permette di seguire classificazione, attesa e rilancio. Un claim vivo blocca il duplicato; dopo un'interruzione il processo provider non viene ripreso.
 
 ## Terminazione valida
 

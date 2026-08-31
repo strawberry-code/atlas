@@ -26,6 +26,21 @@ class ProviderProcessTest(unittest.TestCase):
             policy=SimpleNamespace(afk=True, sandbox=False, bypass_permissions=True),
         )
 
+    def test_il_briefing_non_ordina_un_secondo_lucchetto_ne_ammette_domande(self):
+        """Il figlio riceve un nodo gia' suo e nessuno a cui chiedere.
+
+        Regressione del run del 2026-08-30: il briefing ordinava 'atlas take', il
+        nodo risultava gia' rivendicato e l'agente si e' fermato a chiedere
+        l'autorizzazione a forzarlo, uscendo con exit status zero.
+        """
+        prompt = providers._prompt(self.context)
+
+        self.assertIn("do not run 'atlas take'", prompt)
+        self.assertIn("already claimed N01 for you", prompt)
+        self.assertIn("atlas close N01", prompt)
+        self.assertIn("never", prompt.lower())
+        self.assertIn("handle $(unsafe) && value", prompt)
+
     @mock.patch.object(providers.subprocess, "Popen")
     def test_lancio_non_interattivo_e_argomenti_non_passano_dalla_shell(self, popen):
         process = SimpleNamespace(returncode=0, communicate=lambda: ("out", ""))

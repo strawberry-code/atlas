@@ -18,9 +18,10 @@ from .adapters import (
 )
 from .config import Graph
 from .model import blocked, claimed, frontier, is_done, node_of
-from .retry import RETRYABLE_FAILURES, RetryPolicy, RetryState, classify_failure
+from .retry import (RETRYABLE_FAILURES, AmbiguousTerminationError, RetryPolicy,
+                    RetryState, classify_failure)
 from .run_state import RunState
-from .store import StateError, load, read_transaction
+from .store import CLAIMED, StateError, load, read_transaction
 from .strings import t
 
 
@@ -171,6 +172,20 @@ def launcher_from_registry(registry: AdapterRegistry, logger: RunLogger | None =
             return handle
         return _FallbackHandle(handle, lambda: fallback(run, node))
 
+    def identity_for(node: dict) -> str | None:
+        """L'identita' che l'agente avra', risolta senza lanciare niente.
+
+        Il runner rivendica il nodo prima del lancio e deve scrivere nel lucchetto
+        chi ci lavorera' davvero. Un nodo irrisolvibile non ha ancora un'identita'
+        credibile: il claim resta quello del processo che lo prende, e il launch
+        alzera' o passera' dal fallback come prima.
+        """
+        try:
+            return registry.resolve(node).identity
+        except AdapterRegistryError:
+            return None
+
+    launch.identity_for = identity_for
     return launch
 
 
@@ -245,7 +260,9 @@ def _execute(run: Run, launcher: Launcher, wait_for: Waiter | None = None,
             if candidato["id"] in run._started and not run.retry_state.pending(candidato["id"]):
                 raise RunnerError(t("automata.already_started", id=candidato["id"]))
 
-            nodo = claims.claim(run.graph, candidato["id"])
+            previsto = _identita_prevista(launcher, candidato)
+            nodo = claims.claim(run.graph, candidato["id"], assignee=previsto,
+                                on_behalf_of=previsto)
             run._started.add(nodo["id"])
             _event(run, "node-claimed", node=nodo["id"], status="active")
             tentativo = run.retry_state.begin(nodo["id"], now())
@@ -267,25 +284,23 @@ def _execute(run: Run, launcher: Launcher, wait_for: Waiter | None = None,
             try:
                 osservazione = _raw_wait(handle, wait_for)
             except Exception as errore:
-                _gestisci_fallimento(run, node_id, tentativo, errore, now())
-                continue
-            failure = (classify_failure(osservazione)
-                       if _is_agent_outcome(osservazione) or isinstance(osservazione, BaseException)
-                       else None)
-            if failure is not None:
-                _gestisci_fallimento(run, node_id, tentativo, osservazione, now())
-                continue
-            if osservazione is not None and not _is_agent_outcome(osservazione):
+                osservazione = errore
+            if _e_notifica(osservazione):
                 _nuovi_eventi(_eventi_da_attesa(osservazione), eventi_visti)
 
+            # Atlas si consulta prima dell'esito del processo, in entrambi i versi:
+            # un exit status zero non chiude niente da solo (il guardrail di B04),
+            # e un'uscita storta non cancella una chiusura che il grafo ha gia'
+            # registrato. Il lavoro fatto non si butta per come e' morto il figlio.
             with read_transaction(run.graph.json_path) as data:
                 osservato = node_of(data, node_id)
             if not is_done(osservato):
-                # Una ClosureEvent non e' un esito dell'adapter: senza una
-                # chiusura Atlas resta il guardrail di B04, non un'autorizzazione
-                # implicita a rilanciare il lavoro.
-                raise RunnerError(t("automata.not_terminal", id=node_id,
-                                     status=osservato["status"]))
+                # Il nodo indeciso e' un guasto del nodo, non del run: passa dal
+                # budget retry, che rilascia il lucchetto prima di riprovare, e il
+                # resto della frontiera continua ad avanzare.
+                _gestisci_fallimento(run, node_id, tentativo,
+                                     _guasto(node_id, osservato, osservazione), now())
+                continue
             run.retry_state.complete(node_id)
             _event(run, "node-closed", node=node_id, attempt=tentativo, status="active")
             _frontier_event(run, load(run.graph.json_path), now())
@@ -344,19 +359,87 @@ def _gestisci_fallimento(run: Run, node_id: str, tentativo: int, valore: object,
                          timestamp: float) -> None:
     failure = classify_failure(valore) or "ambiguous-termination"
     delay = (run.retry_policy.delay_for(tentativo)
-             if failure in RETRYABLE_FAILURES and run.retry_policy.can_retry(tentativo)
+             if failure in RETRYABLE_FAILURES and run.retry_policy.can_retry(tentativo, failure)
              else None)
     dettaglio = getattr(valore, "detail", None) or str(valore) or None
     run.retry_state.record_failure(node_id, tentativo, failure, dettaglio, timestamp, delay)
     run.log.append(f"retry-classified node={node_id} class={failure} attempt={tentativo}")
     _event(run, "attempt-failed", node=node_id, attempt=tentativo, failure=failure,
-           reason=dettaglio, status="active" if delay is not None else "failed")
-    claims.release(run.graph, node_id)
+           reason=dettaglio, status="active")
+    _rilascia_se_tenuto(run, node_id)
     if delay is None:
-        raise RunnerError(t("automata.retry_exhausted", ids=node_id))
+        # Il budget del nodo e' finito, non quello del run: fermare qui l'intero
+        # ciclo abbandonava rami interi che non dipendevano da questo nodo. Il
+        # nodo resta terminale nel ledger dei retry, quindi non verra' ripreso, e
+        # il verdetto finale lo pronuncia il ciclo quando non c'e' piu' altro da
+        # fare, nominando tutti i nodi esauriti invece del primo.
+        run.log.append(f"retry-exhausted node={node_id} class={failure}")
+        _event(run, "node-exhausted", node=node_id, attempt=tentativo, failure=failure,
+               reason=dettaglio, status="active")
+        return
     run.log.append(f"retry-scheduled node={node_id} attempt={tentativo} delay={delay:g}")
     _event(run, "backoff-scheduled", node=node_id, attempt=tentativo,
            failure=failure, next_at=timestamp + delay, status="waiting")
+
+
+def _e_notifica(osservazione: object) -> bool:
+    """Vero per le sole ClosureEvent: un esito o un'eccezione non sono notifiche."""
+    return (osservazione is not None and not _is_agent_outcome(osservazione)
+            and not isinstance(osservazione, BaseException))
+
+
+def _guasto(node_id: str, osservato: dict, osservazione: object) -> object:
+    """Il valore da classificare quando Atlas non mostra il nodo terminale.
+
+    Un esito che parla gia' da se' (un'eccezione, un outcome che non e' 'closed')
+    si classifica per quello che e'. Restano il successo dichiarato e la notifica
+    senza chiusura: li' il processo e' finito bene e il lavoro non c'e', che e'
+    una terminazione ambigua e non un guasto del run.
+    """
+    if isinstance(osservazione, BaseException) or (
+            _is_agent_outcome(osservazione) and osservazione.status != "closed"):
+        return osservazione
+    return AmbiguousTerminationError(
+        t("automata.not_terminal", id=node_id, status=osservato["status"])
+        + _ultima_parola(osservazione))
+
+
+def _rilascia_se_tenuto(run: Run, node_id: str) -> None:
+    """Molla il lucchetto solo se c'e' ancora da mollare.
+
+    Un agente puo' aver rilasciato il nodo da solo prima di uscire, e release alza
+    su un nodo non rivendicato: quell'eccezione uscirebbe dal ciclo come un guasto
+    del run mentre descrive esattamente lo stato che ci serve. Gli altri errori di
+    release, come una ref remota che non si libera, restano errori.
+    """
+    if node_of(load(run.graph.json_path), node_id)["status"] == CLAIMED:
+        claims.release(run.graph, node_id)
+
+
+def _identita_prevista(launcher: Launcher, node: dict) -> str | None:
+    """L'identita' che l'agente avra' quando partira', se il launcher sa dirla.
+
+    Il lucchetto si prende prima del lancio: senza questa domanda il claim
+    porterebbe l'identita' del runner, e il figlio troverebbe il proprio nodo
+    tenuto da uno sconosciuto. Un launcher che non la espone (un'integrazione
+    custom, i test) resta valido e il claim torna a essere quello di chi lo prende.
+    """
+    dichiara = getattr(launcher, "identity_for", None)
+    return dichiara(node) if callable(dichiara) else None
+
+
+def _ultima_parola(osservazione: object, limite: int = 400) -> str:
+    """La coda di cio' che l'agente ha detto, per far diagnosticare dal ledger.
+
+    Senza, il motivo per cui un nodo non si e' chiuso resta solo nei log del
+    provider, che il ledger non sa nemmeno dove siano: e' la differenza fra
+    leggere 'ha chiesto un'autorizzazione' e dover ricostruire un run a mano.
+    """
+    detail = getattr(osservazione, "detail", None)
+    if not detail:
+        return ""
+    testo = " ".join(str(detail).split())
+    return ": " + (testo if len(testo) <= limite else "..." + testo[-limite:])
 
 
 def _riconcilia_retry(run: Run, timestamp: float) -> None:
@@ -399,7 +482,7 @@ def _record_reconciled_crash(run: Run, node_id: str, attempt: int,
                              timestamp: float) -> None:
     """Registra una perdita di processo e conserva il budget retry."""
     delay = (run.retry_policy.delay_for(attempt)
-             if run.retry_policy.can_retry(attempt) else None)
+             if run.retry_policy.can_retry(attempt, "crash") else None)
     run.retry_state.record_failure(node_id, attempt, "crash",
                                    "previous run stopped during attempt",
                                    timestamp, delay)

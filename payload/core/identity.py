@@ -53,7 +53,15 @@ def e_mio(node: dict) -> bool:
     nodo, uno dei due rinfrescando il lucchetto dell'altro. Nel dubbio si risponde
     di no, che al massimo costa un --force o un ATLAS_IDENTITY dichiarato.
     """
-    me = identity()
+    return mio_come(node, identity())
+
+
+def mio_come(node: dict, me: str) -> bool:
+    """Come e_mio, ma per un'identita' dichiarata invece di quella dell'ambiente.
+
+    Automata rivendica un nodo per conto del provider che sta per lanciare, quindi
+    l'identita' da confrontare non e' quella del processo che chiama.
+    """
     return nota(me) and holder(node).get("identity") == me
 
 

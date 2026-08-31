@@ -101,10 +101,13 @@ class RetryPolicy:
     initial_delay: float = 60.0
     multiplier: float = 2.0
     max_delay: float = 3600.0
+    ambiguous_attempts: int = 2
 
     def __post_init__(self) -> None:
         if type(self.max_attempts) is not int or self.max_attempts <= 0:
             raise ValueError("max_attempts must be a positive integer")
+        if type(self.ambiguous_attempts) is not int or self.ambiguous_attempts <= 0:
+            raise ValueError("ambiguous_attempts must be a positive integer")
         if self.initial_delay < 0 or self.multiplier < 1 or self.max_delay < 0:
             raise ValueError("retry delays must be non-negative and multiplier at least one")
 
@@ -113,8 +116,18 @@ class RetryPolicy:
             raise ValueError("failed_attempt must be a positive integer")
         return min(self.max_delay, self.initial_delay * self.multiplier ** (failed_attempt - 1))
 
-    def can_retry(self, attempt: int) -> bool:
-        return attempt < self.max_attempts
+    def can_retry(self, attempt: int, failure: FailureKind | None = None) -> bool:
+        """Il budget del tentativo, con un tetto piu' stretto per l'ambiguo.
+
+        Un agente che esce pulito senza chiudere il nodo non e' un guasto passeggero
+        come un timeout o un 429: rilanciarlo per l'intero budget brucia la quota del
+        provider per riottenere la stessa indecisione, e lascia il run appeso per ore
+        su un nodo che nessun tentativo identico chiudera'. Due tentativi bastano a
+        coprire il caso davvero transitorio.
+        """
+        tetto = (min(self.ambiguous_attempts, self.max_attempts)
+                 if failure == "ambiguous-termination" else self.max_attempts)
+        return attempt < tetto
 
 
 class RetryStateError(StateError):

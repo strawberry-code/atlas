@@ -64,6 +64,19 @@ class RetryClassifierTest(unittest.TestCase):
         self.assertTrue(policy.can_retry(1))
         self.assertFalse(policy.can_retry(policy.max_attempts))
 
+    def test_lambiguo_ha_un_tetto_piu_stretto_del_budget_generale(self):
+        """Rilanciare otto volte un agente che esce senza chiudere brucia quota."""
+        policy = self.retry.RetryPolicy()
+
+        self.assertTrue(policy.can_retry(1, "ambiguous-termination"))
+        self.assertFalse(policy.can_retry(2, "ambiguous-termination"))
+        self.assertTrue(policy.can_retry(2, "timeout"))
+        # Un budget generale piu' stretto del tetto ambiguo resta il vincolo.
+        stretta = self.retry.RetryPolicy(max_attempts=1)
+        self.assertFalse(stretta.can_retry(1, "ambiguous-termination"))
+        with self.assertRaises(ValueError):
+            self.retry.RetryPolicy(ambiguous_attempts=0)
+
 
 class RetryStateTest(unittest.TestCase):
     @classmethod
