@@ -173,7 +173,7 @@ def create_graph(ws: Workspace, slug: str, title: str, destination: str,
                  "updated": now()[:10], "notes": notes or []},
         "branches": branches or {"A": {"label": t("mutate.ramo_default_label"), "color": "#4f46e5"}},
         "nodes": [], "fog": [], "outOfScope": [],
-        "questions": [],
+        "questions": [], "interactions": [],
     }
     validate(data, ws.config["vocab"])
     write_new(ref.json_path, data)

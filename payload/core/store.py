@@ -83,9 +83,10 @@ def _decodifica(path: Path, testo: str) -> dict:
         raise ConfigError(t("store.grafo_rotto", path=path, dettaglio=errore)) from errore
     if not isinstance(graph, dict) or not isinstance(graph.get("nodes"), list):
         raise ConfigError(t("store.grafo_senza_nodi", path=path))
-    # Questions were added without changing the graph schema: old graphs have an
-    # empty question ledger until their next read/write cycle.
+    # Questions and interactions were added without changing the graph schema:
+    # old graphs receive empty ledgers on their next read/write cycle.
     graph.setdefault("questions", [])
+    graph.setdefault("interactions", [])
     return graph
 
 

@@ -18,6 +18,7 @@ from .model import node_of, owners_of
 from .store import StateError, transaction
 from .strings import t
 from .topology import levels
+from .interactions import validate_interactions
 
 
 def now() -> str:
@@ -90,6 +91,7 @@ def validate(data: dict, vocab: dict) -> None:
         if domanda["status"] == "answered" and (not isinstance(domanda["answer"], str)
                                                    or not domanda["answer"].strip()):
             raise StateError(t("mutate.domanda_invalida", dettaglio="risposta mancante"))
+    validate_interactions(data)
     levels(data)  # solleva sui cicli
 
 

@@ -24,7 +24,10 @@ Si guarda la frontiera con `atlas status`, si rivendica un nodo con `atlas claim
 Una riga per nodo chiuso, in ordine di chiusura: quanto basta per giudicarne la rilevanza, poi si apre il ticket.
 
 <!-- atlas:auto -->
-_niente, per ora._
+- **A01** Verifica i prerequisiti del relay: Prerequisiti Telegram e HTTPS mancanti; credenziali OCI locali presenti senza esposizione di segreti. · [ticket](tickets/A01.md)
+- **A02** Definisci il contratto UX e delle Interazioni: Contratto Interaction definito: tre eventi, quattro stati, capability dichiarate e card senza dettagli di trasporto. · [ticket](tickets/A02.md)
+- **A03** Implementa ledger e schema Interaction: Ledger Interaction atomico e idempotente nel graph.json, con audit, contesto e scadenza. · [ticket](tickets/A03.md)
+- **A04** Implementa lifecycle e risposta validata rilasciato: run Automata del 2026-08-30 interrotto: il nodo non fu mai lavorato · [ticket](tickets/A04.md)
 
 ## Non ancora specificato
 

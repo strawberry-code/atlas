@@ -36,15 +36,18 @@
       "branch": "A",
       "type": "task",
       "mode": "AFK",
-      "status": "open",
+      "status": "closed",
       "assignee": null,
       "owner": [],
       "blockedBy": [],
       "question": "Verifica senza stampare segreti che l'ambiente di deploy contenga bot Telegram approvato, hostname HTTPS, credenziali OCI e riferimenti ai segreti. Se manca qualcosa, produci un errore diagnostico preciso senza selezionare risorse esistenti o inventare configurazioni.",
-      "answer": null,
+      "answer": "Prerequisiti Telegram e HTTPS mancanti; credenziali OCI locali presenti senza esposizione di segreti.",
       "claim": null,
       "artifacts": [],
-      "createdAt": "2026-08-30T23:06:18+02:00"
+      "createdAt": "2026-08-30T23:06:18+02:00",
+      "cost": null,
+      "closedBy": "codex-luna",
+      "closedAt": "2026-08-30T23:34:16+02:00"
     },
     {
       "id": "A02",
@@ -52,15 +55,18 @@
       "branch": "A",
       "type": "task",
       "mode": "AFK",
-      "status": "open",
+      "status": "closed",
       "assignee": null,
       "owner": [],
       "blockedBy": [],
       "question": "Definisci i pochi eventi che interrompono l'utente, gli stati Interaction, le azioni consentite e i testi brevi delle card. Il percorso normale non deve mostrare configurazione, token, hostname o concetti di trasporto.",
-      "answer": null,
+      "answer": "Contratto Interaction definito: tre eventi, quattro stati, capability dichiarate e card senza dettagli di trasporto.",
       "claim": null,
       "artifacts": [],
-      "createdAt": "2026-08-30T23:06:18+02:00"
+      "createdAt": "2026-08-30T23:06:18+02:00",
+      "cost": null,
+      "closedBy": "codex-luna",
+      "closedAt": "2026-08-30T23:36:42+02:00"
     },
     {
       "id": "A03",
@@ -68,15 +74,18 @@
       "branch": "A",
       "type": "task",
       "mode": "AFK",
-      "status": "open",
+      "status": "closed",
       "assignee": null,
       "owner": [],
       "blockedBy": ["A02"],
       "question": "Implementa record persistenti, atomici e auditabili per un'Interazione, con contesto grafo/run/nodo, azioni ammesse, scadenza e idempotenza. Il ledger deve essere la fonte di verità, non il relay né la dashboard.",
-      "answer": null,
+      "answer": "Ledger Interaction atomico e idempotente nel graph.json, con audit, contesto e scadenza.",
       "claim": null,
-      "artifacts": [],
-      "createdAt": "2026-08-30T23:06:18+02:00"
+      "artifacts": ["payload/core/__init__.py", "payload/core/editor.py", "payload/core/interactions.py", "payload/core/mutate.py", "payload/core/store.py", "tests/test_interactions.py"],
+      "createdAt": "2026-08-30T23:06:18+02:00",
+      "cost": null,
+      "closedBy": "codex-luna",
+      "closedAt": "2026-08-30T23:41:32+02:00"
     },
     {
       "id": "A04",
@@ -368,5 +377,15 @@
     }
   ],
   "fog": [],
-  "outOfScope": []
+  "outOfScope": [],
+  "questions": [],
+  "interactions": [],
+  "releases": [
+    {
+      "id": "A04",
+      "title": "Implementa lifecycle e risposta validata",
+      "reason": "run Automata del 2026-08-30 interrotto: il nodo non fu mai lavorato",
+      "at": "2026-08-31T09:47:13+02:00"
+    }
+  ]
 }
