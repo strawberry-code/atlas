@@ -67,13 +67,17 @@ nell'ambiente di chi esegue `atlas serve`). Il codice del pairing è pronto e
 testato (`payload/core/serve_pairing.py`, `relay/pairing.py`), il gate è lo
 stesso che riguarda l'intero relay, non un difetto di questo passo.
 
-**Anche a pairing completato, oggi nessun messaggio Telegram parte da solo.**
-Un tap su un bottone di un messaggio Telegram già esistente arriva fino al
-lifecycle Atlas (capability verificata, Interaction risolta, messaggio
-aggiornato), ma niente costruisce e invia quel primo messaggio con i bottoni:
-è il gap aperto in [fog](../.atlas/graphs/260830-atlas-interactions/map.md)
-da D06, nessun nodo di questo grafo lo copre. Finché non esiste, Telegram è
-un canale di risposta, non ancora un canale di alert.
+**A pairing completato, Telegram è anche un canale di alert, non solo di
+risposta.** Come `notify_local`/`notify_himalaya`, `notify_telegram.py`
+passa dal coordinatore notifiche (C01): quando un'Interaction si apre invia
+il messaggio iniziale con un bottone per azione, ciascuno con la sua
+capability D01, tramite il tunnel D03; un tap su quel messaggio arriva poi al
+lifecycle Atlas come già descritto (capability verificata, Interaction
+risolta, messaggio aggiornato). Il gap che D06 aveva lasciato in
+[fog](../.atlas/graphs/260830-atlas-interactions/map.md) è chiuso da D07. Resta
+comunque il limite di questo ambiente, lo stesso di tutto il relay: senza un
+bot Telegram e un hostname HTTPS deployati (Diagnostica, sotto), il canale non
+ha mai inviato un messaggio a un utente vero.
 
 ### 3. Capisci una consegna mancata
 
@@ -97,8 +101,10 @@ in silenzio.
   avvisi browser esistono solo mentre la pagina è caricata), `ATLAS_HIMALAYA_TO`
   non è dichiarata sulla macchina che ha eseguito il run (l'unico canale
   rimasto è allora l'avviso di sistema, utile solo se qualcuno guardava lo
-  schermo), oppure il canale è Telegram e la sua parte di invio, come detto
-  sopra, non esiste ancora.
+  schermo), oppure il canale è Telegram e il relay non è configurato, non è
+  raggiungibile o il progetto non è ancora appaiato a nessuna chat: in
+  ognuno di questi casi il ledger di consegna registra `pending` o `failed`
+  per quel canale, mai un tentativo silenzioso.
 - `atlas run-log --tail 20` mostra la sequenza vera: `interaction-opened`,
   l'attesa, un eventuale `retry`, la chiusura. Utile per distinguere "nessuno
   ha risposto" da "il run non è mai arrivato a chiedere".
@@ -138,6 +144,14 @@ siano opzionali da sapere quando qualcosa non torna.
 - **Pairing**: un codice monouso per progetto, persistito su disco lato
   relay (sopravvive a un restart), mai un token o un chat ID digitato a
   mano lato client. `relay/pairing.py`.
+- **Deliver iniziale**: il canale Telegram del coordinatore notifiche (C01),
+  attivo solo se relay e capability sono entrambi configurati nell'ambiente
+  di chi esegue `atlas serve`. Il client non conosce mai un chat ID: passa il
+  graph slug, il relay lo risolve dal pairing (`chat_id_di`, l'inverso di
+  `progetto_di`). Un relay irraggiungibile, non deployato o un progetto non
+  appaiato finiscono nel ledger di consegna come `pending`/`failed`, mai in
+  un tentativo silenzioso. `payload/core/notify_telegram.py`, endpoint
+  `POST /tunnel/deliver` in `relay/atlas_relay.py`.
 
 Per chi lavora sul codice del relay, non solo per chi lo usa, il resto dei
 dettagli operativi e i comandi di verifica in isolamento sono in
@@ -145,12 +159,10 @@ dettagli operativi e i comandi di verifica in isolamento sono in
 
 ## Cosa non fa, oggi
 
-Due limiti reali, per non promettere quello che questo grafo non ha ancora
-costruito:
+Un limite reale, per non promettere quello che questo ambiente non ha ancora
+verificato:
 
-- **Nessun bot Telegram che parla per primo.** Il messaggio iniziale con i
-  bottoni oggi Atlas non lo manda a nessuno: un tap su un messaggio esistente
-  funziona, aprire la conversazione no.
 - **Nessun deploy reale.** Relay OCI, bot Telegram e hostname HTTPS non sono
-  mai stati messi in piedi: tutto quello che serve un servizio esterno resta
-  verificato in isolamento, mai contro un host vero.
+  mai stati messi in piedi: tutto quello che serve un servizio esterno,
+  incluso il deliver iniziale con i bottoni (D07), resta verificato in
+  isolamento con fixture locali, mai contro un host vero.

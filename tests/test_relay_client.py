@@ -7,9 +7,11 @@ from __future__ import annotations
 import ast
 import io
 import sys
+import tempfile
 import threading
 import time
 import unittest
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -18,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "relay"))
 
 from core import relay_client
 import atlas_relay
+import pairing
 import tunnel as relay_tunnel
 
 TOKEN = "il-bearer-del-tunnel"
@@ -89,6 +92,8 @@ class Backoff(unittest.TestCase):
 
 
 class _RispostaVuota:
+    status = 200
+
     def __enter__(self):
         return self
 
@@ -124,6 +129,41 @@ class AggiornaMessaggio(unittest.TestCase):
             raise OSError("rete giu'")
 
         relay_client.aggiorna_messaggio(config, 1, 1, "x", opener=opener)  # non solleva
+
+
+class InviaMessaggio(unittest.TestCase):
+    """POST '<base>/tunnel/deliver' (D07): il deliver iniziale con i
+    bottoni. A differenza di aggiorna_messaggio (D06) qui il guasto NON deve
+    essere assorbito: la consegna non e' ancora avvenuta."""
+
+    def test_posta_bearer_e_corpo_corretti(self):
+        config = relay_client.TunnelConfig(base_url="https://relay.test", token=TOKEN)
+        richieste = []
+
+        def opener(richiesta, timeout=None):
+            richieste.append(richiesta)
+            return _RispostaVuota()
+
+        relay_client.invia_messaggio(config, "il-progetto", "Serve una decisione",
+                                     [("Conferma", "tok-1"), ("Rifiuta", "tok-2")], opener=opener)
+        self.assertEqual(len(richieste), 1)
+        richiesta = richieste[0]
+        self.assertEqual(richiesta.full_url, "https://relay.test/tunnel/deliver")
+        self.assertEqual(richiesta.get_header("Authorization"), f"Bearer {TOKEN}")
+        import json as _json
+        self.assertEqual(_json.loads(richiesta.data), {
+            "graph": "il-progetto", "text": "Serve una decisione",
+            "buttons": [{"label": "Conferma", "data": "tok-1"}, {"label": "Rifiuta", "data": "tok-2"}],
+        })
+
+    def test_relay_irraggiungibile_solleva(self):
+        config = relay_client.TunnelConfig(base_url="https://relay.test", token=TOKEN)
+
+        def opener(richiesta, timeout=None):
+            raise OSError("rete giu'")
+
+        with self.assertRaises(OSError):
+            relay_client.invia_messaggio(config, "g", "x", [], opener=opener)
 
 
 class FakeRisposta:
@@ -323,6 +363,46 @@ class TapResultEndToEnd(unittest.TestCase):
     def test_bearer_sbagliato_non_chiama_modifica_messaggio(self):
         config = relay_client.TunnelConfig(base_url=self.base_url, token="sbagliato")
         relay_client.aggiorna_messaggio(config, 42, 7, "x", opener=urllib.request.urlopen)
+        self.assertEqual(self.chiamate, [])
+
+
+class DeliverEndToEnd(unittest.TestCase):
+    """invia_messaggio (client) contro il vero endpoint /tunnel/deliver
+    (relay, D07), pairing vero incluso: stesso principio di
+    TapResultEndToEnd, verso il deliver iniziale."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.gestore_pairing = pairing.GestorePairing(Path(self.tmp.name) / "pairing.json")
+        codice, _ = self.gestore_pairing.richiedi("il-progetto")
+        self.gestore_pairing.conferma(codice, 42)
+        self.chiamate = []
+        self.server = atlas_relay.crea_server(
+            host="127.0.0.1", port=0, tunnel_token=TOKEN, gestore_pairing=self.gestore_pairing,
+            invia_bottoni=lambda chat_id, testo, bottoni: self.chiamate.append((chat_id, testo, bottoni)))
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+        host, port = self.server.server_address
+        self.base_url = f"http://{host}:{port}"
+
+    def tearDown(self):
+        self.server.shutdown()
+        self.thread.join()
+        self.server.server_close()
+
+    def test_invia_messaggio_raggiunge_invia_bottoni_via_pairing(self):
+        config = relay_client.TunnelConfig(base_url=self.base_url, token=TOKEN)
+        relay_client.invia_messaggio(config, "il-progetto", "Serve una decisione",
+                                     [("Conferma", "tok-1")], opener=urllib.request.urlopen)
+        self.assertEqual(self.chiamate, [(42, "Serve una decisione", [("Conferma", "tok-1")])])
+
+    def test_progetto_non_appaiato_solleva(self):
+        config = relay_client.TunnelConfig(base_url=self.base_url, token=TOKEN)
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            relay_client.invia_messaggio(config, "un-altro-progetto", "x", [],
+                                         opener=urllib.request.urlopen)
+        self.assertEqual(ctx.exception.code, 409)
         self.assertEqual(self.chiamate, [])
 
 

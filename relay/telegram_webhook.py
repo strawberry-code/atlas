@@ -15,6 +15,13 @@ L'associazione chat -> progetto (PairingStore) e' un confine, non
 un'implementazione: D05 costruisce il flusso one-tap che la popola davvero.
 'MemoriaPairing' qui e' solo lo stub minimo, vuoto per costruzione, coerente
 col fatto che finche' D05 non esiste nessuna chat e' associata a niente.
+
+Il 'callback_data' che entra da questo modulo (D08) e' un identificativo
+corto emesso da 'capability_store.StoreCapability' al momento del deliver,
+non il capability token: pesa troppo per il limite di 64 byte di Telegram.
+'GestoreWebhook' lo risolve nel token vero appena prima del sink, tramite
+'capability_resolver' iniettato: questo modulo continua a non conoscere il
+contenuto della capability, solo il suo trasporto opaco.
 """
 from __future__ import annotations
 
@@ -100,6 +107,7 @@ class CodaTap:
 AnswerCallback = Callable[[object], None]
 Sink = Callable[[dict], None]
 PairingStart = Callable[[str, int], None]
+CapabilityResolver = Callable[[str], str | None]
 
 
 def verifica_segreto(header_segreto: str | None, atteso: str) -> None:
@@ -167,18 +175,29 @@ class GestoreWebhook:
     """Punto unico d'ingresso del webhook: verifica, deduplica, filtra per
     associazione, poi passa l'evento minimo al sink. Solleva WebhookRejected o
     UnpairedUser; chi chiama (l'handler HTTP) decide lo status code, questa
-    classe non conosce HTTP."""
+    classe non conosce HTTP.
+
+    'capability_resolver' (D08) e' l'unico punto in cui il callback_data che
+    Telegram consegna, l'identificativo corto emesso da 'capability_store.
+    StoreCapability' al deliver, torna a essere il capability token opaco che
+    D06 sa verificare: se None (non ancora configurato, o test che non ne
+    hanno bisogno) il campo attraversa questa classe cosi' com'e', come
+    prima di D08. Un identificativo che il resolver non sa risolvere non
+    raggiunge il sink: stesso 'nessuna traccia' di un token invalido scartato
+    oggi da 'payload/core/capability.py', un passo prima."""
 
     def __init__(self, segreto_atteso: str, pairing: PairingStore, sink: Sink,
                  answer_callback: AnswerCallback | None = None,
                  dedup: DedupCallback | None = None,
-                 pairing_start: PairingStart | None = None) -> None:
+                 pairing_start: PairingStart | None = None,
+                 capability_resolver: CapabilityResolver | None = None) -> None:
         self._segreto_atteso = segreto_atteso
         self._pairing = pairing
         self._sink = sink
         self._answer_callback = answer_callback
         self._dedup = dedup or DedupCallback()
         self._pairing_start = pairing_start
+        self._capability_resolver = capability_resolver
 
     def gestisci(self, corpo: bytes, header_segreto: str | None) -> None:
         verifica_segreto(header_segreto, self._segreto_atteso)
@@ -211,6 +230,18 @@ class GestoreWebhook:
 
         if not isinstance(chat_id, int) or not self._pairing.is_paired(chat_id):
             raise UnpairedUser("chat non associata a nessun progetto")
+
+        if evento["kind"] == "callback" and self._capability_resolver is not None:
+            # D08: il callback_data che Telegram ha appena consegnato e'
+            # l'identificativo corto emesso al deliver, non il capability
+            # token. Lo risolviamo qui, l'ultimo passo prima del sink: un
+            # identificativo sconosciuto, scaduto o gia' consumato non
+            # produce nulla da risolvere, e il tap si scarta qui, prima di
+            # attraversare il tunnel verso il client.
+            token = self._capability_resolver(evento.get("callback_data"))
+            if token is None:
+                return
+            evento = {**evento, "callback_data": token}
 
         self._sink(evento)
 
@@ -252,6 +283,24 @@ def costruisci_invia_messaggio(bot_token: str, opener=urllib.request.urlopen) ->
     return _invia
 
 
+def costruisci_invia_bottoni(bot_token: str,
+                             opener=urllib.request.urlopen) -> Callable[[int, str, list], None]:
+    """'sendMessage' con inline keyboard (D07): il deliver iniziale di
+    un'Interazione, un bottone per azione ammessa. A differenza delle altre
+    chiamate Telegram di questo modulo NON assorbe il guasto: qui il
+    fallimento e' il primo tentativo di consegna, non l'effetto collaterale
+    di una transazione Atlas gia' commessa, quindi deve risalire al
+    chiamante (l'handler HTTP del relay) perche' il client lo registri nel
+    ledger di consegna (C01) invece di credere arrivata una notifica che non
+    lo e' mai stata."""
+    def _invia(chat_id: int, testo: str, bottoni: list[tuple[str, str]]) -> None:
+        tastiera = {"inline_keyboard": [[{"text": etichetta, "callback_data": dato}]
+                                        for etichetta, dato in bottoni]}
+        _chiamata_telegram(bot_token, "sendMessage",
+                            {"chat_id": chat_id, "text": testo, "reply_markup": tastiera}, opener)
+    return _invia
+
+
 def costruisci_modifica_messaggio(bot_token: str,
                                   opener=urllib.request.urlopen) -> Callable[[int, int, str], None]:
     """'editMessageText' (D06): il client, dopo aver risolto un'Interaction,
@@ -275,13 +324,18 @@ PREREQUISITI = ["TELEGRAM_BOT_TOKEN_REF", "TELEGRAM_WEBHOOK_SECRET_REF"]
 
 def costruisci_gestore_da_ambiente(env: Mapping[str, str], pairing: PairingStore | None = None,
                                     sink: Sink | None = None,
-                                    pairing_start: PairingStart | None = None) -> GestoreWebhook | None:
+                                    pairing_start: PairingStart | None = None,
+                                    capability_resolver: CapabilityResolver | None = None
+                                    ) -> GestoreWebhook | None:
     """None se mancano i prerequisiti Telegram (stesso gate di A01/D02: bot e
     segreti non ancora approvati in questo ambiente): il resto del relay
     (/healthz) continua a funzionare, l'avvio del servizio non si blocca per
     una feature non ancora sbloccata. 'pairing_start' arriva da chi assembla
     il servizio (atlas_relay.main): questo modulo fissa solo il confine
-    (D04), non costruisce l'implementazione del pairing (D05, relay/pairing.py)."""
+    (D04), non costruisce l'implementazione del pairing (D05, relay/pairing.py).
+    'capability_resolver' e' lo stesso principio per D08: qui si fissa solo
+    il confine, 'capability_store.StoreCapability.preleva' e' l'implementazione
+    che atlas_relay.main() costruisce e condivide con l'endpoint di deliver."""
     if any(not env.get(nome) for nome in PREREQUISITI):
         return None
     return GestoreWebhook(
@@ -290,4 +344,5 @@ def costruisci_gestore_da_ambiente(env: Mapping[str, str], pairing: PairingStore
         sink=sink if sink is not None else CodaTap(),
         answer_callback=costruisci_answer_callback(env["TELEGRAM_BOT_TOKEN_REF"]),
         pairing_start=pairing_start,
+        capability_resolver=capability_resolver,
     )

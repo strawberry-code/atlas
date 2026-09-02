@@ -15,6 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "relay"))
 
 import atlas_relay
+import capability_store
 import deploy
 import pairing
 import telegram_webhook
@@ -261,6 +262,110 @@ class TapResultSulRelay(unittest.TestCase):
             server.server_close()
 
 
+class DeliverSulRelay(unittest.TestCase):
+    """Endpoint /tunnel/deliver (D07): il client chiede il deliver iniziale
+    di un'Interazione con i suoi bottoni. Stesso bearer del tunnel, il chat_id
+    si risolve dal graph via il pairing vero (D05), 409 se non appaiato, 404
+    se Telegram non e' configurato in questo processo, 502 se Telegram
+    rifiuta l'invio."""
+
+    TOKEN = "il-bearer-del-tunnel"
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.gestore_pairing = pairing.GestorePairing(Path(self.tmp.name) / "pairing.json")
+        codice, _ = self.gestore_pairing.richiedi("il-progetto")
+        self.gestore_pairing.conferma(codice, 42)
+        self.chiamate = []
+        self.store = capability_store.StoreCapability()
+        self.server = atlas_relay.crea_server(
+            host="127.0.0.1", port=0, tunnel_token=self.TOKEN, gestore_pairing=self.gestore_pairing,
+            invia_bottoni=lambda chat_id, testo, bottoni: self.chiamate.append((chat_id, testo, bottoni)),
+            capability_store=self.store)
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+        host, port = self.server.server_address
+        self.url = f"http://{host}:{port}/tunnel/deliver"
+
+    def tearDown(self):
+        self.server.shutdown()
+        self.thread.join()
+        self.server.server_close()
+
+    def _posta(self, corpo: dict, token: str | None = TOKEN):
+        import json
+        headers = {"Content-Type": "application/json"}
+        if token is not None:
+            headers["Authorization"] = f"Bearer {token}"
+        richiesta = urllib.request.Request(self.url, data=json.dumps(corpo).encode("utf-8"),
+                                           headers=headers, method="POST")
+        return urllib.request.urlopen(richiesta)
+
+    def _corpo(self, **over):
+        base = {"graph": "il-progetto", "text": "Serve una decisione",
+                "buttons": [{"label": "Conferma", "data": "tok-1"}]}
+        base.update(over)
+        return base
+
+    def test_200_risolve_il_chat_id_e_chiama_invia_bottoni(self):
+        with self._posta(self._corpo()) as risposta:
+            self.assertEqual(risposta.status, 200)
+        self.assertEqual(len(self.chiamate), 1)
+        chat_id, testo, bottoni = self.chiamate[0]
+        self.assertEqual((chat_id, testo), (42, "Serve una decisione"))
+        # D08: 'invia_bottoni' non vede piu' il capability token ('tok-1')
+        # ma l'identificativo corto emesso dallo store, risolvibile a ritroso.
+        self.assertEqual([etichetta for etichetta, _ in bottoni], ["Conferma"])
+        identificativo = bottoni[0][1]
+        self.assertNotEqual(identificativo, "tok-1")
+        self.assertLessEqual(len(identificativo.encode("utf-8")), 64)
+        self.assertEqual(self.store.preleva(identificativo), "tok-1")
+
+    def test_401_senza_bearer(self):
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            self._posta(self._corpo(), token=None)
+        self.assertEqual(ctx.exception.code, 401)
+        self.assertEqual(self.chiamate, [])
+
+    def test_400_con_corpo_incompleto(self):
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            self._posta({"graph": "il-progetto"})
+        self.assertEqual(ctx.exception.code, 400)
+
+    def test_409_se_il_progetto_non_e_appaiato(self):
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            self._posta(self._corpo(graph="un-altro-progetto"))
+        self.assertEqual(ctx.exception.code, 409)
+        self.assertEqual(self.chiamate, [])
+
+    def test_502_se_telegram_rifiuta_l_invio(self):
+        def invia_bottoni_rotto(chat_id, testo, bottoni):
+            raise urllib.error.URLError("giu'")
+
+        self.server.invia_bottoni = invia_bottoni_rotto
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            self._posta(self._corpo())
+        self.assertEqual(ctx.exception.code, 502)
+
+    def test_404_se_non_configurato(self):
+        server = atlas_relay.crea_server(host="127.0.0.1", port=0, tunnel_token=self.TOKEN)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        host, port = server.server_address
+        try:
+            richiesta = urllib.request.Request(
+                f"http://{host}:{port}/tunnel/deliver", data=b"{}",
+                headers={"Authorization": f"Bearer {self.TOKEN}"}, method="POST")
+            with self.assertRaises(urllib.error.HTTPError) as ctx:
+                urllib.request.urlopen(richiesta)
+            self.assertEqual(ctx.exception.code, 404)
+        finally:
+            server.shutdown()
+            thread.join()
+            server.server_close()
+
+
 class InoltroTapEndToEnd(unittest.TestCase):
     """Le tre meta' di D06 assemblate come farebbe atlas_relay.main(): un tap
     verificato dal webhook (D04) arriva al sink costruito da
@@ -320,6 +425,88 @@ class InoltroTapEndToEnd(unittest.TestCase):
                     break
             self.assertIn("event: tap\n", righe)
             self.assertTrue(any('"callback_data": "il-token"' in r for r in righe))
+
+
+class InoltroTapConCallbackDataAccorciatoEndToEnd(unittest.TestCase):
+    """D08 assemblato come farebbe atlas_relay.main(): un unico
+    'capability_store.StoreCapability' condiviso fra l'endpoint di deliver
+    (che registra il capability token e torna l'id corto) e il webhook (che
+    lo risolve appena prima del sink). Il capability token per intero non
+    tocca mai Telegram: solo l'identificativo corto ci arriva, e solo quello
+    torna indietro nel tap."""
+
+    TOKEN = "il-bearer-del-tunnel"
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.gestore_pairing = pairing.GestorePairing(Path(self.tmp.name) / "pairing.json")
+        codice, _ = self.gestore_pairing.richiedi("il-progetto")
+        self.gestore_pairing.conferma(codice, 42)
+
+        self.registro = tunnel.RegistroTunnel()
+        self.store = capability_store.StoreCapability()
+        sink = tunnel.costruisci_instradamento(self.gestore_pairing.progetto_di, self.registro)
+        gestore_webhook = telegram_webhook.GestoreWebhook(
+            segreto_atteso=SEGRETO_TEST, pairing=self.gestore_pairing, sink=sink,
+            answer_callback=lambda callback_id: None, capability_resolver=self.store.preleva)
+        self.chiamate_invia_bottoni = []
+        self.server = atlas_relay.crea_server(
+            host="127.0.0.1", port=0, gestore_webhook=gestore_webhook, tunnel_token=self.TOKEN,
+            registro_tunnel=self.registro, gestore_pairing=self.gestore_pairing,
+            invia_bottoni=lambda chat_id, testo, bottoni: self.chiamate_invia_bottoni.append(bottoni),
+            capability_store=self.store)
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+        host, port = self.server.server_address
+        self.base_url = f"http://{host}:{port}"
+
+    def tearDown(self):
+        self.server.fermo.set()
+        self.server.shutdown()
+        self.thread.join()
+        self.server.server_close()
+
+    def test_il_capability_token_reale_torna_indietro_dopo_il_tap(self):
+        import json
+
+        capability_reale = "eyJ..." + "x" * 250  # >64 byte, come un token vero (D01/D07)
+        richiesta_deliver = urllib.request.Request(
+            f"{self.base_url}/tunnel/deliver",
+            data=json.dumps({"graph": "il-progetto", "text": "Serve una decisione",
+                             "buttons": [{"label": "Conferma", "data": capability_reale}]}).encode(),
+            headers={"Authorization": f"Bearer {self.TOKEN}", "Content-Type": "application/json"},
+            method="POST")
+        with urllib.request.urlopen(richiesta_deliver) as risposta:
+            self.assertEqual(risposta.status, 200)
+        identificativo_corto = self.chiamate_invia_bottoni[0][0][1]
+        self.assertLessEqual(len(identificativo_corto.encode("utf-8")), 64)
+
+        richiesta_tunnel = urllib.request.Request(
+            f"{self.base_url}/tunnel?graph=il-progetto&runId=run-1",
+            headers={"Authorization": f"Bearer {self.TOKEN}"})
+        with urllib.request.urlopen(richiesta_tunnel, timeout=5) as risposta_tunnel:
+            for _ in range(200):
+                if self.registro.sessioni_di("il-progetto"):
+                    break
+                time.sleep(0.01)
+
+            update = {"update_id": 1, "callback_query": {
+                "id": "cb-1", "data": identificativo_corto,
+                "message": {"message_id": 5, "chat": {"id": 42}}}}
+            richiesta_webhook = urllib.request.Request(
+                f"{self.base_url}/telegram/webhook", data=json.dumps(update).encode("utf-8"),
+                headers={"X-Telegram-Bot-Api-Secret-Token": SEGRETO_TEST}, method="POST")
+            with urllib.request.urlopen(richiesta_webhook) as esito:
+                self.assertEqual(esito.status, 200)
+
+            righe = []
+            while True:
+                riga = risposta_tunnel.readline().decode("utf-8")
+                righe.append(riga)
+                if riga.strip() == "" and any("data:" in r for r in righe):
+                    break
+            self.assertTrue(any(f'"callback_data": "{capability_reale}"' in r for r in righe))
 
 
 class PairingSulRelay(unittest.TestCase):

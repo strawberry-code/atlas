@@ -31,6 +31,8 @@ atlas take <ID>
 
 Se il claim viene rifiutato perché questa identità ne tiene già uno, chiudi o rilascia quello prima. Non usare `--force` per abitudine.
 
+**Mentre tieni il claim, non fermare il turno ad aspettare una notifica.** Se il lavoro richiede una verifica lunga, come una suite di test lanciata in background, o la tieni in primo piano finché non dà l'esito, o continui con altro lavoro sul nodo e rileggi il log quando serve. Un turno che si chiude in attesa lascia il nodo rivendicato e il grafo bloccato per chiunque altro, un lucchetto vivo con nessuno che lo sta davvero lavorando.
+
 ## 3. Fermati se il nodo dice HITL
 
 La riga sotto il titolo, stampata da `take`, dice ramo, tipo, modo e stato.

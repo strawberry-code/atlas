@@ -134,6 +134,28 @@ def aggiorna_messaggio(config: TunnelConfig, chat_id: int, message_id: int, test
         pass
 
 
+def invia_messaggio(config: TunnelConfig, graph: str, testo: str, bottoni: list[tuple[str, str]],
+                    opener=urllib.request.urlopen) -> None:
+    """POST '<base>/tunnel/deliver' (D07): il deliver iniziale di
+    un'Interazione aperta, un bottone per azione ammessa. A differenza di
+    aggiorna_messaggio questa chiamata NON assorbe il guasto: la consegna non
+    e' ancora avvenuta, quindi un relay irraggiungibile, non deployato o un
+    progetto non ancora appaiato (D05) devono risalire a notify.dispatch
+    (C01), che li registra nel ledger di consegna e decide se ritentare."""
+    corpo = json.dumps({
+        "graph": graph, "text": testo,
+        "buttons": [{"label": etichetta, "data": dato} for etichetta, dato in bottoni],
+    }).encode("utf-8")
+    richiesta = urllib.request.Request(
+        f"{config.base_url.rstrip('/')}/tunnel/deliver",
+        data=corpo, method="POST",
+        headers={"Authorization": f"Bearer {config.token}", "Content-Type": "application/json"},
+    )
+    with opener(richiesta, timeout=10) as risposta:
+        if risposta.status != 200:
+            raise ConnessioneRelayRifiutata(f"deliver rifiutato dal relay: HTTP {risposta.status}")
+
+
 def esegui(config: TunnelConfig, graph: str, run_id: str, on_event: OnEvent, stop: Event,
           opener=urllib.request.urlopen, rand: Callable[[], float] = random.random,
           wait: Callable[[float], None] | None = None) -> None:

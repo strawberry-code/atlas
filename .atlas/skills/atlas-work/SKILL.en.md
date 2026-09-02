@@ -31,6 +31,8 @@ atlas take <ID>
 
 If the claim is refused because this identity already holds one, close or release that one first. Don't reach for `--force` out of habit.
 
+**While you hold the claim, don't end the turn waiting for a notification.** If the work needs a long verification, such as a test suite launched in the background, either keep it in the foreground until it gives its result, or move on to other work on the node and read the log back when it's actually needed. A turn that stops to wait leaves the node claimed and the graph blocked for everyone else, a live lock with no one actually working it.
+
 ## 3. Stop if the node says HITL
 
 The line under the title, printed by `take`, says branch, type, mode, and status.

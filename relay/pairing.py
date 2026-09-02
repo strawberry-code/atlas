@@ -121,6 +121,21 @@ class GestorePairing:
             record = self._leggi()["associazioni"].get(str(chat_id))
         return record["graph"] if record else None
 
+    def chat_id_di(self, graph: str) -> int | None:
+        """L'inverso di progetto_di (D07): a quale chat spingere il deliver
+        iniziale di un'Interazione di questo progetto. Se piu' chat sono
+        appaiate allo stesso progetto (due dispositivi, o un ripareamento
+        senza aver disassociato il vecchio), vince la piu' recente: un nuovo
+        pairing sposta dove arrivano le notifiche senza dover pulire nulla a
+        mano."""
+        with self._lock:
+            associazioni = self._leggi()["associazioni"]
+        candidati = [(int(chat_id), record["pairedAt"]) for chat_id, record in associazioni.items()
+                    if record["graph"] == graph]
+        if not candidati:
+            return None
+        return max(candidati, key=lambda coppia: coppia[1])[0]
+
 
 def costruisci_pairing_start(store: GestorePairing, invia_messaggio: InviaMessaggio) -> PairingStart:
     """La chiusura che GestoreWebhook (D04) chiama su un '/start <codice>':

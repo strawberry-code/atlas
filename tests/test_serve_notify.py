@@ -99,6 +99,33 @@ class ServeNotifyTest(unittest.TestCase):
         # non c'e' nulla da consegnare, senza toccare l'utility di sistema.
         self.serve_notify.avvisa(self.ref)
 
+    def test_canali_attivi_include_telegram_solo_se_relay_e_capability_configurati(self):
+        self.assertNotIn("telegram", self.serve_notify._canali_attivi())
+        os.environ.update({"RELAY_HTTPS_HOSTNAME": "relay.test", "ATLAS_RELAY_TOKEN_REF": "t",
+                           "ATLAS_CAPABILITY_KEY_REF": "k"})
+        try:
+            self.assertIn("telegram", self.serve_notify._canali_attivi())
+        finally:
+            for chiave in ("RELAY_HTTPS_HOSTNAME", "ATLAS_RELAY_TOKEN_REF", "ATLAS_CAPABILITY_KEY_REF"):
+                os.environ.pop(chiave, None)
+
+    def test_una_interaction_aperta_arriva_al_canale_telegram_appaiato(self):
+        # 'local' e' sempre attivo (_canali_attivi): il registro deve
+        # comunque servirlo, anche se qui interessa solo verificare telegram.
+        interaction_id = self._apri_interaction()
+        canale_locale = _CanaleFinto()
+        canale_telegram = _CanaleFinto()
+        canale_telegram.identity = "telegram"
+        registro = self.channels.ChannelRegistry([canale_locale, canale_telegram])
+        os.environ.update({"RELAY_HTTPS_HOSTNAME": "relay.test", "ATLAS_RELAY_TOKEN_REF": "t",
+                           "ATLAS_CAPABILITY_KEY_REF": "k"})
+        try:
+            self.serve_notify.avvisa(self.ref, registro)
+        finally:
+            for chiave in ("RELAY_HTTPS_HOSTNAME", "ATLAS_RELAY_TOKEN_REF", "ATLAS_CAPABILITY_KEY_REF"):
+                os.environ.pop(chiave, None)
+        self.assertEqual([interaction_id], canale_telegram.consegnate)
+
 
 if __name__ == "__main__":
     unittest.main()

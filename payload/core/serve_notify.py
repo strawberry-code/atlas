@@ -15,7 +15,7 @@ from __future__ import annotations
 import os
 import time
 
-from . import notify, notify_himalaya, notify_local
+from . import capability, notify, notify_himalaya, notify_local, notify_telegram, relay_client
 from .channels import ChannelRegistry
 from .config import Graph
 from .retry import RetryPolicy
@@ -27,23 +27,27 @@ _POLICY = RetryPolicy()
 def _canali_attivi() -> tuple[str, ...]:
     """'local' e' sempre attivo (C02, nessuna configurazione richiesta);
     'himalaya' solo se un destinatario e' configurato sulla macchina
-    (ATLAS_HIMALAYA_TO): senza, pianificarlo produrrebbe solo un guasto
-    permanente e silenzioso a ogni Interaction (avvisa() scarta l'esito di
-    dispatch(), nessuno leggerebbe mai quel 'failed')."""
+    (ATLAS_HIMALAYA_TO); 'telegram' solo se il relay (D03) e la capability
+    (D01) sono entrambi configurati. Senza, pianificarlo produrrebbe solo un
+    guasto permanente e silenzioso a ogni Interaction (avvisa() scarta
+    l'esito di dispatch(), nessuno leggerebbe mai quel 'failed')."""
     canali = [notify_local.IDENTITY]
     if os.environ.get(notify_himalaya.ENV_TO):
         canali.append(notify_himalaya.IDENTITY)
+    if relay_client.da_ambiente(os.environ) is not None and capability.da_ambiente(os.environ) is not None:
+        canali.append(notify_telegram.IDENTITY)
     return tuple(canali)
 
 
 def _registro_predefinito() -> ChannelRegistry:
-    return ChannelRegistry((notify_local.DesktopChannel(), notify_himalaya.HimalayaChannel()))
+    return ChannelRegistry((notify_local.DesktopChannel(), notify_himalaya.HimalayaChannel(),
+                            notify_telegram.TelegramChannel()))
 
 
 def avvisa(ref: Graph, registro: ChannelRegistry | None = None) -> None:
     """'registro' e' il punto di iniezione dei test: di default sono i canali
-    veri (notify_local, notify_himalaya), cosi' il chiamante di produzione non
-    deve mai passarlo esplicitamente."""
+    veri (notify_local, notify_himalaya, notify_telegram), cosi' il chiamante
+    di produzione non deve mai passarlo esplicitamente."""
     try:
         with read_transaction(ref.json_path) as data:
             stato = notify.NotifyState(ref.notify_state_path, ref.slug)

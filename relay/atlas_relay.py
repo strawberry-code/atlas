@@ -1,6 +1,8 @@
 """Servizio relay isolato (D02): process/health-check, l'adapter webhook
 Telegram (D04), l'endpoint SSE del tunnel client-relay (D03), il pairing
-Telegram one-tap (D05) e l'inoltro delle azioni Telegram al client (D06).
+Telegram one-tap (D05), l'inoltro delle azioni Telegram al client (D06) e lo
+scambio callback_data <-> capability sotto il limite di 64 byte di Telegram
+(D08, capability_store.StoreCapability).
 
 Bind solo su ATLAS_RELAY_HOST (default 127.0.0.1): l'esposizione pubblica passa
 da Caddy (Caddyfile.atlas-relay), mai da questo processo. Porta e host sono le
@@ -12,21 +14,24 @@ from __future__ import annotations
 import json
 import os
 import threading
+import urllib.error
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from queue import Empty
 from urllib.parse import parse_qs, urlsplit
 
+import capability_store
 import pairing
 import tunnel
 from telegram_webhook import (GestoreWebhook, UnpairedUser, WebhookRejected,
-                               costruisci_gestore_da_ambiente, costruisci_invia_messaggio,
-                               costruisci_modifica_messaggio)
+                               costruisci_gestore_da_ambiente, costruisci_invia_bottoni,
+                               costruisci_invia_messaggio, costruisci_modifica_messaggio)
 
 HOST = os.environ.get("ATLAS_RELAY_HOST", "127.0.0.1")
 PORT = int(os.environ.get("ATLAS_RELAY_PORT", "8765"))
 TELEGRAM_WEBHOOK_PATH = "/telegram/webhook"
 TUNNEL_PATH = "/tunnel"
 TAP_RESULT_PATH = "/tunnel/tap-result"
+DELIVER_PATH = "/tunnel/deliver"
 PAIRING_PATH = "/pairing"
 INTERVALLO_BATTITO = 15.0   # stesso passo del canale SSE della dashboard (serve.py)
 
@@ -199,9 +204,73 @@ class Handler(BaseHTTPRequestHandler):
         modifica(chat_id, message_id, testo)
         self._json(200, {"ok": True})
 
+    def _tunnel_deliver(self) -> None:
+        """POST /tunnel/deliver {"graph","text","buttons":[{"label","data"}]}
+        (D07): il deliver iniziale di un'Interazione con un bottone per
+        azione ammessa. Stesso bearer del tunnel. 404 se Telegram non e'
+        configurato lato relay (nessun bot token: A01/D02 ancora chiusi),
+        409 se il progetto non e' appaiato a nessuna chat (D05 non ancora
+        completato dall'utente), 502 se Telegram rifiuta l'invio.
+
+        'data' qui e' ancora il capability token per intero (D01): il client
+        non lo accorcia mai, non sa nulla di limiti Telegram. E' qui, appena
+        prima di 'invia' (Telegram vero), che 'capability_store' (D08) lo
+        scambia con l'identificativo corto che finisce davvero su
+        callback_data, sotto il limite di 64 byte."""
+        invia = getattr(self.server, "invia_bottoni", None)
+        gestore_pairing: pairing.GestorePairing | None = getattr(self.server, "gestore_pairing", None)
+        if invia is None or gestore_pairing is None:
+            self.send_response(404)
+            self.end_headers()
+            return
+        if not self._bearer_ok():
+            self.send_response(401)
+            self.end_headers()
+            return
+        lunghezza = int(self.headers.get("Content-Length") or 0)
+        corpo_richiesta = self.rfile.read(lunghezza) if lunghezza else b""
+        try:
+            corpo = json.loads(corpo_richiesta) if corpo_richiesta else {}
+        except json.JSONDecodeError:
+            corpo = None
+        graph = corpo.get("graph") if isinstance(corpo, dict) else None
+        testo = corpo.get("text") if isinstance(corpo, dict) else None
+        bottoni = corpo.get("buttons") if isinstance(corpo, dict) else None
+        if (not isinstance(graph, str) or not isinstance(testo, str) or not isinstance(bottoni, list)
+                or not all(isinstance(b, dict) and isinstance(b.get("label"), str)
+                          and isinstance(b.get("data"), str) for b in bottoni)):
+            self.send_response(400)
+            self.end_headers()
+            return
+        chat_id = gestore_pairing.chat_id_di(graph)
+        if chat_id is None:
+            self.send_response(409)
+            self.end_headers()
+            return
+        store: capability_store.StoreCapability | None = getattr(
+            self.server, "capability_store", None)
+        # D08: sul bottone Telegram non va il capability token (~270 byte,
+        # oltre il limite di 64 di callback_data), va l'identificativo corto
+        # che lo referenzia nello store del relay. Se lo store non e'
+        # configurato (atlas_relay.main() lo crea sempre quando Telegram lo
+        # e': solo i test che non gli badano lo lasciano assente) il dato
+        # passa cosi' com'e', come prima di D08.
+        coppie = [(b["label"], store.registra(b["data"]) if store is not None else b["data"])
+                 for b in bottoni]
+        try:
+            invia(chat_id, testo, coppie)
+        except (OSError, urllib.error.URLError):
+            self.send_response(502)
+            self.end_headers()
+            return
+        self._json(200, {"ok": True})
+
     def do_POST(self) -> None:
         if urlsplit(self.path).path == TAP_RESULT_PATH:
             self._tap_result()
+            return
+        if urlsplit(self.path).path == DELIVER_PATH:
+            self._tunnel_deliver()
             return
         if urlsplit(self.path).path == PAIRING_PATH:
             self._pairing_richiedi()
@@ -240,6 +309,8 @@ class _RelayServer(ThreadingHTTPServer):
     gestore_pairing: pairing.GestorePairing | None = None
     pairing_bot_username: str | None = None
     modifica_messaggio: object = None
+    invia_bottoni: object = None
+    capability_store: capability_store.StoreCapability | None = None
     fermo: threading.Event
 
 
@@ -249,7 +320,10 @@ def crea_server(host: str = HOST, port: int = PORT,
                  registro_tunnel: tunnel.RegistroTunnel | None = None,
                  gestore_pairing: pairing.GestorePairing | None = None,
                  pairing_bot_username: str | None = None,
-                 modifica_messaggio: object = None) -> ThreadingHTTPServer:
+                 modifica_messaggio: object = None,
+                 invia_bottoni: object = None,
+                 capability_store: capability_store.StoreCapability | None = None
+                 ) -> ThreadingHTTPServer:
     server = _RelayServer((host, port), Handler)
     server.gestore_webhook = gestore_webhook
     server.tunnel_token = tunnel_token
@@ -257,6 +331,8 @@ def crea_server(host: str = HOST, port: int = PORT,
     server.gestore_pairing = gestore_pairing
     server.pairing_bot_username = pairing_bot_username
     server.modifica_messaggio = modifica_messaggio
+    server.invia_bottoni = invia_bottoni
+    server.capability_store = capability_store
     server.fermo = threading.Event()
     return server
 
@@ -276,14 +352,22 @@ def main() -> None:
     sink = (tunnel.costruisci_instradamento(gestore_pairing.progetto_di, registro_tunnel)
             if gestore_pairing is not None and registro_tunnel is not None else None)
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN_REF")
+    # D08: lo stesso store serve sia il deliver (registra il token, torna
+    # l'id corto) sia il webhook (risolve l'id corto nel token): un bottone
+    # su cui il bot non e' mai stato configurato non emette mai id da
+    # risolvere, quindi lo store puo' esistere sempre, senza un gate suo.
+    memoria_capability = capability_store.StoreCapability()
     server = crea_server(
         gestore_webhook=costruisci_gestore_da_ambiente(
-            os.environ, pairing=gestore_pairing, sink=sink, pairing_start=pairing_start),
+            os.environ, pairing=gestore_pairing, sink=sink, pairing_start=pairing_start,
+            capability_resolver=memoria_capability.preleva),
         tunnel_token=token,
         registro_tunnel=registro_tunnel,
         gestore_pairing=gestore_pairing,
         pairing_bot_username=os.environ.get("TELEGRAM_BOT_USERNAME"),
         modifica_messaggio=costruisci_modifica_messaggio(bot_token) if bot_token else None,
+        invia_bottoni=costruisci_invia_bottoni(bot_token) if bot_token else None,
+        capability_store=memoria_capability,
     )
     try:
         server.serve_forever()

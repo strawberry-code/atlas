@@ -62,6 +62,21 @@ class GestorePairingTest(unittest.TestCase):
         self.assertTrue(ripreso.is_paired(42))
         self.assertEqual(ripreso.progetto_di(42), "prova")
 
+    def test_chat_id_di_e_l_inverso_di_progetto_di(self):
+        codice, _ = self.store.richiedi("prova")
+        self.store.conferma(codice, 42)
+        self.assertEqual(self.store.chat_id_di("prova"), 42)
+
+    def test_chat_id_di_none_senza_associazioni(self):
+        self.assertIsNone(self.store.chat_id_di("nessuno"))
+
+    def test_chat_id_di_sceglie_l_associazione_piu_recente(self):
+        codice_a, _ = self.store.richiedi("prova")
+        self.store.conferma(codice_a, 1)
+        codice_b, _ = self.store.richiedi("prova")
+        self.store.conferma(codice_b, 2)
+        self.assertEqual(self.store.chat_id_di("prova"), 2)
+
     def test_due_richieste_per_lo_stesso_graph_non_si_calpestano(self):
         codice_a, _ = self.store.richiedi("prova")
         codice_b, _ = self.store.richiedi("prova")

@@ -212,6 +212,32 @@ class GestoreWebhookTest(unittest.TestCase):
         self.assertEqual(chiamate, [])
         self.assertEqual(self.eventi, [])
 
+    def test_senza_capability_resolver_il_callback_data_passa_cosi_com_e(self):
+        """Comportamento di prima di D08: se il confine non e' configurato,
+        nessuno tocca il campo."""
+        gestore = self._gestore()
+        gestore.gestisci(self._corpo(_update_callback(data="il-token-per-intero")), SEGRETO)
+        self.assertEqual(self.eventi[0]["callback_data"], "il-token-per-intero")
+
+    def test_capability_resolver_sostituisce_lidentificativo_col_token(self):
+        eventi, risposte = [], []
+        gestore = tw.GestoreWebhook(
+            segreto_atteso=SEGRETO, pairing=tw.MemoriaPairing((42,)), sink=eventi.append,
+            answer_callback=risposte.append,
+            capability_resolver=lambda ident: "il-token-vero" if ident == "id-corto" else None)
+        gestore.gestisci(self._corpo(_update_callback(data="id-corto")), SEGRETO)
+        self.assertEqual(eventi[0]["callback_data"], "il-token-vero")
+
+    def test_capability_resolver_sconosciuto_non_arriva_al_sink(self):
+        eventi, risposte = [], []
+        gestore = tw.GestoreWebhook(
+            segreto_atteso=SEGRETO, pairing=tw.MemoriaPairing((42,)), sink=eventi.append,
+            answer_callback=risposte.append,
+            capability_resolver=lambda ident: None)
+        gestore.gestisci(self._corpo(_update_callback(data="id-mai-esistito")), SEGRETO)
+        self.assertEqual(eventi, [])
+        self.assertEqual(risposte, ["cb-1"])  # l'ack Telegram avviene comunque
+
 
 class AnswerCallbackTest(unittest.TestCase):
     def test_chiama_endpoint_con_bot_token_e_callback_id(self):
@@ -282,6 +308,50 @@ class ModificaMessaggioTest(unittest.TestCase):
         modifica(42, 7, "x")  # non deve sollevare
 
 
+class InviaBottoniTest(unittest.TestCase):
+    """sendMessage con inline keyboard (D07): il deliver iniziale con un
+    bottone per azione ammessa. A differenza di modifica/answer, il guasto
+    NON deve essere assorbito: risale al chiamante (l'handler /tunnel/deliver
+    del relay), che lo traduce in un 502 verso il client."""
+
+    def test_chiama_sendmessage_con_inline_keyboard(self):
+        chiamate = []
+
+        class FakeRisposta:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        def opener(richiesta, timeout):
+            chiamate.append(richiesta)
+            return FakeRisposta()
+
+        invia = tw.costruisci_invia_bottoni("BOT:TOKEN", opener=opener)
+        invia(42, "Serve una decisione", [("Conferma", "tok-1"), ("Rifiuta", "tok-2")])
+
+        self.assertEqual(len(chiamate), 1)
+        self.assertIn("BOT:TOKEN", chiamate[0].full_url)
+        self.assertIn("sendMessage", chiamate[0].full_url)
+        import json as _json
+        corpo = _json.loads(chiamate[0].data)
+        self.assertEqual(corpo["chat_id"], 42)
+        self.assertEqual(corpo["text"], "Serve una decisione")
+        self.assertEqual(corpo["reply_markup"], {"inline_keyboard": [
+            [{"text": "Conferma", "callback_data": "tok-1"}],
+            [{"text": "Rifiuta", "callback_data": "tok-2"}],
+        ]})
+
+    def test_url_error_risale_al_chiamante(self):
+        def opener(richiesta, timeout):
+            raise urllib.error.URLError("giu'")
+
+        invia = tw.costruisci_invia_bottoni("BOT:TOKEN", opener=opener)
+        with self.assertRaises(urllib.error.URLError):
+            invia(42, "x", [("Conferma", "tok-1")])
+
+
 class CostruisciGestoreDaAmbiente(unittest.TestCase):
     def test_none_senza_prerequisiti(self):
         self.assertIsNone(tw.costruisci_gestore_da_ambiente({}))
@@ -292,6 +362,16 @@ class CostruisciGestoreDaAmbiente(unittest.TestCase):
             "TELEGRAM_WEBHOOK_SECRET_REF": SEGRETO,
         })
         self.assertIsInstance(gestore, tw.GestoreWebhook)
+
+    def test_capability_resolver_passato_al_gestore(self):
+        # Nessuna chiamata a gestisci() qui: farebbe scattare l'answer_callback
+        # vero (rete verso api.telegram.org), non pertinente a questo test,
+        # che verifica solo il passaggio del parametro attraverso il confine.
+        gestore = tw.costruisci_gestore_da_ambiente(
+            {"TELEGRAM_BOT_TOKEN_REF": "op://vault/telegram-bot-token",
+             "TELEGRAM_WEBHOOK_SECRET_REF": SEGRETO},
+            capability_resolver=lambda ident: f"risolto:{ident}")
+        self.assertEqual(gestore._capability_resolver("id-corto"), "risolto:id-corto")
 
 
 if __name__ == "__main__":
