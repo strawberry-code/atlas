@@ -138,6 +138,26 @@ class LeaseCampi(Base):
         nodo = self.model.node_of(self.store.load(self.ref.json_path), "F01")
         self.assertEqual("live", self.claims.claim_state(nodo, self.ws.config["agent"]))
 
+    def test_claim_state_delegato_live_col_lease_anche_senza_pid(self):
+        """Un claim on_behalf_of (Automata per conto del provider) non porta il PID
+        di chi lavora davvero: senza la lente del lease sarebbe sempre 'dead', un
+        lucchetto vivo scambiato per orfano mentre l'agente delegato lo sta lavorando."""
+        self.popola()
+        self.claims.claim(self.ref, "F01", on_behalf_of="codex-luna")
+        nodo = self.model.node_of(self.store.load(self.ref.json_path), "F01")
+        self.assertIsNone(nodo["claim"]["pid"])
+        self.assertEqual("live", self.claims.claim_state(nodo, self.ws.config["agent"]))
+
+    def test_claim_state_delegato_dead_a_lease_scaduto(self):
+        self.popola()
+        self.claims.claim(self.ref, "F01", on_behalf_of="codex-luna")
+        with self.store.transaction(self.ref.json_path) as data:
+            claim = self.model.node_of(data, "F01")["claim"]
+            claim["lease_until"] = (datetime.now().astimezone()
+                                    - timedelta(seconds=3600)).isoformat(timespec="seconds")
+        nodo = self.model.node_of(self.store.load(self.ref.json_path), "F01")
+        self.assertEqual("dead", self.claims.claim_state(nodo, self.ws.config["agent"]))
+
     def test_close_rifiuta_un_claim_remoto_fresco(self):
         self.popola()
         self.rispondi("F01")

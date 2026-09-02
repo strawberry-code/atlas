@@ -34,6 +34,19 @@ _config_sandbox: Path | None = None
 E2E_IDENTITY = "e2e-session"
 
 
+def _env(**overrides: str) -> dict:
+    """Ambiente per i sottoprocessi della sandbox e2e.
+
+    Parte da os.environ ma scarta ogni ATLAS_* ereditato: se questa suite gira
+    dentro un agente lanciato da 'atlas run', il runner gli ha esportato
+    ATLAS_ROOT/ATLAS_GRAPH del grafo vero, e senza questo filtro i sottoprocessi
+    in sandbox li ereditano e finiscono per rivendicare un nodo del grafo vero
+    con l'identita' e2e-session invece di lavorare nella sandbox isolata.
+    """
+    base = {k: v for k, v in os.environ.items() if not k.startswith("ATLAS_")}
+    return {**base, **overrides}
+
+
 def verifica(condizione: bool, cosa: str) -> None:
     esiti.append((bool(condizione), cosa))
     print(f"  {'ok  ' if condizione else 'ROTTO'} {cosa}")
@@ -62,7 +75,7 @@ def payload_pyc() -> list[str]:
 def locale(cwd: Path, *args: str) -> subprocess.CompletedProcess:
     """I comandi del grafo: dalla 0.7 li fa lo stesso eseguibile, dentro il progetto."""
     return subprocess.run([sys.executable, str(CLI), *args], cwd=cwd,
-                          env=dict(os.environ, ATLAS_CONFIG=str(_config_sandbox),
+                          env=_env(ATLAS_CONFIG=str(_config_sandbox),
                                    ATLAS_IDENTITY=E2E_IDENTITY),
                           capture_output=True, text=True)
 
@@ -91,7 +104,7 @@ def main() -> int:
     atlas_home = Path(tempfile.mkdtemp())
     atlas_config = atlas_home / "atlas.json"
     _config_sandbox = atlas_config
-    env = dict(os.environ, ATLAS_CONFIG=str(atlas_config), ATLAS_IDENTITY=E2E_IDENTITY)
+    env = _env(ATLAS_CONFIG=str(atlas_config), ATLAS_IDENTITY=E2E_IDENTITY)
     try:
         prepara(target)
         print(f"\n  progetto finto in {target} · ATLAS_CONFIG in {atlas_config}\n")
@@ -240,7 +253,7 @@ def verifica_install_in_inglese() -> None:
     """Un progetto installato da zero con --lang en produce ticket in inglese dal primo grafo."""
     target = Path(tempfile.mkdtemp())
     atlas_home = Path(tempfile.mkdtemp())
-    env = dict(os.environ, ATLAS_CONFIG=str(atlas_home / "atlas.json"))
+    env = _env(ATLAS_CONFIG=str(atlas_home / "atlas.json"))
     try:
         subprocess.run(["git", "init", "-q"], cwd=target, check=True)
         globale(target, "install", str(target), "--yes", "--lang", "en", "--graph", "demo", env=env)
@@ -273,7 +286,7 @@ def verifica_migrazione_dal_motore_a_sorgenti() -> None:
     """
     target = Path(tempfile.mkdtemp())
     atlas_home = Path(tempfile.mkdtemp())
-    env = dict(os.environ, ATLAS_CONFIG=str(atlas_home / "atlas.json"))
+    env = _env(ATLAS_CONFIG=str(atlas_home / "atlas.json"))
     try:
         subprocess.run(["git", "init", "-q"], cwd=target, check=True)
         globale(target, "install", str(target), "--yes", "--graph", "epic-test", env=env)
@@ -310,7 +323,7 @@ def verifica_uninstall() -> None:
     """uninstall toglie Atlas e lascia i dati: e' la promessa scritta nel messaggio."""
     target = Path(tempfile.mkdtemp())
     atlas_home = Path(tempfile.mkdtemp())
-    env = dict(os.environ, ATLAS_CONFIG=str(atlas_home / "atlas.json"))
+    env = _env(ATLAS_CONFIG=str(atlas_home / "atlas.json"))
     try:
         subprocess.run(["git", "init", "-q"], cwd=target, check=True)
         globale(target, "install", str(target), "--yes", "--graph", "epic-test", env=env)
@@ -379,7 +392,7 @@ def verifica_update_riallinea_i_progetti() -> None:
         fixture.routes["/asset/atlas"] = (200, blob, "application/octet-stream")
         fixture.routes["/asset/atlas.sha256"] = (
             200, f"{hashlib.sha256(blob).hexdigest()}  atlas\n".encode("utf-8"), "text/plain")
-        env = dict(os.environ, ATLAS_CONFIG=str(sandbox / "registro.json"),
+        env = _env(ATLAS_CONFIG=str(sandbox / "registro.json"),
                    ATLAS_UPDATE_BASE_URL=fixture.base_url)
 
         def atlas(*args):
@@ -436,7 +449,7 @@ def verifica_file_rotti() -> None:
     """
     target = Path(tempfile.mkdtemp())
     atlas_home = Path(tempfile.mkdtemp())
-    env = dict(os.environ, ATLAS_CONFIG=str(atlas_home / "atlas.json"))
+    env = _env(ATLAS_CONFIG=str(atlas_home / "atlas.json"))
     try:
         subprocess.run(["git", "init", "-q"], cwd=target, check=True)
         globale(target, "install", str(target), "--yes", "--graph", "epic-test", env=env)
@@ -477,7 +490,7 @@ def verifica_hook_una_volta_sola() -> None:
     """Install e' idempotente sull'hook, uninstall lo toglie, quelli di altri restano."""
     target = Path(tempfile.mkdtemp())
     atlas_home = Path(tempfile.mkdtemp())
-    env = dict(os.environ, ATLAS_CONFIG=str(atlas_home / "atlas.json"))
+    env = _env(ATLAS_CONFIG=str(atlas_home / "atlas.json"))
     impostazioni = target / ".claude" / "settings.json"
 
     def gruppi() -> list:
@@ -530,7 +543,7 @@ def verifica_uscita_non_utf8() -> None:
     si scrive su file o in pipe, dove cp1252 non sa rappresentare i nostri caratteri."""
     target = Path(tempfile.mkdtemp())
     atlas_home = Path(tempfile.mkdtemp())
-    env = dict(os.environ, ATLAS_CONFIG=str(atlas_home / "atlas.json"), PYTHONIOENCODING="ascii")
+    env = _env(ATLAS_CONFIG=str(atlas_home / "atlas.json"), PYTHONIOENCODING="ascii")
     try:
         subprocess.run(["git", "init", "-q"], cwd=target, check=True)
         globale(target, "install", str(target), "--yes", "--graph", "epic-test", env=env)
@@ -558,7 +571,7 @@ def verifica_scrittura_e_conflitti() -> None:
     """La scrittura atomica vista da fuori, e il rifiuto quando la premessa e' scaduta."""
     target = Path(tempfile.mkdtemp())
     atlas_home = Path(tempfile.mkdtemp())
-    env = dict(os.environ, ATLAS_CONFIG=str(atlas_home / "atlas.json"))
+    env = _env(ATLAS_CONFIG=str(atlas_home / "atlas.json"))
     global _config_sandbox
     _config_sandbox = atlas_home / "atlas.json"
     try:

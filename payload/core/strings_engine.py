@@ -36,8 +36,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "it": "retry non avviato: il nodo {id} ha ancora un agente attivo",
         "en": "retry not started: node {id} still has an active agent"},
     "automata.retry_exhausted": {
-        "it": "run non riuscito: retry esauriti o errore permanente sui nodi: {ids}",
-        "en": "run failed: retries exhausted or permanent error on nodes: {ids}"},
+        "it": "run non riuscito: retry esauriti o errore permanente sui nodi: {ids}. "
+              "Se la causa e' risolta, rimuovi la voce del nodo (o il file) da {path} "
+              "prima di rilanciare: il budget resta segnato esaurito da un run precedente.",
+        "en": "run failed: retries exhausted or permanent error on nodes: {ids}. "
+              "If the cause is fixed, remove the node's entry (or the file) at {path} "
+              "before relaunching: the budget stays marked exhausted from a previous run."},
     "automata.invalid_termination": {
         "it": "run non terminabile: la frontiera e' vuota ma restano nodi non terminali",
         "en": "run cannot terminate: the frontier is empty but non-terminal nodes remain"},

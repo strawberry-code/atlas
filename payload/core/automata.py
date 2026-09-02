@@ -371,7 +371,8 @@ def _execute(run: Run, launcher: Launcher, wait_for: Waiter | None = None,
                        if run.retry_state.terminal(node_id)]:
             _attendi_interazione(run, node_of(data, falliti[0]), "run-stopped",
                                  interaction_waiter, now(), ", ".join(falliti))
-            raise RunnerError(t("automata.retry_exhausted", ids=", ".join(falliti)))
+            raise RunnerError(t("automata.retry_exhausted", ids=", ".join(falliti),
+                                path=run.graph.retry_state_path))
         if aperti := blocked(data):
             _frontier_event(run, data, now(), status="blocked",
                             reason=f"residual blockers: {', '.join(n['id'] for n in aperti)}")

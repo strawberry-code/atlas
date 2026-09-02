@@ -89,9 +89,18 @@ def claim_state(node: dict, agent: dict) -> str:
     col PID: il lease e' la lente, e non c'e' idle remoto (un processo vivo ma
     quieto non e' osservabile da un'altra macchina). Per un claim locale resta la
     verifica sul PID con l'idle su idle_hours. Un claim remoto senza lease_until
-    vale come fresco, mai come morto: nel dubbio si lascia lavorare."""
+    vale come fresco, mai come morto: nel dubbio si lascia lavorare.
+
+    Un claim preso con on_behalf_of (Automata, per conto del provider che lancia)
+    non porta il PID di chi lavora davvero (claim() lo scrive a None apposta): la
+    verifica sul processo direbbe sempre morto un lucchetto vivo. Il flag
+    'delegated' distingue questo caso da un claim normale senza PID noto (per
+    esempio preso fuori da Claude Code, senza CLAUDE_PID in ambiente), che resta
+    prudentemente 'dead' come prima. Per un claim delegato la lente e' il lease,
+    come per un claim remoto."""
     h = holder(node)
-    if h.get("host") and h["host"] != _host():
+    remoto = h.get("host") and h["host"] != _host()
+    if remoto or h.get("delegated"):
         return "live" if fresco(_epoch_da_iso(h.get("lease_until"))) else "dead"
     if not alive(h.get("pid"), agent["process_name"]):
         return "dead"
@@ -289,7 +298,8 @@ def claim(ref: Graph, node_id: str, assignee: str | None = None, force: bool = F
         ora = _adesso().isoformat(timespec="seconds")
         node.update(status=CLAIMED, assignee=assignee or agent["default_assignee"],
                     claim={"pid": pid, "session": sid, "identity": me, "host": _host(),
-                           "at": ora, "heartbeat": ora, "lease_until": _lease_until(ttl)})
+                           "at": ora, "heartbeat": ora, "lease_until": _lease_until(ttl),
+                           "delegated": bool(on_behalf_of)})
         # Dopo l'update, non prima: il nodo che l'agente si porta via e' questo, con
         # status e assignee gia' cambiati. L'impronta esclude claim, quindi scriverla
         # li' dentro non la invalida.
