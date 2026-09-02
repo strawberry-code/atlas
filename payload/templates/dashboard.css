@@ -131,13 +131,15 @@
 html{scrollbar-color:var(--border-strong) transparent;height:100%}
 body{
   margin:0;height:100vh;overflow:hidden;color:var(--ink);background:var(--bg);
-  display:grid;grid-template-rows:54px 1fr;grid-template-columns:332px 1fr;
-  grid-template-areas:"top top" "side map";
+  display:grid;grid-template-rows:54px 1fr;grid-template-columns:332px 1fr minmax(230px,296px);
+  grid-template-areas:"top top top" "side map notif";
   font:12.5px/1.5 ui-monospace,'SF Mono',SFMono-Regular,Menlo,Consolas,'Cascadia Mono',monospace;
 }
+:root[data-notifiche="chiuso"] body{grid-template-columns:332px 1fr 46px}
 @media (max-width: 880px){
-  body{grid-template-rows:54px minmax(0,38vh) 1fr;grid-template-columns:minmax(0,1fr);
-    grid-template-areas:"top" "side" "map"}
+  body{grid-template-rows:54px minmax(0,38vh) 1fr minmax(0,26vh);grid-template-columns:minmax(0,1fr);
+    grid-template-areas:"top" "side" "map" "notif"}
+  :root[data-notifiche="chiuso"] body{grid-template-columns:minmax(0,1fr);grid-template-rows:54px minmax(0,38vh) 1fr 44px}
 }
 
 /* ---------- intestazione ---------- */
@@ -243,6 +245,80 @@ li b{color:var(--ink);font-weight:700;font-size:11px;transition:color .15s ease}
   scrollbar-color:var(--border-strong) transparent}
 
 .firma{margin-top:auto;padding:8px 2px 0;color:var(--faint);font-size:9.5px;line-height:1.5}
+
+/* ---------- pannello Notifiche: destro, compatto, richiudibile ---------- */
+.notifiche{
+  grid-area:notif;min-height:0;min-width:0;overflow-y:auto;background:var(--bg);
+  border-left:1px solid var(--border);display:flex;flex-direction:column;z-index:2;
+  scrollbar-width:thin;scrollbar-color:var(--border-strong) transparent;
+}
+@media (max-width: 880px){.notifiche{border-left:none;border-top:1px solid var(--border)}}
+.notifiche-toggle{
+  all:unset;box-sizing:border-box;display:flex;align-items:center;gap:8px;cursor:pointer;
+  padding:13px 14px;border-bottom:1px solid var(--border);flex:none;
+}
+.notifiche-toggle:hover{background:var(--code-bg)}
+.notifiche-toggle .bell{width:14px;height:14px;flex:none;color:var(--muted)}
+.notifiche-toggle h2{margin:0;flex:1}
+.notifiche-toggle .chev{width:12px;height:12px;color:var(--faint);flex:none;transition:transform .15s ease}
+:root[data-notifiche="chiuso"] .notifiche-toggle .chev{transform:rotate(180deg)}
+:root[data-notifiche="chiuso"] .notifiche-toggle{flex-direction:column;padding:14px 6px;gap:8px}
+:root[data-notifiche="chiuso"] .notifiche-toggle h2{display:none}
+:root[data-notifiche="chiuso"] .notifiche-corpo{display:none}
+.badge{
+  background:var(--st-frontier-bg);color:var(--st-frontier-tx);border:1px solid var(--st-frontier);
+  font-size:9.5px;font-weight:700;padding:1px 6px;line-height:1.5;flex:none;
+}
+.notifiche-corpo{padding:12px;display:flex;flex-direction:column;gap:14px;overflow-y:auto}
+.notif-canali{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.pairing-telegram{
+  border:1px solid var(--border-strong);background:var(--pane-2);color:var(--ink);
+  font:inherit;font-size:10.5px;font-weight:600;padding:6px 10px;cursor:pointer;
+  transition:border-color .15s ease,color .15s ease;
+}
+.pairing-telegram:hover{border-color:var(--accent);color:var(--accent)}
+.pairing-telegram:disabled{opacity:.5;cursor:default;pointer-events:none}
+.pairing-stato{font-size:10px;color:var(--muted)}
+.pairing-stato.pairing-ok{color:var(--st-closed-tx)}
+.pairing-stato.pairing-errore{color:var(--st-out-of-scope-tx)}
+.notif-sezione h3{
+  margin:0 0 8px;font-size:9.5px;font-weight:700;letter-spacing:.14em;color:var(--muted);
+  text-transform:uppercase;
+}
+.notif-vuoto{margin:0;color:var(--faint);font-size:10.5px;font-style:italic}
+.notif-sezione ul{display:flex;flex-direction:column;gap:8px}
+.notif-card{
+  display:block;background:linear-gradient(180deg,var(--pane),var(--pane-2));border:1px solid var(--border);
+  padding:10px 11px;cursor:pointer;transition:border-color .15s ease;
+}
+.notif-card:hover{border-color:var(--border-strong)}
+.notif-card.notif-attenzione{border-left:3px solid var(--st-frontier)}
+.notif-card.notif-contesto{cursor:default;border-style:dashed}
+.notif-card.notif-contesto:hover{border-color:var(--border)}
+.notif-card.notif-chiusa{opacity:.78}
+.notif-card.notif-evidenzia{outline:2px solid var(--accent);outline-offset:2px}
+.notif-testo{margin:0;color:var(--ink);font-size:11.5px;line-height:1.5}
+.notif-meta{margin:6px 0 0;display:flex;gap:6px;align-items:center}
+.notif-meta .tag{margin-left:0;max-width:none;overflow:visible;text-overflow:clip}
+.notif-meta .tag:last-child{margin-left:auto}
+.notif-meta .tag.urgente{color:var(--st-frontier-tx)}
+.notif-azioni{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px}
+.notif-azioni button{
+  flex:1;border:1px solid var(--border-strong);background:var(--pane-2);color:var(--ink);
+  font:inherit;font-size:10.5px;font-weight:600;padding:6px 8px;cursor:pointer;
+  transition:border-color .15s ease,color .15s ease;
+}
+.notif-azioni button:hover{border-color:var(--accent);color:var(--accent)}
+.notif-azioni button:disabled{opacity:.5;cursor:default;pointer-events:none}
+.notif-errore-testo{flex:0 0 100%;margin:0;color:var(--st-frontier-tx);font-size:10px}
+.notif-log{margin-top:8px}
+.notif-log summary{
+  font-size:9.5px;color:var(--muted);cursor:pointer;letter-spacing:.06em;
+  text-transform:uppercase;user-select:none;
+}
+.notif-log summary:hover{color:var(--ink)}
+.notif-log ul{margin:6px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:3px}
+.notif-log li{font-size:10px;color:var(--muted)}
 
 /* ---------- mappa del grafo ---------- */
 .map{grid-area:map;position:relative;min-width:0;min-height:0;overflow:hidden;background:var(--bg)}
@@ -457,8 +533,9 @@ body[data-filter] path.edge{opacity:.25}
 /* dalla riga alla mappa: il mouse su una voce dei pannelli (o su un id citato
    nell'avviso) mette a fuoco quel nodo e i suoi archi; le regole per-nodo
    stanno nello stile generato */
-body:has(.side [data-node]:hover) .map .n{opacity:.25}
-body:has(.side [data-node]:hover) .map :is(path.edge,circle.port){opacity:.12}
+body:has(.side [data-node]:hover) .map .n,body:has(.notifiche [data-node]:hover) .map .n{opacity:.25}
+body:has(.side [data-node]:hover) .map :is(path.edge,circle.port),
+body:has(.notifiche [data-node]:hover) .map :is(path.edge,circle.port){opacity:.12}
 
 a{text-decoration:none;color:inherit}
 
@@ -524,6 +601,10 @@ body.sheet-open .sheet{transform:none}
 .sheet-foot a{color:var(--accent);font-size:11px;letter-spacing:.04em}
 .sheet-foot a:hover{text-decoration:underline}
 .sheet-empty{color:var(--faint);font-style:italic}
+.sheet-artifacts{margin:0;padding:0 22px 14px;list-style:none;flex:none;display:flex;flex-direction:column;gap:4px}
+.sheet-artifacts:empty{display:none;padding:0}
+.sheet-artifacts-label{font-size:9.5px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.sheet-artifacts code{font-size:10.5px;color:var(--ink);word-break:break-all}
 
 /* markdown renderizzato nella scheda: qui si legge, quindi sans */
 .md{font:13.5px/1.65 ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;

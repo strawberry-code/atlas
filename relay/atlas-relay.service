@@ -1,0 +1,22 @@
+[Unit]
+Description=Atlas Relay (isolato, D02)
+After=network.target
+
+[Service]
+Type=simple
+User=atlas-relay
+Group=atlas-relay
+WorkingDirectory=/opt/atlas-relay/current
+ExecStart=/usr/bin/python3 /opt/atlas-relay/current/atlas_relay.py
+Environment=ATLAS_RELAY_HOST=127.0.0.1
+Environment=ATLAS_RELAY_PORT=8765
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/atlas-relay
+
+[Install]
+WantedBy=multi-user.target

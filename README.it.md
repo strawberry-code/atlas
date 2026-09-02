@@ -71,6 +71,10 @@ Usa `atlas run-status` per leggere gli stati `active`, `waiting`, `failed`, `blo
 
 Un modo di orchestrare più nodi insieme, se il progetto ne ha molti prendibili: una sessione "principale" che guarda la frontiera e coordina, i nodi AFK delegati a sotto-agenti che lavorano in parallelo e scrivono i risultati nei rispettivi ticket, i nodi HITL riservati a una sessione dedicata. Non è una funzione del motore, è un modo di usarlo: Atlas resta la fonte di verità su cosa è fatto, chi coordina sopra è libero di organizzarsi come preferisce.
 
+## Atlas Interactions
+
+Il pannello Notifiche sulla destra della dashboard trasforma nodi HITL, run bloccati, retry esauriti e END in card azionabili, risolte con `atlas serve` attivo, senza polling: una risposta valida risveglia Automata subito al commit. Gli avvisi browser e di sistema funzionano senza configurazione; un profilo Himalaya già configurato sulla macchina aggiunge alert ed escalation via email; un bottone di pairing Telegram one-tap (nessun token, chat ID o hostname da digitare) aggiunge azioni con bottoni inline tramite un Atlas Relay opt-in. Setup, diagnostica e prerequisiti di deploy del relay Telegram sono in `docs/atlas-interactions-quickstart.md`.
+
 ## Installare il CLI
 
 ```bash

@@ -99,6 +99,10 @@ class Graph:
         return self.dir / "run-state.json"
 
     @property
+    def notify_state_path(self) -> Path:
+        return self.dir / "notify-state.json"
+
+    @property
     def map_path(self) -> Path:
         return self.dir / "map.md"
 

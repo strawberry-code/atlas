@@ -17,16 +17,34 @@ deve appendersi a ogni pagina servita.
 Un solo filo di guardia fa la ronda sul grafo e annuncia ai collegati; le
 richieste HTTP cascano sui thread del ThreadingHTTPServer. Niente dipendenze:
 http.server, socketserver, threading e webbrowser sono tutti stdlib.
+
+'atlas serve' e' anche l'unico posto dove un bottone del pannello Notifiche
+puo' rispondere davvero: POST /interactions/<id>/<action> applica l'azione al
+lifecycle atomico (interactions.resolve_interaction, dentro mutate.editing) e
+il commit e' cio' che risveglia Automata. Da un file aperto con 'atlas
+render' (file://) quei bottoni restano disabilitati in JS: non c'e' server a
+cui parlare.
+
+La stessa ronda che annuncia il reload prova anche il canale locale del
+coordinatore notifiche (serve_notify.avvisa, C02): un avviso di sistema senza
+nessuna configurazione, oltre al pannello e all'avviso browser che gia' vive
+in dashboard.js.
+
+'atlas serve' e' anche l'unico posto dove parte il pairing Telegram one-tap
+(serve_pairing.py, D05): POST/GET /pairing/telegram* parlano col relay al
+posto del browser, cosi' il bearer del relay non lascia mai questo processo.
 """
 from __future__ import annotations
 
 import hashlib
 import http.server
+import json
 import threading
 import time
 import webbrowser
+from urllib.parse import parse_qs, unquote, urlsplit
 
-from . import render, remotelock
+from . import render, remotelock, serve_actions, serve_notify, serve_pairing
 from .config import ConfigError, Graph
 from .store import StateError, read_transaction
 from .strings import t
@@ -72,6 +90,12 @@ class Dashboard:
         self._ultima_lettura = 0.0
         self._remoto_sporco = False       # una lettura remota nuova aspetta di entrare in pagina
         self._lucchetto = threading.Lock()
+
+    @property
+    def ref(self) -> Graph:
+        """Il grafo che questa dashboard serve: usato anche da chi mutua il
+        lifecycle su un'azione di card (do_POST), non solo da chi la disegna."""
+        return self._ref
 
     def _mtime_grafo(self) -> float | None:
         try:
@@ -178,6 +202,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._pagina()
         elif self.path == "/events":
             self._eventi()
+        elif urlsplit(self.path).path == serve_pairing.PERCORSO_STATO:
+            codice = (parse_qs(urlsplit(self.path).query).get("code") or [""])[0]
+            stato, payload = serve_pairing.stato(codice)
+            self._json(stato, payload)
         else:
             self.send_error(404)
 
@@ -196,6 +224,27 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(corpo)))
         self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+        self.wfile.write(corpo)
+
+    def do_POST(self) -> None:
+        if self.path == serve_pairing.PERCORSO_AVVIA:
+            stato, payload = serve_pairing.avvia(self.server.dash.ref)
+            self._json(stato, payload)
+            return
+        corrispondenza = serve_actions.PERCORSO.match(self.path)
+        if not corrispondenza:
+            self.send_error(404)
+            return
+        stato, payload = serve_actions.applica(
+            self.server.dash.ref, unquote(corrispondenza.group(1)), unquote(corrispondenza.group(2)))
+        self._json(stato, payload)
+
+    def _json(self, status: int, payload: dict) -> None:
+        corpo = json.dumps(payload).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(corpo)))
         self.end_headers()
         self.wfile.write(corpo)
 
@@ -241,6 +290,7 @@ def _watch(server: Server) -> None:
             pass                        # un trasporto che alza invece di rispondere: la ronda non muore
         if cambiato:
             server.spettatori.annuncia()
+            serve_notify.avvisa(server.dash.ref)   # canale locale (C02): niente da configurare
         server.fermo.wait(INTERVALLO)
 
 

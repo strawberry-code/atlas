@@ -552,6 +552,20 @@ class Artefatti(Base):
         self.assertEqual("", dati["nodes"]["F02"]["model"])
         self.assertIn("if (n.model)", html)
 
+    def test_dashboard_mostra_gli_artefatti_del_nodo_su_richiesta(self):
+        """Consultazione su richiesta (A02): gli artefatti viaggiano nella scheda
+        del ticket, incorporati nel JSON come il resto, mai nella card compatta."""
+        self.popola()
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.edit_node(g, "F01", artifacts=["payload/core/model.py"])
+        self.render_tutto()
+        html = self.ref.dashboard_path.read_text(encoding="utf-8")
+        isola = html.split('<script type="application/json" id="atlas-data">', 1)[1].split("</script>", 1)[0]
+        dati = json.loads(isola.replace("<\\/", "</"))
+        self.assertEqual(["payload/core/model.py"], dati["nodes"]["F01"]["artifacts"])
+        self.assertEqual([], dati["nodes"]["F02"]["artifacts"])
+        self.assertIn("sheet-artifacts", html)
+
     def test_dashboard_regge_un_grafo_vuoto(self):
         self.render_tutto()
         self.assertIn("<svg", self.ref.dashboard_path.read_text(encoding="utf-8"))

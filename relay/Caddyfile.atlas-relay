@@ -1,0 +1,11 @@
+# Blocco isolato per Atlas Relay (D02).
+#
+# Da includere nel Caddyfile principale con:
+#   import /etc/caddy/Caddyfile.atlas-relay
+#
+# Non contiene e non modifica i blocchi del bot WhenAGI o di Claude Proxy, che
+# restano nei loro file: questo file dichiara solo il proprio hostname e la
+# propria porta locale.
+{$RELAY_HTTPS_HOSTNAME} {
+    reverse_proxy 127.0.0.1:8765
+}

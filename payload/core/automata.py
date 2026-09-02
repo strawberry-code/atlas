@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import argparse
+import os
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
-from . import claims, interactions, mutate
+from . import capability, claims, interactions, mutate, relay_client, telegram_actions
 from .adapters import (
     DEFAULT_MODEL,
     FALLBACK_MODEL,
@@ -244,6 +246,7 @@ def execute(run: Run, launcher: Launcher, wait_for: Waiter | None = None,
         _event(run, "run-resumed", status="active", reason="previous run state recovered",
                node=None, provider=None, attempt=None, failure=None, next_at=None)
     _frontier_event(run, data, now())
+    fermo, tunnel = _avvia_tunnel_telegram(run)
     try:
         return _execute(run, launcher, wait_for, now, sleeper, interaction_waiter)
     except RunnerError as errore:
@@ -251,6 +254,35 @@ def execute(run: Run, launcher: Launcher, wait_for: Waiter | None = None,
         _event(run, "run-blocked" if status == "blocked" else "run-failed",
                status=status, reason=str(errore))
         raise
+    finally:
+        _ferma_tunnel_telegram(fermo, tunnel)
+
+
+def _avvia_tunnel_telegram(run: Run) -> tuple[threading.Event | None, threading.Thread | None]:
+    """Apre il tunnel D03 per questa sessione (D06) se il relay e la chiave
+    delle capability (D01) sono entrambi configurati nell'ambiente;
+    altrimenti il run procede come sempre, senza Telegram. Gira in un thread
+    demone: non deve mai impedire al processo di uscire."""
+    config = relay_client.da_ambiente(os.environ)
+    chiave = capability.da_ambiente(os.environ)
+    if config is None or chiave is None:
+        return None, None
+    fermo = threading.Event()
+    on_event = telegram_actions.gestore(run.graph, run.run_state.run_id, chiave, config)
+    thread = threading.Thread(
+        target=relay_client.esegui,
+        args=(config, run.graph.slug, run.run_state.run_id, on_event, fermo),
+        daemon=True,
+    )
+    thread.start()
+    return fermo, thread
+
+
+def _ferma_tunnel_telegram(fermo: threading.Event | None, thread: threading.Thread | None) -> None:
+    if fermo is None:
+        return
+    fermo.set()
+    thread.join(timeout=5.0)
 
 
 def _execute(run: Run, launcher: Launcher, wait_for: Waiter | None = None,

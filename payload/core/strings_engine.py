@@ -290,4 +290,10 @@ STRINGS: dict[str, dict[str, str]] = {
                                    "non è attivo: le macchine non si proteggono a vicenda",
                              "en": "the config declares lock.remote but the remote lock is "
                                    "not active: the machines don't protect each other"},
+
+    # --- telegram_actions.py (D06) ---
+    "telegram_actions.resolved": {"it": "Fatto: {label}.", "en": "Done: {label}."},
+    "telegram_actions.rejected": {
+        "it": "Questa richiesta non è più valida (scaduta o già risolta).",
+        "en": "This request is no longer valid (expired or already resolved)."},
 }

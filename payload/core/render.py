@@ -1,16 +1,17 @@
 """Dashboard: da graph.json a un HTML autoconsistente che si apre da disco.
 
-La pagina ha tre parti: l'intestazione coi numeri di sintesi, la colonna dei
-pannelli e il grafo come mappa navigabile. Nessuna risorsa remota: stile e
-comportamento (templates/dashboard.css e .js) viaggiano inline. Il disegno del
-grafo sta in render_svg.py, la scheda del ticket e i suoi dati in
-render_sheet.py: qui c'e' solo l'assemblaggio della pagina.
+La pagina ha quattro parti: l'intestazione coi numeri di sintesi, la colonna
+dei pannelli, il grafo come mappa navigabile e il pannello Notifiche a destra.
+Nessuna risorsa remota: stile e comportamento (templates/dashboard.css e .js)
+viaggiano inline. Il disegno del grafo sta in render_svg.py, la scheda del
+ticket e i suoi dati in render_sheet.py, le card delle Interactions in
+render_notifiche.py: qui c'e' solo l'assemblaggio della pagina.
 """
 from __future__ import annotations
 
 from html import escape
 
-from . import render_owners, render_panels, render_sheet, render_svg, render_table, theme
+from . import render_notifiche, render_owners, render_panels, render_sheet, render_svg, render_table, theme
 from .config import Graph
 from .model import claimed, frontier, progress
 from .risorse import leggi_template
@@ -103,7 +104,9 @@ def build(ref: Graph, data: dict, remoto: list[object] | None = None,
     stampo_prefs = ('<script>try{var t=localStorage.getItem("atlas-theme");'
                     'if(t)document.documentElement.dataset.theme=t;'
                     'var v=localStorage.getItem("atlas-view");'
-                    'if(v)document.documentElement.dataset.view=v}catch(e){}</script>')
+                    'if(v)document.documentElement.dataset.view=v;'
+                    'var n=localStorage.getItem("atlas-notifiche");'
+                    'if(n)document.documentElement.dataset.notifiche=n}catch(e){}</script>')
     return (
         f'<!doctype html><html lang="{current()}"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
@@ -112,6 +115,7 @@ def build(ref: Graph, data: dict, remoto: list[object] | None = None,
         f'{_topbar(ref, data, front, presi)}'
         f'<aside class="side">{render_panels.panels(ref, data, front, presi, gruppi, remoto=remoto, remoto_errore=remoto_errore)}</aside>'
         f'{_mappa(data, depth, front_ids, gruppi)}'
+        f'{render_notifiche.panel(ref, data)}'
         f'{render_table.table(data, front_ids)}'
         f'{render_sheet.sheet()}{render_sheet.data_island(ref, data, front_ids)}'
         f'<script>{leggi_template("dashboard.js")}</script>'

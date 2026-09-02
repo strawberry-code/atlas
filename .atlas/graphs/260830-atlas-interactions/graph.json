@@ -4,7 +4,7 @@
     "slug": "260830-atlas-interactions",
     "title": "Atlas Interactions",
     "destination": "Interazioni Atlas a basso attrito: pannello Notifiche, avvisi locali, email Himalaya e Telegram con relay OCI, risposta valida e ripresa Automata senza polling.",
-    "updated": "2026-08-30",
+    "updated": "2026-09-02",
     "notes": ["Issue #30. Tutti i nodi sono AFK e non specificano model: Automata usa Codex Luna di default.", "Il deploy Telegram richiede un bot, hostname e segreti OCI già approvati nel suo ambiente; il grafo li verifica ma non li crea né li espone."]
   },
   "branches": {
@@ -131,15 +131,18 @@
       "branch": "B",
       "type": "task",
       "mode": "AFK",
-      "status": "open",
+      "status": "closed",
       "assignee": null,
       "owner": [],
       "blockedBy": ["A03"],
       "question": "Deriva dal ledger i dati minimi per la dashboard, senza ricostruire lo stato dai log. Esponi urgenza, età, stato, nodo, run e azioni consentite.",
-      "answer": null,
+      "answer": "Proiezione dashboard del ledger Interaction: nuovo modulo interactions_view.project() con età, urgenza (timedelta residuo), stato, nodo, run e azioni consentite, senza rileggere gli eventi di audit",
       "claim": null,
-      "artifacts": [],
-      "createdAt": "2026-08-30T23:06:18+02:00"
+      "artifacts": ["dist/atlas", "dist/atlas.sha256", "payload/core/interactions_view.py", "tests/test_interactions_view.py"],
+      "createdAt": "2026-08-30T23:06:18+02:00",
+      "cost": null,
+      "closedBy": "claude",
+      "closedAt": "2026-09-01T12:15:58+02:00"
     },
     {
       "id": "B02",
@@ -147,15 +150,18 @@
       "branch": "B",
       "type": "task",
       "mode": "AFK",
-      "status": "open",
+      "status": "closed",
       "assignee": null,
       "owner": [],
       "blockedBy": ["A02", "B01"],
       "question": "Aggiungi un pannello destro stiloso, compatto e richiudibile, con badge, attenzione richiesta, in attesa e risolte oggi. Ogni card deve spiegare in una frase cosa serve e offrire al massimo due azioni primarie.",
-      "answer": null,
+      "answer": "Pannello destro Notifiche: compatto, richiudibile, badge, tre sezioni (attenzione richiesta/in attesa/risolte oggi), card a una frase con al massimo due azioni",
       "claim": null,
-      "artifacts": [],
-      "createdAt": "2026-08-30T23:06:18+02:00"
+      "artifacts": ["payload/core/render_notifiche.py", "payload/core/interactions_view.py", "payload/core/render.py", "payload/core/strings_docs.py", "payload/templates/dashboard.css", "payload/templates/dashboard.js", "tests/test_render_notifiche.py", "tests/test_interactions_view.py", "dist/atlas", "dist/atlas.sha256", ".atlas/graphs/260830-atlas-interactions/tickets/B02.md"],
+      "createdAt": "2026-08-30T23:06:18+02:00",
+      "cost": null,
+      "closedBy": "claude",
+      "closedAt": "2026-09-01T13:01:37+02:00"
     },
     {
       "id": "B03",
@@ -163,15 +169,18 @@
       "branch": "B",
       "type": "task",
       "mode": "AFK",
-      "status": "open",
+      "status": "closed",
       "assignee": null,
       "owner": [],
       "blockedBy": ["A04", "B02"],
       "question": "Collega le azioni del pannello al lifecycle atomico e alla ripresa di Automata. Mostra contesto, artefatti e log solo su richiesta; rendi impossibili doppio invio e azioni non ammesse.",
-      "answer": null,
+      "answer": "Bottoni del pannello Notifiche collegati al lifecycle atomico via POST /interactions/<id>/<action> in 'atlas serve'; il commit risveglia Automata come A05. Corretto un difetto di propagazione ereditato da B02 (un'azione apriva anche la scheda); azioni non ammesse e doppio invio impossibili lato server. Log di audit e artefatti del nodo ora consultabili su richiesta.",
       "claim": null,
-      "artifacts": [],
-      "createdAt": "2026-08-30T23:06:18+02:00"
+      "artifacts": ["payload/core/serve.py", "payload/core/serve_actions.py", "payload/core/render_notifiche.py", "payload/core/interactions_view.py", "payload/core/render_sheet.py", "payload/core/strings_docs.py", "payload/templates/dashboard.js", "payload/templates/dashboard.css", "tests/test_serve.py", "tests/test_render_notifiche.py", "tests/test_interactions_view.py", "tests/test_motore.py", "dist/atlas", "dist/atlas.sha256", ".atlas/graphs/260830-atlas-interactions/tickets/B03.md"],
+      "createdAt": "2026-08-30T23:06:18+02:00",
+      "cost": null,
+      "closedBy": "claude",
+      "closedAt": "2026-09-01T13:32:33+02:00"
     },
     {
       "id": "C01",
@@ -179,15 +188,18 @@
       "branch": "C",
       "type": "task",
       "mode": "AFK",
-      "status": "open",
+      "status": "closed",
       "assignee": null,
       "owner": [],
       "blockedBy": ["A03"],
       "question": "Implementa un modulo interno che trasforma Interazioni in consegne, deduplica, registra gli esiti e applica retry bounded. I default devono essere silenziosi sui successi intermedi e rumorosi solo quando serve una persona, il run fallisce o arriva END.",
-      "answer": null,
+      "answer": "Coordinatore notifiche: notify.py (plan/dispatch, NotifyState ledger JSON con dedup permanente) e channels.py (registro canali stile AdapterRegistry) implementati; retry bounded riusa retry.RetryPolicy/classify_failure; escalate falso solo su retry pending, vero su delivered/failed. 8 test nuovi, suite completa verde.",
       "claim": null,
-      "artifacts": [],
-      "createdAt": "2026-08-30T23:06:18+02:00"
+      "artifacts": ["payload/core/notify.py", "payload/core/channels.py", "tests/test_notify.py", "payload/core/config.py"],
+      "createdAt": "2026-08-30T23:06:18+02:00",
+      "cost": null,
+      "closedBy": "claude",
+      "closedAt": "2026-09-01T13:36:23+02:00"
     },
     {
       "id": "C02",
@@ -195,15 +207,18 @@
       "branch": "C",
       "type": "task",
       "mode": "AFK",
-      "status": "open",
+      "status": "closed",
       "assignee": null,
       "owner": [],
       "blockedBy": ["B01", "C01"],
       "question": "Invia avvisi locali senza setup quando il pannello ha una nuova Interazione rilevante. L'avviso deve riportare alla card giusta e non duplicare il rumore della dashboard.",
-      "answer": null,
+      "answer": "Avvisi locali senza setup: canale di sistema (notify_local.py) e canale browser (dashboard.js) agganciati alla ronda di 'atlas serve', dedup via NotifyState/localStorage, click sulla notifica browser che riporta alla card",
       "claim": null,
-      "artifacts": [],
-      "createdAt": "2026-08-30T23:06:18+02:00"
+      "artifacts": ["dist/atlas", "dist/atlas.sha256", "payload/core/notify_local.py", "payload/core/render_notifiche.py", "payload/core/serve.py", "payload/core/serve_notify.py", "payload/templates/dashboard.css", "payload/templates/dashboard.js", "tests/test_notify_local.py", "tests/test_render_notifiche.py", "tests/test_serve_notify.py"],
+      "createdAt": "2026-08-30T23:06:18+02:00",
+      "cost": null,
+      "closedBy": "?",
+      "closedAt": "2026-09-01T13:57:47+02:00"
     },
     {
       "id": "C03",
@@ -211,15 +226,18 @@
       "branch": "C",
       "type": "task",
       "mode": "AFK",
-      "status": "open",
+      "status": "closed",
       "assignee": null,
       "owner": [],
       "blockedBy": ["C01"],
       "question": "Invia alert ed escalation tramite un profilo Himalaya già configurato localmente. Non leggere mailbox, non interpretare risposte email e non scrivere credenziali in Atlas.",
-      "answer": null,
+      "answer": "Canale Himalaya per alert ed escalation: notify_himalaya.py (solo invio via 'himalaya message send', nessuna lettura mailbox, credenziali via env ATLAS_HIMALAYA_TO/ACCOUNT mai nel grafo) agganciato alla ronda di 'atlas serve' via serve_notify.py, dedup/retry riusati da C01",
       "claim": null,
-      "artifacts": [],
-      "createdAt": "2026-08-30T23:06:18+02:00"
+      "artifacts": ["payload/core/notify_himalaya.py", "tests/test_notify_himalaya.py", "payload/core/serve_notify.py", "tests/test_serve_notify.py", "dist/atlas", "dist/atlas.sha256", ".atlas/graphs/260830-atlas-interactions/tickets/C03.md"],
+      "createdAt": "2026-08-30T23:06:18+02:00",
+      "cost": null,
+      "closedBy": "claude",
+      "closedAt": "2026-09-01T14:18:22+02:00"
     },
     {
       "id": "D01",
@@ -227,15 +245,18 @@
       "branch": "D",
       "type": "task",
       "mode": "AFK",
-      "status": "open",
+      "status": "closed",
       "assignee": null,
       "owner": [],
       "blockedBy": ["A03", "A04"],
       "question": "Definisci un tunnel uscente autenticato dal client Atlas al relay OCI e capability opache, monouso, firmate e a scadenza. Il relay può trasportare azioni ma non conserva né autorizza lo stato del grafo.",
-      "answer": null,
+      "answer": "Protocollo definito: tunnel outbound client-relay in stile SSE su HTTPS (no WebSocket, no polling), autenticato con bearer per-progetto; capability token opachi HMAC-firmati, monouso e a scadenza <= quella dell'Interaction, emessi e verificati solo dal client, mai dal relay",
       "claim": null,
       "artifacts": [],
-      "createdAt": "2026-08-30T23:06:18+02:00"
+      "createdAt": "2026-08-30T23:06:18+02:00",
+      "cost": null,
+      "closedBy": "claude",
+      "closedAt": "2026-09-01T14:12:09+02:00"
     },
     {
       "id": "D02",
@@ -243,15 +264,18 @@
       "branch": "D",
       "type": "task",
       "mode": "AFK",
-      "status": "open",
+      "status": "closed",
       "assignee": null,
       "owner": [],
       "blockedBy": ["A01", "D01"],
       "question": "Implementa e distribuisci un servizio relay isolato dietro Caddy e systemd, con health check e rollback. Procedi soltanto dopo A01 e non toccare il bot WhenAGI o Claude Proxy esistenti.",
-      "answer": null,
+      "answer": "Servizio relay isolato e tubatura di deploy (systemd/Caddy, health check, rollback automatico) implementati e testati in isolamento; deploy reale non eseguito perché il gate di A01 (bot Telegram/hostname HTTPS approvati) è ancora chiuso in questo ambiente",
       "claim": null,
-      "artifacts": [],
-      "createdAt": "2026-08-30T23:06:18+02:00"
+      "artifacts": ["relay/atlas_relay.py", "relay/deploy.py", "relay/atlas-relay.service", "relay/Caddyfile.atlas-relay", "relay/README.md", "tests/test_relay.py", ".atlas/graphs/260830-atlas-interactions/tickets/D02.md"],
+      "createdAt": "2026-08-30T23:06:18+02:00",
+      "cost": null,
+      "closedBy": "claude",
+      "closedAt": "2026-09-01T14:27:57+02:00"
     },
     {
       "id": "D03",
@@ -259,15 +283,18 @@
       "branch": "D",
       "type": "task",
       "mode": "AFK",
-      "status": "open",
+      "status": "closed",
       "assignee": null,
       "owner": [],
       "blockedBy": ["D01"],
       "question": "Implementa nel client Atlas la connessione uscente resiliente al relay, con riconnessione, identità di run e assenza di polling. Una disconnessione non deve inventare chiusure né perdere lo stato Atlas.",
-      "answer": null,
+      "answer": "Connessione uscente resiliente client-relay (D03): payload/core/relay_client.py (riconnessione con backoff esponenziale e full jitter, identità di sessione graph/runId, nessun polling, zero import verso interactions/mutate/run_state quindi una disconnessione non può inventare chiusure né toccare lo stato Atlas) e relay/tunnel.py + endpoint GET /tunnel su relay/atlas_relay.py (bearer, RegistroTunnel in memoria per sessione, nessuna coda di rimessaggio). Wiring in atlas serve/Automata e instradamento del sink Telegram lasciati a D06, che ha anche capability e pairing.",
       "claim": null,
-      "artifacts": [],
-      "createdAt": "2026-08-30T23:06:18+02:00"
+      "artifacts": ["payload/core/relay_client.py", "relay/tunnel.py", "relay/atlas_relay.py", "tests/test_relay_client.py", "tests/test_tunnel.py", "tests/test_relay.py", "dist/atlas", "dist/atlas.sha256", ".atlas/graphs/260830-atlas-interactions/tickets/D03.md"],
+      "createdAt": "2026-08-30T23:06:18+02:00",
+      "cost": null,
+      "closedBy": "claude",
+      "closedAt": "2026-09-02T07:22:45+02:00"
     },
     {
       "id": "D04",
@@ -275,15 +302,18 @@
       "branch": "D",
       "type": "task",
       "mode": "AFK",
-      "status": "open",
+      "status": "closed",
       "assignee": null,
       "owner": [],
       "blockedBy": ["D02"],
       "question": "Implementa l'adapter Telegram sul relay OCI: webhook HTTPS verificato, utenti non associati rifiutati e callback inline idempotenti. Mantieni il payload minimo e non loggare segreti o contenuto sensibile.",
-      "answer": null,
+      "answer": "Adapter Telegram lato relay (D04): webhook verificato via secret token, utenti non associati rifiutati con 200 silenzioso, callback inline deduplicati per update_id con ack sempre inviato; payload minimo, nessun log di segreti o contenuto sensibile",
       "claim": null,
-      "artifacts": [],
-      "createdAt": "2026-08-30T23:06:18+02:00"
+      "artifacts": ["relay/telegram_webhook.py", "relay/atlas_relay.py", "relay/deploy.py", "relay/README.md", "tests/test_telegram_webhook.py", "tests/test_relay.py"],
+      "createdAt": "2026-08-30T23:06:18+02:00",
+      "cost": null,
+      "closedBy": "claude",
+      "closedAt": "2026-09-01T14:45:20+02:00"
     },
     {
       "id": "D05",
@@ -291,15 +321,18 @@
       "branch": "D",
       "type": "task",
       "mode": "AFK",
-      "status": "open",
+      "status": "closed",
       "assignee": null,
       "owner": [],
       "blockedBy": ["B02", "D03", "D04"],
       "question": "Dal pannello Notifiche rendi possibile collegare Telegram con un solo bottone e un token di pairing monouso. L'utente non deve inserire token bot, chat ID, hostname o file di configurazione.",
-      "answer": null,
+      "answer": "Pairing Telegram one-tap dal pannello Notifiche: un bottone, un codice monouso persistito lato relay, nessun campo per token bot/chat ID/hostname; corretto anche un bug latente di D03 in deploy.py che non rsyncava tunnel.py.",
       "claim": null,
-      "artifacts": [],
-      "createdAt": "2026-08-30T23:06:18+02:00"
+      "artifacts": ["payload/core/serve_pairing.py", "payload/core/serve.py", "payload/core/render_notifiche.py", "payload/core/strings_docs.py", "payload/templates/dashboard.js", "payload/templates/dashboard.css", "relay/pairing.py", "relay/atlas_relay.py", "relay/telegram_webhook.py", "relay/deploy.py", "tests/test_pairing.py", "tests/test_serve_pairing.py", "tests/test_render_notifiche.py", "tests/test_relay.py", "tests/test_telegram_webhook.py", "tests/test_serve.py", "dist/atlas", "dist/atlas.sha256"],
+      "createdAt": "2026-08-30T23:06:18+02:00",
+      "cost": null,
+      "closedBy": "33493",
+      "closedAt": "2026-09-02T08:14:38+02:00"
     },
     {
       "id": "D06",
@@ -307,15 +340,18 @@
       "branch": "D",
       "type": "task",
       "mode": "AFK",
-      "status": "open",
+      "status": "closed",
       "assignee": null,
       "owner": [],
       "blockedBy": ["A04", "D03", "D04", "D05"],
       "question": "Fai attraversare a un tap Telegram il relay e il tunnel fino al lifecycle locale Atlas. Valida capability, utente, scadenza e idempotenza, aggiorna il messaggio Telegram e lascia Automata riprendere solo dopo la transazione riuscita.",
-      "answer": null,
+      "answer": "Tap Telegram inoltrato da relay/tunnel al lifecycle Atlas: capability D01 verificata (firma, scadenza, jti monouso), Interaction risolta dentro mutate.editing, messaggio Telegram aggiornato, Automata ripreso senza polling; deliver iniziale con bottoni segnalato in fog come gap non coperto da alcun nodo precedente",
       "claim": null,
-      "artifacts": [],
-      "createdAt": "2026-08-30T23:06:18+02:00"
+      "artifacts": ["payload/core/capability.py", "payload/core/telegram_actions.py", "payload/core/relay_client.py", "payload/core/automata.py", "payload/core/strings_engine.py", "payload/core/__init__.py", "relay/tunnel.py", "relay/telegram_webhook.py", "relay/atlas_relay.py", "relay/README.md", "tests/test_capability.py", "tests/test_telegram_actions.py", "tests/test_automata_tunnel.py", "tests/test_tunnel.py", "tests/test_telegram_webhook.py", "tests/test_relay.py", "tests/test_relay_client.py", "dist/atlas", "dist/atlas.sha256"],
+      "createdAt": "2026-08-30T23:06:18+02:00",
+      "cost": null,
+      "closedBy": "33493",
+      "closedAt": "2026-09-02T08:40:32+02:00"
     },
     {
       "id": "E01",
@@ -323,15 +359,18 @@
       "branch": "E",
       "type": "task",
       "mode": "AFK",
-      "status": "open",
+      "status": "closed",
       "assignee": null,
       "owner": [],
       "blockedBy": ["A05", "B03", "C02", "C03", "D06"],
       "question": "Copri con test unitari, integrazione ed end-to-end il percorso Automata, Interazione, UI, avviso locale, Himalaya, Telegram, tap remoto, aggiornamento della frontiera e ripresa. Verifica anche duplicati, scadenze, restart e disconnessioni.",
-      "answer": null,
+      "answer": "Verifica end-to-end: 732/732 unit test (729 preesistenti + 3 nuovi) e 97/97 e2e.py verdi; nuovo tests/test_verifica_e2e_interazioni.py con thread e server HTTP reali prova il risveglio Automata da un vero POST di 'atlas serve' e il comportamento di run_state su crash-a-meta'-attesa vs stop-pulito-su-HITL; Telegram outbound resta non verificabile perche' non esiste (gap gia' noto da D06)",
       "claim": null,
-      "artifacts": [],
-      "createdAt": "2026-08-30T23:06:18+02:00"
+      "artifacts": ["tests/test_verifica_e2e_interazioni.py", ".atlas/graphs/260830-atlas-interactions/tickets/E01.md"],
+      "createdAt": "2026-08-30T23:06:18+02:00",
+      "cost": null,
+      "closedBy": "33493",
+      "closedAt": "2026-09-02T09:01:30+02:00"
     },
     {
       "id": "E02",
@@ -339,15 +378,18 @@
       "branch": "E",
       "type": "task",
       "mode": "AFK",
-      "status": "open",
+      "status": "closed",
       "assignee": null,
       "owner": [],
       "blockedBy": ["B03", "C02", "C03", "D05", "D06"],
       "question": "Documenta un percorso di due minuti per vedere il primo alert, collegare Telegram con un bottone e capire una consegna mancata. Mantieni i dettagli relay e sicurezza fuori dal percorso principale, ma disponibili nella diagnostica.",
-      "answer": null,
+      "answer": "Quick start e diagnostica delle Interazioni in docs/atlas-interactions-quickstart.md: primo alert (locale/browser/Himalaya, tutti reali), pairing Telegram one-tap e diagnosi di una consegna mancata; i due gap noti (invio Telegram iniziale assente, deploy relay mai eseguito) dichiarati esplicitamente, non nascosti",
       "claim": null,
-      "artifacts": [],
-      "createdAt": "2026-08-30T23:06:18+02:00"
+      "artifacts": ["docs/atlas-interactions-quickstart.md", ".atlas/graphs/260830-atlas-interactions/tickets/E02.md"],
+      "createdAt": "2026-08-30T23:06:18+02:00",
+      "cost": null,
+      "closedBy": "33493",
+      "closedAt": "2026-09-02T09:16:18+02:00"
     },
     {
       "id": "E03",
@@ -355,15 +397,18 @@
       "branch": "E",
       "type": "task",
       "mode": "AFK",
-      "status": "open",
+      "status": "closed",
       "assignee": null,
       "owner": [],
       "blockedBy": ["E01", "E02"],
       "question": "Riesegui le suite complete, controlla sicurezza dei capability token, restart del relay, rollback, deduplica, documentazione e assenza di regressioni. Confronta la consegna con ogni requisito della issue #30.",
-      "answer": null,
+      "answer": "Suite 732/732 + 97/97 verdi su dist/atlas rigenerato (era rimasto disallineato da E02); capability/relay/dedup/rollback verificati solidi; corrette due lacune di documentazione (CLAUDE.md sulla rete in payload/, README su Interazioni); confermati e non toccati i gap noti (Telegram outbound, deploy reale, idempotenza per run) e il set di azioni ridotto rispetto alla issue #30",
       "claim": null,
-      "artifacts": [],
-      "createdAt": "2026-08-30T23:06:18+02:00"
+      "artifacts": ["CLAUDE.md", "README.it.md", "README.md", "dist/atlas", "dist/atlas.sha256"],
+      "createdAt": "2026-08-30T23:06:18+02:00",
+      "cost": null,
+      "closedBy": "33493",
+      "closedAt": "2026-09-02T09:35:49+02:00"
     },
     {
       "id": "END",
@@ -382,16 +427,100 @@
       "createdAt": "2026-08-30T23:06:18+02:00"
     }
   ],
-  "fog": ["La quota Codex e' esaurita fino al 30 settembre 2026: i run di questo periodo lavorano con Claude via fallback automatico, senza toccare il campo model dei nodi.", "per B01: Finche' i canali di avviso non esistono, una card aperta da Automata non la vede nessuno: il runner ora la lascia scadere in 15 minuti e chiude con la sua diagnosi.", "per C01: La coda degli eventi delle Interazioni vive in memoria di processo: una risposta scritta nel grafo da un altro processo sveglia il runner solo alla sua rilettura, ogni 30 secondi."],
+  "fog": ["La quota Codex e' esaurita fino al 30 settembre 2026: i run di questo periodo lavorano con Claude via fallback automatico, senza toccare il campo model dei nodi.", "per B01: Finche' i canali di avviso non esistono, una card aperta da Automata non la vede nessuno: il runner ora la lascia scadere in 15 minuti e chiude con la sua diagnosi.", "per C01: La coda degli eventi delle Interazioni vive in memoria di processo: una risposta scritta nel grafo da un altro processo sveglia il runner solo alla sua rilettura, ogni 30 secondi.", "per C02: gli avvisi locali (browser e sistema) partono dalla ronda di 'atlas serve', non dal runner Automata: se Automata gira senza dashboard servita, una nuova Interazione resta visibile solo nel grafo finche' qualcuno non apre 'atlas serve' o la dashboard scade da sola.", "Nessun canale Telegram lato client invia ancora la notifica iniziale con i bottoni (il deliver di D01): capability.emetti esiste (D06) ma nessuno lo chiama fuori dai test. Serve un TelegramChannel che implementi channels.Channel, generi una capability per bottone ed emetta un deliver via relay_client verso il chat_id risolto lato relay dal pairing (serve l'inverso di progetto_di).", "per A05: Rilanciare 'atlas run' prima di chiudere a mano un nodo HITL gia' notificato non riprende quel run: run_state chiude a 'failed' su uno stop pulito (terminale, non resumable), quindi il run successivo prende un run_id nuovo e apre una seconda card indipendente per lo stesso nodo (idempotenza A03 per run_id, non per nodo). Verificato con codice vero in tests/test_verifica_e2e_interazioni.py."],
   "outOfScope": [],
   "questions": [],
-  "interactions": [],
+  "interactions": [
+    {
+      "id": "I001",
+      "graph": "260830-atlas-interactions",
+      "runId": "d42e23752613",
+      "nodeId": "B01",
+      "event": "run-stopped",
+      "summary": "Il lavoro si e' fermato: B01, C01, D01.",
+      "allowedActions": [
+        {
+          "id": "retry",
+          "label": "Riprova",
+          "effect": "retry"
+        },
+        {
+          "id": "cancel",
+          "label": "Annulla",
+          "effect": "cancel"
+        }
+      ],
+      "expiresAt": "2026-09-01T12:07:53+02:00",
+      "idempotencyKey": "d42e23752613:B01:run-stopped",
+      "status": "expired",
+      "createdAt": "2026-09-01T11:52:53+02:00",
+      "updatedAt": "2026-09-01T12:07:54+02:00",
+      "resolution": null,
+      "events": [
+        {
+          "at": "2026-09-01T11:52:53+02:00",
+          "type": "opened",
+          "by": "33493"
+        },
+        {
+          "at": "2026-09-01T12:07:54+02:00",
+          "type": "expired",
+          "by": "33493"
+        }
+      ]
+    },
+    {
+      "id": "I002",
+      "graph": "260830-atlas-interactions",
+      "runId": "5d2048c9ffbb",
+      "nodeId": "D05",
+      "event": "run-stopped",
+      "summary": "Il lavoro si e' fermato: D05.",
+      "allowedActions": [
+        {
+          "id": "retry",
+          "label": "Riprova",
+          "effect": "retry"
+        },
+        {
+          "id": "cancel",
+          "label": "Annulla",
+          "effect": "cancel"
+        }
+      ],
+      "expiresAt": "2026-09-02T08:13:06+02:00",
+      "idempotencyKey": "5d2048c9ffbb:D05:run-stopped",
+      "status": "open",
+      "createdAt": "2026-09-02T07:58:06+02:00",
+      "updatedAt": "2026-09-02T07:58:06+02:00",
+      "resolution": null,
+      "events": [
+        {
+          "at": "2026-09-02T07:58:06+02:00",
+          "type": "opened",
+          "by": "33493"
+        }
+      ]
+    }
+  ],
   "releases": [
     {
       "id": "A04",
       "title": "Implementa lifecycle e risposta validata",
       "reason": "run Automata del 2026-08-30 interrotto: il nodo non fu mai lavorato",
       "at": "2026-08-31T09:47:13+02:00"
+    },
+    {
+      "id": "B02",
+      "title": "Costruisci il side panel Notifiche",
+      "reason": "run interrotto, lucchetto orfano",
+      "at": "2026-09-01T12:34:02+02:00"
+    },
+    {
+      "id": "D03",
+      "title": "Apri il tunnel Atlas verso il relay",
+      "reason": "claim fantasma della suite e2e, nessun lavoro svolto",
+      "at": "2026-09-02T07:02:29+02:00"
     }
   ]
 }

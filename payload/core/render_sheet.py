@@ -51,6 +51,7 @@ def data_island(ref: Graph, data: dict, front_ids: set[str]) -> str:
             "cost": n.get("cost") or "",
             "model": n.get("model") or "",
             "owner": owners_of(n),
+            "artifacts": n.get("artifacts") or [],
             "md": _ticket_md(ref, n["id"]),
         }
     # il marcatore, non il glifo nudo: per un nodo in lavorazione e' l'anello, lo
@@ -65,6 +66,7 @@ def sheet() -> str:
         '<div class="scrim"></div>'
         f'<aside class="sheet" role="dialog" aria-modal="true" data-empty="{escape(t("render.sheet_vuoto"))}"'
         f' data-owner-label="{escape(t("render.sheet_assegnato"))}"'
+        f' data-artefatti-label="{escape(t("render.sheet_artefatti"))}"'
         # le etichette del click-to-copy viaggiano nel markup, non nel JS, che resta
         # neutro di lingua: le rilegge da qui quando compone il titolo della scheda
         f' data-copia="{escape(t("render.copia"))}" data-copiato="{escape(t("render.copiato"))}">'
@@ -72,6 +74,7 @@ def sheet() -> str:
         f'<button type="button" class="sheet-close" aria-label="{escape(t("render.sheet_chiudi"))}">✕</button>'
         '<h2 class="sheet-title"></h2><p class="sheet-question"></p></header>'
         '<div class="sheet-body md"></div>'
+        '<ul class="sheet-artifacts"></ul>'
         f'<footer class="sheet-foot"><a class="sheet-raw" target="_blank">{t("render.sheet_apri_file")}</a></footer>'
         '</aside>'
     )

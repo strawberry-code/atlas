@@ -169,6 +169,205 @@ class Http(Base):
         self.assertTrue(ricevuto, "il canale /events non ha annunciato il reload")
 
 
+class Azioni(Base):
+    """POST /interactions/<id>/<action>: il pannello Notifiche parla col
+    lifecycle atomico (A04) e con la ripresa di Automata (A05) solo da qui."""
+
+    def _server(self):
+        dash = self.serve.Dashboard(self.ref)
+        dash.aggiorna()
+        server = self.serve.Server(("127.0.0.1", 0), self.serve.Handler)
+        server.dash = dash
+        server.spettatori = self.serve.Viewers()
+        server.fermo = threading.Event()
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(self._ferma, server)
+        return server
+
+    def _ferma(self, server):
+        server.fermo.set()
+        server.shutdown()
+        server.server_close()
+
+    def _url(self, server, percorso):
+        return f"http://127.0.0.1:{server.server_address[1]}{percorso}"
+
+    def _post(self, server, percorso):
+        richiesta = urllib.request.Request(self._url(server, percorso), method="POST")
+        return urllib.request.urlopen(richiesta, timeout=5)
+
+    def _apri_interaction(self):
+        from core import interactions
+
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.add_node(g, "A01", "Nodo", "A", "Domanda")
+        with self.mutate.editing(self.ref) as g:
+            record = interactions.open_interaction(
+                g, run_id="run-01", node_id="A01", event="decision-required",
+                summary="Serve una decisione per A01.",
+                allowed_actions=[
+                    {"id": "confirm", "label": "Conferma", "effect": "resume"},
+                    {"id": "decline", "label": "Rifiuta", "effect": "cancel"},
+                ],
+                expires_at="2099-01-01T00:00:00+00:00",
+                idempotency_key="run-01:A01:decision")
+        return record["id"]
+
+    def _record(self, interaction_id):
+        from core.store import load
+        return next(r for r in load(self.ref.json_path)["interactions"] if r["id"] == interaction_id)
+
+    def test_un_azione_consentita_risolve_l_interaction_nel_ledger(self):
+        interaction_id = self._apri_interaction()
+        server = self._server()
+
+        with self._post(server, f"/interactions/{interaction_id}/confirm") as risposta:
+            self.assertEqual(200, risposta.status)
+            self.assertEqual({"ok": True}, json.loads(risposta.read()))
+        self.assertEqual("resolved", self._record(interaction_id)["status"])
+
+    def test_un_azione_non_dichiarata_torna_409_senza_toccare_il_ledger(self):
+        interaction_id = self._apri_interaction()
+        server = self._server()
+
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            self._post(server, f"/interactions/{interaction_id}/acknowledge")
+        self.assertEqual(409, ctx.exception.code)
+        self.assertEqual("open", self._record(interaction_id)["status"])
+
+    def test_il_secondo_invio_trova_la_card_gia_chiusa(self):
+        interaction_id = self._apri_interaction()
+        server = self._server()
+
+        with self._post(server, f"/interactions/{interaction_id}/confirm") as risposta:
+            self.assertEqual(200, risposta.status)
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            self._post(server, f"/interactions/{interaction_id}/confirm")
+        self.assertEqual(409, ctx.exception.code)
+
+    def test_un_id_di_interaction_inesistente_torna_409_non_traceback(self):
+        server = self._server()
+
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            self._post(server, "/interactions/I999/confirm")
+        self.assertEqual(409, ctx.exception.code)
+
+    def test_un_percorso_malformato_da_404(self):
+        server = self._server()
+
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            self._post(server, "/interactions/I001")
+        self.assertEqual(404, ctx.exception.code)
+
+    def test_la_risoluzione_risveglia_chi_aspetta_in_process(self):
+        """Collega il pannello alla ripresa di Automata: resolve_interaction
+        dentro mutate.editing pubblica il ResolutionEvent che sblocca
+        wait_for_resolution, lo stesso meccanismo che usa il runner (A05)."""
+        from core import interactions
+
+        interaction_id = self._apri_interaction()
+        server = self._server()
+
+        risultato = []
+
+        def aspetta():
+            risultato.append(interactions.wait_for_resolution(self.ref.slug, "run-01", timeout=5))
+
+        ascolta = threading.Thread(target=aspetta)
+        ascolta.start()
+        time.sleep(0.2)   # lascia che wait_for_resolution si metta in coda
+
+        with self._post(server, f"/interactions/{interaction_id}/confirm") as risposta:
+            self.assertEqual(200, risposta.status)
+        ascolta.join(timeout=5)
+
+        self.assertEqual(1, len(risultato))
+        self.assertIsNotNone(risultato[0])
+        self.assertEqual(interaction_id, risultato[0].interaction_id)
+
+
+class Pairing(Base):
+    """POST/GET /pairing/telegram*: 'atlas serve' fa da tramite verso il relay
+    (D05), il browser non parla mai col relay direttamente. La logica vera di
+    serve_pairing.avvia/stato e' gia' testata in isolamento in
+    tests/test_serve_pairing.py: qui si controlla solo che Handler la chiami e
+    traduca il risultato in JSON."""
+
+    def _server(self):
+        dash = self.serve.Dashboard(self.ref)
+        dash.aggiorna()
+        server = self.serve.Server(("127.0.0.1", 0), self.serve.Handler)
+        server.dash = dash
+        server.spettatori = self.serve.Viewers()
+        server.fermo = threading.Event()
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(self._ferma, server)
+        return server
+
+    def _ferma(self, server):
+        server.fermo.set()
+        server.shutdown()
+        server.server_close()
+
+    def _url(self, server, percorso):
+        return f"http://127.0.0.1:{server.server_address[1]}{percorso}"
+
+    def test_avvia_chiama_serve_pairing_e_torna_il_suo_json(self):
+        from core import serve_pairing
+
+        chiamate = []
+        originale = serve_pairing.avvia
+
+        def finto(ref, env=None, opener=None):
+            chiamate.append(ref.slug)
+            return 200, {"ok": True, "url": "https://t.me/atlas_bot?start=abc", "code": "abc"}
+
+        serve_pairing.avvia = finto
+        self.addCleanup(setattr, serve_pairing, "avvia", originale)
+
+        server = self._server()
+        richiesta = urllib.request.Request(self._url(server, "/pairing/telegram"), method="POST")
+        with urllib.request.urlopen(richiesta) as risposta:
+            self.assertEqual(risposta.status, 200)
+            self.assertEqual(json.loads(risposta.read()),
+                              {"ok": True, "url": "https://t.me/atlas_bot?start=abc", "code": "abc"})
+        self.assertEqual(chiamate, [self.ref.slug])
+
+    def test_avvia_senza_relay_configurato_torna_503(self):
+        from core import serve_pairing
+
+        originale = serve_pairing.avvia
+        serve_pairing.avvia = lambda ref, env=None, opener=None: (503, {"ok": False})
+        self.addCleanup(setattr, serve_pairing, "avvia", originale)
+
+        server = self._server()
+        richiesta = urllib.request.Request(self._url(server, "/pairing/telegram"), method="POST")
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urllib.request.urlopen(richiesta)
+        self.assertEqual(ctx.exception.code, 503)
+
+    def test_stato_passa_il_codice_dalla_querystring(self):
+        from core import serve_pairing
+
+        chiamate = []
+        originale = serve_pairing.stato
+
+        def finto(codice, env=None, opener=None):
+            chiamate.append(codice)
+            return 200, {"ok": True, "status": "associato"}
+
+        serve_pairing.stato = finto
+        self.addCleanup(setattr, serve_pairing, "stato", originale)
+
+        server = self._server()
+        with urllib.request.urlopen(self._url(server, "/pairing/telegram/status?code=abc123")) as risposta:
+            self.assertEqual(risposta.status, 200)
+            self.assertEqual(json.loads(risposta.read()), {"ok": True, "status": "associato"})
+        self.assertEqual(chiamate, ["abc123"])
+
+
 class StubTrasporto:
     """Il trasporto finto per la vista: elenca() conta le chiamate e risponde con
     l'elenco che gli si da' (o Rete, o vuoto). Gli altri metodi del protocollo non

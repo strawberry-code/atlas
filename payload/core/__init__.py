@@ -3,4 +3,4 @@
 Il motore non conosce il progetto che lo ospita: riceve un Workspace da config e
 lavora sui path che quello gli dice. Nessuna dipendenza fuori dalla stdlib.
 """
-__all__ = ["adapters", "claims", "config", "docs", "interactions", "model", "mutate", "providers", "render", "retry", "run_state", "store", "theme"]
+__all__ = ["adapters", "capability", "claims", "config", "docs", "interactions", "model", "mutate", "providers", "relay_client", "render", "retry", "run_state", "store", "telegram_actions", "theme"]

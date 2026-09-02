@@ -70,6 +70,10 @@ Use `atlas run-status` to read `active`, `waiting`, `failed`, `blocked` or `comp
 
 One way to orchestrate several nodes at once, if the project has many available: a "main" session that watches the frontier and coordinates, AFK nodes delegated to sub-agents that work in parallel and write their results into their own tickets, HITL nodes reserved for a dedicated session. This isn't a feature of the engine, it's just one way of using it: Atlas stays the source of truth on what's done, whoever's coordinating on top is free to organize however they like.
 
+## Atlas Interactions
+
+The dashboard's right-side Notifications panel turns HITL nodes, blocked runs, exhausted retries and END into actionable cards, resolved with `atlas serve` running, no polling: a valid response resumes Automata straight from the commit. Browser and system notifications work with no setup; a Himalaya profile already configured on the machine adds email alerts and escalation; a one-tap Telegram pairing button (no token, chat ID or hostname to type in) adds inline-button actions through an opt-in Atlas Relay. Setup, diagnostics and the deploy prerequisites for the Telegram relay are in `docs/atlas-interactions-quickstart.md`.
+
 ## Installing the CLI
 
 ```bash

@@ -7,6 +7,8 @@ __pycache__/
 /atlascli/_payload.py
 # Coda locale degli attriti da sistemare, si svuota man mano che li chiudiamo
 /atlas-friction.md
+# Stato del pairing Telegram (D05), scritto a runtime dal relay: mai dati d'esempio da versionare
+/relay/state/
 
 # Atlas: artefatti rigenerabili
 .atlas/graphs/*/dashboard.html
