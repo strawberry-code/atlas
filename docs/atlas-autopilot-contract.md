@@ -1,8 +1,8 @@
-# Atlas Automata: contratto pubblico
+# Atlas Autopilot: contratto pubblico
 
 Versione del contratto: 1.
 
-Atlas Automata è un runner meccanico per eseguire il lavoro già descritto da un
+Atlas Autopilot è un runner meccanico per eseguire il lavoro già descritto da un
 grafo Atlas. Il runner coordina processi agentici, ma non ragiona al posto del
 grafo e non usa un LLM come orchestratore.
 
@@ -16,7 +16,7 @@ atlas run-log --tail 20
 
 ## Confini del contratto
 
-Il contratto riguarda una singola esecuzione di Automata, indicata qui come
+Il contratto riguarda una singola esecuzione di Autopilot, indicata qui come
 run. Il run riceve:
 
 - il grafo Atlas su cui lavorare;
@@ -27,7 +27,7 @@ Il valore `parallelism=1` significa esecuzione strettamente seriale: un solo
 agente può essere attivo e il nodo successivo non parte prima della chiusura del
 precedente. Un valore maggiore di `1` abilita parallelismo limitato: in ogni
 istante il numero di agenti attivi non supera il valore ricevuto. Il grafo non
-salva il parallelismo e Automata non introduce un default implicito. Un run che
+salva il parallelismo e Autopilot non introduce un default implicito. Un run che
 non riceve il parametro, o lo riceve non intero o non positivo, è invalido e
 deve essere rifiutato prima di avviare un agente.
 
@@ -35,7 +35,7 @@ deve essere rifiutato prima di avviare un agente.
 
 ### 1. Il runner è meccanico
 
-Automata non usa un LLM per scegliere i nodi, ordinare la coda, interpretare
+Autopilot non usa un LLM per scegliere i nodi, ordinare la coda, interpretare
 `blockedBy`, decidere se un nodo è eleggibile o dichiarare concluso il run.
 Queste decisioni derivano esclusivamente dallo stato Atlas e dalle sue
 operazioni di lettura e chiusura. Un adapter può usare un LLM per eseguire il
@@ -43,7 +43,7 @@ lavoro del nodo, ma non per sostituire la macchina a stati del runner.
 
 ### 2. La frontiera Atlas è la sorgente di verità
 
-Prima di ogni avvio Automata legge la frontiera Atlas del grafo attivo e lancia
+Prima di ogni avvio Autopilot legge la frontiera Atlas del grafo attivo e lancia
 solo nodi aperti i cui blocker risultano chiusi, nel rispetto del limite di
 parallelismo. Dopo ogni chiusura osservata rilegge il grafo e ricostruisce la
 frontiera. Una coda locale, un log del run o l'output di un agente possono
@@ -63,7 +63,7 @@ lavorerà non è quello: la sua liveness è il lease, che scade da solo.
 
 ### 3. Ogni agente è AFK
 
-Automata avvia ogni agente senza richiedere input umano durante il run. Il
+Autopilot avvia ogni agente senza richiedere input umano durante il run. Il
 processo agente esegue fuori sandbox e con bypass dei permessi, secondo il
 contratto dell'adapter selezionato. Un nodo HITL non è un'eccezione implicita:
 se il grafo lo contiene, il runner deve segnalarlo come incompatibile con un
@@ -96,7 +96,7 @@ credenziali già configurate, e riceve sempre questi valori minimi:
 - `ATLAS_ROOT`: cartella `.atlas` del progetto;
 - `ATLAS_GRAPH`: slug del grafo attivo;
 - `ATLAS_IDENTITY`: identità dell'adapter;
-- `ATLAS_AUTOMATA_NODE`: id del nodo rivendicato.
+- `ATLAS_AUTOPILOT_NODE`: id del nodo rivendicato.
 
 Il provider deve lavorare senza input umano, aggiornare Atlas usando il claim
 ricevuto, scrivere la risposta nel ticket e chiudere il nodo. Il processo
@@ -135,7 +135,7 @@ Il retry predefinito è bounded e usa un backoff esponenziale da 60 secondi fino
 
 ## Terminazione valida
 
-Automata può dichiarare un run completato con successo solo quando tutte le
+Autopilot può dichiarare un run completato con successo solo quando tutte le
 condizioni seguenti sono vere nello stesso stato osservato:
 
 1. la frontiera Atlas è vuota;
@@ -153,7 +153,7 @@ Atlas non mostra come terminale.
 
 ## Criteri di successo
 
-L'implementazione di Automata soddisfa questo contratto quando le verifiche
+L'implementazione di Autopilot soddisfa questo contratto quando le verifiche
 dimostrano che:
 
 - l'avvio rifiuta un `parallelism` mancante, non intero o non positivo;
@@ -174,9 +174,9 @@ persistente dello stato, del protocollo degli eventi di chiusura o
 dell'implementazione dei singoli adapter. Questi sono contratti tecnici separati
 che devono rispettare i confini qui stabiliti; i comandi pubblici, la politica di
 retry predefinita e la diagnosi descritti sopra sono invece parte della consegna
-di Automata.
+di Autopilot.
 
-Automata inoltre non modifica automaticamente la topologia Atlas, non inventa
+Autopilot inoltre non modifica automaticamente la topologia Atlas, non inventa
 blocker, non risponde a nodi HITL e non tratta una coda locale come una seconda
 fonte di verità. La selezione di un ordine di lavoro può essere deterministica
 e configurata, ma non può contraddire la frontiera del grafo.

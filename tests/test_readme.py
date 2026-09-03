@@ -91,11 +91,11 @@ class Readme(unittest.TestCase):
     def test_le_due_lingue_hanno_la_stessa_struttura(self):
         self.assertEqual(_titoli(IT), _titoli(EN), "una sezione e' stata aggiunta o tolta a meta'")
 
-    def test_automata_e_documentato_in_entrambi_i_readme(self):
+    def test_autopilot_e_documentato_in_entrambi_i_readme(self):
         requisiti = {
-            "README.md": ("Atlas Automata", "--parallelism", "Codex Luna", "Claude Sonnet",
+            "README.md": ("Atlas Autopilot", "--parallelism", "Codex Luna", "Claude Sonnet",
                            "AdapterRegistry", "outside the sandbox", "retryable"),
-            "README.it.md": ("Atlas Automata", "--parallelism", "Codex Luna", "Claude Sonnet",
+            "README.it.md": ("Atlas Autopilot", "--parallelism", "Codex Luna", "Claude Sonnet",
                               "AdapterRegistry", "fuori sandbox", "ritentabili"),
         }
         for path in (IT, EN):
@@ -105,15 +105,15 @@ class Readme(unittest.TestCase):
                     self.assertIn(requisito, testo)
             self.assertNotIn("�", testo)
 
-    def test_i_template_documentano_automata_in_entrambi_i_contratti_e_readme(self):
+    def test_i_template_documentano_autopilot_in_entrambi_i_contratti_e_readme(self):
         requisiti = {
-            CONTRACT_EN: ("Automata runs", "Codex Luna", "Claude Sonnet", "AgentAdapter",
+            CONTRACT_EN: ("Autopilot runs", "Codex Luna", "Claude Sonnet", "AgentAdapter",
                           "outside the sandbox", "retryable"),
-            CONTRACT_IT: ("Run Automata", "Codex Luna", "Claude Sonnet", "AgentAdapter",
+            CONTRACT_IT: ("Run Autopilot", "Codex Luna", "Claude Sonnet", "AgentAdapter",
                           "fuori sandbox", "ritentabili"),
-            README_TEMPLATE_EN: ("Automata runs", "--parallelism N", "Codex Luna", "Claude Sonnet",
+            README_TEMPLATE_EN: ("Autopilot runs", "--parallelism N", "Codex Luna", "Claude Sonnet",
                                  "AdapterRegistry", "retryable"),
-            README_TEMPLATE_IT: ("Run Automata", "--parallelism N", "Codex Luna", "Claude Sonnet",
+            README_TEMPLATE_IT: ("Run Autopilot", "--parallelism N", "Codex Luna", "Claude Sonnet",
                                  "AdapterRegistry", "ritentabili"),
         }
         for path, attesi in requisiti.items():

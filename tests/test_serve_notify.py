@@ -100,14 +100,45 @@ class ServeNotifyTest(unittest.TestCase):
         self.serve_notify.avvisa(self.ref)
 
     def test_canali_attivi_include_telegram_solo_se_relay_e_capability_configurati(self):
-        self.assertNotIn("telegram", self.serve_notify._canali_attivi())
+        self.assertNotIn("telegram", self.serve_notify._canali_attivi(self.ref))
         os.environ.update({"RELAY_HTTPS_HOSTNAME": "relay.test", "ATLAS_RELAY_TOKEN_REF": "t",
                            "ATLAS_CAPABILITY_KEY_REF": "k"})
         try:
-            self.assertIn("telegram", self.serve_notify._canali_attivi())
+            self.assertIn("telegram", self.serve_notify._canali_attivi(self.ref))
         finally:
             for chiave in ("RELAY_HTTPS_HOSTNAME", "ATLAS_RELAY_TOKEN_REF", "ATLAS_CAPABILITY_KEY_REF"):
                 os.environ.pop(chiave, None)
+
+    def test_la_levetta_spenta_esclude_telegram_anche_se_relay_e_capability_ci_sono(self):
+        """SS7-ter/1: relay e capability configurati non bastano se il progetto
+        ha silenziato Telegram con la sua levetta."""
+        os.environ.update({"RELAY_HTTPS_HOSTNAME": "relay.test", "ATLAS_RELAY_TOKEN_REF": "t",
+                           "ATLAS_CAPABILITY_KEY_REF": "k"})
+        try:
+            self.serve_notify.alterna_telegram(self.ref)   # accesa di default -> spenta
+            self.assertNotIn("telegram", self.serve_notify._canali_attivi(self.ref))
+        finally:
+            for chiave in ("RELAY_HTTPS_HOSTNAME", "ATLAS_RELAY_TOKEN_REF", "ATLAS_CAPABILITY_KEY_REF"):
+                os.environ.pop(chiave, None)
+
+    def test_la_levetta_e_accesa_di_default(self):
+        self.assertTrue(self.serve_notify.telegram_abilitato(self.ref))
+
+    def test_alterna_telegram_capovolge_e_torna_lo_stato_nuovo(self):
+        stato, payload = self.serve_notify.alterna_telegram(self.ref)
+        self.assertEqual(200, stato)
+        self.assertEqual({"ok": True, "enabled": False}, payload)
+        self.assertFalse(self.serve_notify.telegram_abilitato(self.ref))
+
+        stato, payload = self.serve_notify.alterna_telegram(self.ref)
+        self.assertEqual({"ok": True, "enabled": True}, payload)
+        self.assertTrue(self.serve_notify.telegram_abilitato(self.ref))
+
+    def test_alterna_telegram_preserva_le_altre_chiavi_di_config_json(self):
+        self.serve_notify.alterna_telegram(self.ref)
+        dati = json.loads((self.root / "config.json").read_text(encoding="utf-8"))
+        self.assertEqual("prova", dati["project"])
+        self.assertEqual(False, dati["notify"]["telegram_enabled"])
 
     def test_una_interaction_aperta_arriva_al_canale_telegram_appaiato(self):
         # 'local' e' sempre attivo (_canali_attivi): il registro deve

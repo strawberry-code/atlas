@@ -15,19 +15,30 @@ atlas fog "a line" --for <ID>  # notes down what came up, addressed to a node if
 
 `atlas serve` keeps the dashboard alive on `http://127.0.0.1`, regenerates it when `graph.json` changes and pushes a reload to the browser already open; with `lock.remote` active it also shows the other machines' locks.
 
-Automata keeps the latest execution in `run-state.json` beside `graph.json`. `atlas run-status` shows whether the run is active, waiting, failed, blocked or completed, together with its node, provider, attempt, retry, frontier and residual blockers. `atlas run-log` prints the persistent history of claims, providers, fallbacks, waits, backoffs, closures and frontier updates; `--tail N` limits the output. The ledger describes what happened, but stores no processes and does not authorize resuming an agent after an interruption.
+Autopilot keeps the latest execution in `run-state.json` beside `graph.json`. `atlas run-status` shows whether the run is active, waiting, failed, blocked or completed, together with its node, provider, attempt, retry, frontier and residual blockers. `atlas run-log` prints the persistent history of claims, providers, fallbacks, waits, backoffs, closures and frontier updates; `--tail N` limits the output. The ledger describes what happened, but stores no processes and does not authorize resuming an agent after an interruption.
 
-### Automata runs
+### Autopilot runs
 
 Start each run with `atlas run --parallelism N`. The value is required for that run, `1` means strict serial execution, and a higher value means bounded parallelism. It is runtime configuration and is never written into the graph. The command configures and validates the run; the runner still takes its scheduling and termination decisions from Atlas.
 
-The node field `model` is optional and remains absent or empty unless the graph author specifies it. Empty selects Codex Luna (`codex-luna`). An explicit value must exactly match a registered adapter identity. If the default Luna provider is unavailable, Automata records one fallback to Claude Sonnet (`claude`); an explicit model is never replaced silently. Gemini and Code Terra are additional supported identities.
+The node field `model` is optional and remains absent or empty unless the graph author specifies it. Empty selects Codex Luna (`codex-luna`). An explicit value must exactly match a registered adapter identity. If the default Luna provider is unavailable, Autopilot records one fallback to Claude Sonnet (`claude`); an explicit model is never replaced silently. Gemini and Code Terra are additional supported identities.
 
 The runner claims the node on behalf of the provider it is about to launch: the lock carries that agent's identity, so the launched agent receives a node that is already its own, must not run `atlas take`, and closes with `atlas close`. An agent that terminates without closing its node counts as an ambiguous termination of that node: it is retried under a tighter cap and, if it still does not close, the run keeps going on the branches that do not depend on it instead of stopping.
 
-Every provider launched by Automata is AFK, runs outside the sandbox and bypasses permissions. To add a provider, implement `AgentAdapter` or configure `SubprocessAdapter`, register it in `AdapterRegistry`, and pass that registry to `launcher_from_registry`. The runner does not change. A subprocess adapter must use a validated argv, closed stdin and the provider's non-interactive flags.
+Every provider launched by Autopilot is AFK, runs outside the sandbox and bypasses permissions. To add a provider, implement `AgentAdapter` or configure `SubprocessAdapter`, register it in `AdapterRegistry`, and pass that registry to `launcher_from_registry`. The runner does not change. A subprocess adapter must use a validated argv, closed stdin and the provider's non-interactive flags.
 
 Use `atlas run-status` to read the current state and reason. Use `atlas run-log` or `atlas run-log --tail N` to inspect model selection, fallback, claims, failures, backoff, closures and frontier refreshes. Timeout, crash, rate limit, provider unavailability and ambiguous termination are retryable; permanent errors are not. The default retry policy grows from one minute to one hour and is bounded. A live claim prevents a duplicate launch; this version does not resume the provider process after interruption.
+
+### The outcome protocol
+
+An AFK agent declares what is happening on a node through four closed channels, never a fifth one invented on the spot: what reads these values is a program, not a model, so there is nothing to interpret outside this list.
+
+- **Work finished**: `atlas close <ID> -s "<summary>"`, the channel already covered above.
+- **Surrender with a reason**: `atlas give-up <ID> --motivo <MOTIVO> -d "<dettaglio>"`, when the question has no valid answer in this run. `MOTIVO` is one of `infeasible`, `missing-resource`, `blocked-environment`, `needs-redesign`. It is terminal for that node in this run: it does not draw from the retry budget, the node returns to the frontier with the surrender recorded.
+- **A person is needed**: `atlas ask-human <ID> -q "<proposta>"`. The proposal is an already-formed binary alternative ("I'll proceed with X, confirm?"), not an open question: the channel is button-driven. It opens an Interaction and suspends the node without counting it as a failure; once answered, the node becomes takeable again.
+- **Progress step**: `atlas progress <ID> <PASSO> ["<nota>"]`, meant to be called often while you work, cheap to call. `PASSO` is one of `investigating`, `implementing`, `verifying`, `writing-answer`, `blocked`. It is not an outcome: it never touches the node's status, only its heartbeat. An agent that has declared a step and then stays silent for more than an hour is considered stuck and the attempt ends as a retryable failure (`timeout`); an agent that never calls `progress` is protected only by the ninety-minute absolute cap, which remains the last line of defense.
+
+`close`, `give-up` and `ask-human` are mutually exclusive by construction: each one requires the node to still be claimed by whoever calls it, so only the first to arrive wins and the others fail with the same error already used for "node not claimed".
 
 If you get here knowing nothing about Atlas, `atlas how-to` is the way in: it prints this contract, the list of commands, the mutations a script can call, the installed skills and this project's paths. Same doctrine you're reading now, reachable from a command instead of a file.
 

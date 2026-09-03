@@ -270,7 +270,9 @@ li b{color:var(--ink);font-weight:700;font-size:11px;transition:color .15s ease}
   font-size:9.5px;font-weight:700;padding:1px 6px;line-height:1.5;flex:none;
 }
 .notifiche-corpo{padding:12px;display:flex;flex-direction:column;gap:14px;overflow-y:auto}
-.notif-canali{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.notif-canali{display:flex;flex-direction:column;gap:4px}
+.pairing-riga{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.pairing-nota{margin:0;font-size:9.5px;color:var(--faint);font-style:italic}
 .pairing-telegram{
   border:1px solid var(--border-strong);background:var(--pane-2);color:var(--ink);
   font:inherit;font-size:10.5px;font-weight:600;padding:6px 10px;cursor:pointer;
@@ -281,6 +283,17 @@ li b{color:var(--ink);font-weight:700;font-size:11px;transition:color .15s ease}
 .pairing-stato{font-size:10px;color:var(--muted)}
 .pairing-stato.pairing-ok{color:var(--st-closed-tx)}
 .pairing-stato.pairing-errore{color:var(--st-out-of-scope-tx)}
+.notif-muto{
+  all:unset;box-sizing:border-box;display:flex;align-items:center;gap:8px;cursor:pointer;font:inherit;
+}
+.notif-muto-stato{font-size:9.5px;color:var(--muted)}
+.notif-muto[data-muto="off"] .notif-muto-stato{color:var(--st-out-of-scope-tx)}
+.notif-muto-azione{
+  border:1px solid var(--border-strong);background:var(--pane-2);color:var(--ink);
+  font-size:9.5px;font-weight:600;padding:3px 8px;transition:border-color .15s ease,color .15s ease;
+}
+.notif-muto:hover .notif-muto-azione{border-color:var(--accent);color:var(--accent)}
+.notif-muto:disabled{opacity:.5;cursor:default;pointer-events:none}
 .notif-sezione h3{
   margin:0 0 8px;font-size:9.5px;font-weight:700;letter-spacing:.14em;color:var(--muted);
   text-transform:uppercase;
@@ -311,6 +324,7 @@ li b{color:var(--ink);font-weight:700;font-size:11px;transition:color .15s ease}
 .notif-azioni button:hover{border-color:var(--accent);color:var(--accent)}
 .notif-azioni button:disabled{opacity:.5;cursor:default;pointer-events:none}
 .notif-errore-testo{flex:0 0 100%;margin:0;color:var(--st-frontier-tx);font-size:10px}
+.notif-guasto{margin:6px 0 0;color:var(--st-out-of-scope-tx);font-size:10.5px}
 .notif-log{margin-top:8px}
 .notif-log summary{
   font-size:9.5px;color:var(--muted);cursor:pointer;letter-spacing:.06em;

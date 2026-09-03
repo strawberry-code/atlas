@@ -72,7 +72,8 @@ def _testa(stato: str, node_id: str, x: float, y: float) -> str:
             f'<text class="nid" x="{x + 32}" y="{y + 21}">{node_id}</text>')
 
 
-def boxes(data: dict, pos: dict, front: set[str], gruppi: dict[str, int]) -> str:
+def boxes(data: dict, pos: dict, front: set[str], gruppi: dict[str, int],
+          *, lite: bool = False) -> str:
     out = []
     ordine_rami = list(data["branches"])
     for node in data["nodes"]:
@@ -89,12 +90,16 @@ def boxes(data: dict, pos: dict, front: set[str], gruppi: dict[str, int]) -> str
             for i, r in enumerate(wrap(node["title"])) if r
         )
         tipo_modo = f'{node["type"]}·{node["mode"]}'
+        # la pagina alleggerita (S11/4, render_lite.py) non porta la domanda del
+        # nodo nemmeno nel tooltip: e' testo del ticket, non grafo/titoli/stati
+        tip = (escape(node["title"]) if lite
+               else f'{escape(node["title"])} — {escape(node["question"])}')
         out.append(
             f'<a href="tickets/{node["id"]}.md" data-node="{node["id"]}">'
             f'<g class="n {css_class(stato)}" id="node-{node["id"]}" '
             f'data-branch="{escape(node["branch"])}" '
             f'data-owners="{render_owners.gruppi(node, gruppi)}">'
-            f'<title>{escape(node["title"])} — {escape(node["question"])}</title>'
+            f'<title>{tip}</title>'
             f'<rect class="card" x="{x}" y="{y}" width="{W}" height="{H}" rx="3" '
             f'stroke-width="1"{tratto}/>'
             # la figura del ramo, in basso a destra: l'angolo che resta libero
@@ -111,8 +116,11 @@ def boxes(data: dict, pos: dict, front: set[str], gruppi: dict[str, int]) -> str
 
 
 def canvas(data: dict, depth: dict[str, int], front_ids: set[str],
-           gruppi: dict[str, int]) -> str:
-    """Stile dinamico + <svg> completo, pronti da inserire nella pagina."""
+           gruppi: dict[str, int], *, lite: bool = False) -> str:
+    """Stile dinamico + <svg> completo, pronti da inserire nella pagina.
+
+    'lite' e' la mappa di render_lite.py (S11/4): stessa disposizione e stessi
+    stati, senza la domanda del nodo nel tooltip (vedi boxes())."""
     pos = layout(data, depth)
     larghezza = max((x + W for x, _ in pos.values()), default=600) + PAD
     altezza = max((y + H for _, y in pos.values()), default=200) + PAD
@@ -123,6 +131,6 @@ def canvas(data: dict, depth: dict[str, int], front_ids: set[str],
         f'<svg viewBox="0 0 {larghezza} {altezza}" width="{larghezza}" height="{altezza}" '
         'xmlns="http://www.w3.org/2000/svg">'
         f'<defs>{render_edges.markers()}</defs>'
-        f'{boxes(data, pos, front_ids, gruppi)}{render_edges.edges(data, pos, front_ids)}'
+        f'{boxes(data, pos, front_ids, gruppi, lite=lite)}{render_edges.edges(data, pos, front_ids)}'
         '</svg>'
     )

@@ -127,6 +127,28 @@ class NotifyTest(unittest.TestCase):
         with self.assertRaises(self.channels.ChannelRegistryError):
             registry.register(_FakeChannel("local"))
 
+    def test_failed_channels_riporta_solo_le_consegne_esaurite(self):
+        data = {"interactions": [_record("I001")]}
+        registry = self.channels.ChannelRegistry(
+            [_FakeChannel("local", fails=99), _FakeChannel("himalaya")])
+        policy = self.notify.RetryPolicy(max_attempts=1, initial_delay=0)
+
+        self.notify.dispatch(data, self.notify.plan(data, self.state, ["local", "himalaya"], 0.0),
+                             registry, self.state, policy, now=0.0)
+
+        self.assertEqual(["local"], self.state.failed_channels("I001"))
+
+    def test_failed_channels_e_vuoto_senza_consegne_esaurite(self):
+        data = {"interactions": [_record("I001")]}
+        registry = self.channels.ChannelRegistry([_FakeChannel("local")])
+        policy = self.notify.RetryPolicy(initial_delay=0)
+
+        self.notify.dispatch(data, self.notify.plan(data, self.state, ["local"], 0.0),
+                             registry, self.state, policy, now=0.0)
+
+        self.assertEqual([], self.state.failed_channels("I001"))
+        self.assertEqual([], self.state.failed_channels("I002"))
+
     def test_lo_stato_sopravvive_al_riavvio(self):
         data = {"interactions": [_record("I001")]}
         registry = self.channels.ChannelRegistry([_FakeChannel("local")])

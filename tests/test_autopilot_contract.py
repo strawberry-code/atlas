@@ -1,4 +1,4 @@
-"""Presidia il contratto pubblico di Atlas Automata.
+"""Presidia il contratto pubblico di Atlas Autopilot.
 
 Il runner viene implementato nei nodi successivi. Questo test tiene pero' stabile
 la superficie normativa che quei nodi devono rispettare, evitando che i requisiti
@@ -11,10 +11,10 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
-CONTRACT = ROOT / "docs" / "atlas-automata-contract.md"
+CONTRACT = ROOT / "docs" / "atlas-autopilot-contract.md"
 
 
-class AtlasAutomataContract(unittest.TestCase):
+class AtlasAutopilotContract(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.text = CONTRACT.read_text(encoding="utf-8")
@@ -68,7 +68,7 @@ class AtlasAutomataContract(unittest.TestCase):
             with self.subTest(requisito=requisito):
                 self.assertIn(requisito, self.text)
 
-    def test_presidia_la_superficie_cli_automata(self):
+    def test_presidia_la_superficie_cli_autopilot(self):
         for comando in ("atlas run --parallelism 1", "atlas run-status", "atlas run-log --tail 20"):
             with self.subTest(comando=comando):
                 self.assertIn(comando, self.text)

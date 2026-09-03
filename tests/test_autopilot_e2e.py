@@ -1,4 +1,4 @@
-"""Test end-to-end deterministici del runner Automata con adapter finti."""
+"""Test end-to-end deterministici del runner Autopilot con adapter finti."""
 from __future__ import annotations
 
 import json
@@ -50,7 +50,7 @@ class UnavailableAdapter(ScriptedAdapter):
         raise self.adapters.ProviderUnavailableError("provider offline")
 
 
-class AutomataEndToEnd(unittest.TestCase):
+class AutopilotEndToEnd(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
         self.root = self.tmp / ".atlas"
@@ -121,8 +121,8 @@ class AutomataEndToEnd(unittest.TestCase):
         policy = self.retry.RetryPolicy(max_attempts=3, initial_delay=0)
 
         with mock.patch.dict(os.environ, {"ATLAS_IDENTITY": "Luna"}):
-            result = self.automata().start(self.ref, 1, retry_policy=policy).execute(
-                self.automata().launcher_from_registry(registry), self.wait_for)
+            result = self.autopilot().start(self.ref, 1, retry_policy=policy).execute(
+                self.autopilot().launcher_from_registry(registry), self.wait_for)
 
         self.assertEqual(tuple(failures), result.terminal_nodes)
         self.assertEqual([node_id for node_id in failures for _ in (0, 1)], adapter.launched)
@@ -150,8 +150,8 @@ class AutomataEndToEnd(unittest.TestCase):
             clock[0] += seconds
 
         with mock.patch.dict(os.environ, {"ATLAS_IDENTITY": "Luna"}):
-            result = self.automata().start(self.ref, 1, retry_policy=policy).execute(
-                self.automata().launcher_from_registry(registry), self.wait_for,
+            result = self.autopilot().start(self.ref, 1, retry_policy=policy).execute(
+                self.autopilot().launcher_from_registry(registry), self.wait_for,
                 now=lambda: clock[0], sleeper=sleeper)
 
         self.assertEqual(("N01",), result.terminal_nodes)
@@ -166,8 +166,8 @@ class AutomataEndToEnd(unittest.TestCase):
         registry = self.adapters.AdapterRegistry([luna, claude])
 
         with mock.patch.dict(os.environ, {"ATLAS_IDENTITY": "Luna"}):
-            result = self.automata().start(self.ref, 1).execute(
-                self.automata().launcher_from_registry(registry), self.wait_for)
+            result = self.autopilot().start(self.ref, 1).execute(
+                self.autopilot().launcher_from_registry(registry), self.wait_for)
 
         self.assertEqual(("N01",), result.terminal_nodes)
         self.assertEqual(["N01"], luna.launched)
@@ -185,10 +185,10 @@ class AutomataEndToEnd(unittest.TestCase):
         registry = self.adapters.AdapterRegistry([adapter])
 
         with mock.patch.dict(os.environ, {"ATLAS_IDENTITY": "Luna"}), self.assertRaises(
-                self.automata().RunnerError):
-            self.automata().start(
+                self.autopilot().RunnerError):
+            self.autopilot().start(
                 self.ref, 1, retry_policy=self.retry.RetryPolicy(max_attempts=1, initial_delay=0)
-            ).execute(self.automata().launcher_from_registry(registry), self.wait_for,
+            ).execute(self.autopilot().launcher_from_registry(registry), self.wait_for,
                       interaction_waiter=self.risolutore())
 
         self.assertEqual("failed", json.loads(self.ref.run_state_path.read_text())["status"])
@@ -196,10 +196,10 @@ class AutomataEndToEnd(unittest.TestCase):
             "nodes"]["N01"]["status"])
         self.assertEqual("open", self.store.load(self.ref.json_path)["nodes"][0]["status"])
 
-    def automata(self):
-        from core import automata
+    def autopilot(self):
+        from core import autopilot
 
-        return automata
+        return autopilot
 
 
 if __name__ == "__main__":

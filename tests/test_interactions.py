@@ -208,6 +208,20 @@ class InteractionsTest(unittest.TestCase):
         self.assertFalse(interactions.is_expired(futura))
         self.assertFalse(interactions.is_expired(risolta))
 
+    def test_has_open_guarda_nodo_evento_e_stato(self):
+        from core import interactions
+
+        data = {"interactions": [
+            {"nodeId": "A01", "event": "human-needed", "status": "open"},
+            {"nodeId": "A01", "event": "decision-required", "status": "open"},
+            {"nodeId": "A01", "event": "human-needed", "status": "resolved"},
+            {"nodeId": "A02", "event": "human-needed", "status": "open"},
+        ]}
+        self.assertTrue(interactions.has_open(data, "A01", "human-needed"))
+        self.assertFalse(interactions.has_open(data, "A02", "decision-required"))
+        self.assertFalse(interactions.has_open(data, "A03", "human-needed"))
+        self.assertFalse(interactions.has_open({"interactions": []}, "A01", "human-needed"))
+
 
 if __name__ == "__main__":
     unittest.main()

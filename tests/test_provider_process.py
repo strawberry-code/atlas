@@ -1,9 +1,10 @@
-"""Verifica il confine fra Automata e i processi provider reali."""
+"""Verifica il confine fra Autopilot e i processi provider reali."""
 from __future__ import annotations
 
 import os
 import sys
 import unittest
+from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
@@ -25,6 +26,191 @@ class ProviderProcessTest(unittest.TestCase):
             node={"id": "N01", "question": "handle $(unsafe) && value"},
             policy=SimpleNamespace(afk=True, sandbox=False, bypass_permissions=True),
         )
+
+    def test_un_agente_che_non_finisce_viene_ucciso_e_conta_come_crash(self):
+        """Il tetto di durata esiste perche' senza il runner aspetta all'infinito.
+
+        Regressione del run del 2026-09-03: un agente e' rimasto vivo 442 minuti
+        senza scrivere niente, tenendo il nodo rivendicato e fermando il run, e
+        l'unico sintomo era che nessun file cambiava piu'.
+        """
+        import subprocess
+
+        class Appeso:
+            returncode = None
+
+            def __init__(self):
+                self.ucciso = False
+                self.chiamate = 0
+
+            def communicate(self, timeout=None):
+                self.chiamate += 1
+                if self.chiamate == 1:
+                    raise subprocess.TimeoutExpired(cmd="finto", timeout=timeout)
+                return ("", "")
+
+            def kill(self):
+                self.ucciso = True
+
+        processo = Appeso()
+        esito = providers.ProcessHandle(processo, timeout=0.01).wait()
+
+        self.assertTrue(processo.ucciso)
+        self.assertEqual("crash", esito.status)
+        self.assertIn("no termination", esito.detail)
+
+    def test_un_agente_che_finisce_in_tempo_non_viene_toccato(self):
+        class Puntuale:
+            returncode = 0
+
+            def __init__(self):
+                self.ucciso = False
+
+            def communicate(self, timeout=None):
+                return ("fatto", "")
+
+            def kill(self):
+                self.ucciso = True
+
+        processo = Puntuale()
+        esito = providers.ProcessHandle(processo).wait()
+
+        self.assertFalse(processo.ucciso)
+        self.assertEqual("closed", esito.status)
+
+    def test_l_attesa_e_a_fette_non_in_un_colpo_solo(self):
+        """H03: comunicate() non riceve mai il tetto assoluto intero, solo fette
+        successive. Senza le fette il runner terrebbe il nodo novanta minuti anche
+        per un agente morto al secondo, senza mai guardare l'avanzamento dichiarato."""
+        import subprocess
+
+        class MaiFinisce:
+            returncode = None
+
+            def __init__(self):
+                self.timeouts = []
+                self.ucciso = False
+
+            def communicate(self, timeout=None):
+                self.timeouts.append(timeout)
+                if not self.ucciso:
+                    raise subprocess.TimeoutExpired(cmd="finto", timeout=timeout)
+                return ("", "")
+
+            def kill(self):
+                self.ucciso = True
+
+        processo = MaiFinisce()
+        esito = providers.ProcessHandle(processo, timeout=0.03, fetta=0.01).wait()
+
+        self.assertEqual(3, len(processo.timeouts[:3]))
+        for valore in processo.timeouts[:3]:
+            self.assertAlmostEqual(0.01, valore)
+        self.assertTrue(processo.ucciso)
+        self.assertEqual("crash", esito.status)
+
+    def test_agente_fermo_dopo_un_passo_dichiarato_viene_ucciso_per_silenzio(self):
+        """Un nodo che ha gia' dichiarato un passo (H01/4) e poi smette di
+        muoversi non aspetta il tetto assoluto: lo dice l'esito 'timeout',
+        distinto dal 'crash' del tetto, cosi' run-log distingue le due difese."""
+        import subprocess
+
+        class MaiFinisce:
+            returncode = None
+
+            def __init__(self):
+                self.ucciso = False
+
+            def communicate(self, timeout=None):
+                if not self.ucciso:
+                    raise subprocess.TimeoutExpired(cmd="finto", timeout=timeout)
+                return ("", "")
+
+            def kill(self):
+                self.ucciso = True
+
+        processo = MaiFinisce()
+        handle = providers.ProcessHandle(
+            processo, timeout=3600, fetta=0.01, silenzio_ammesso=0.02,
+            graph=SimpleNamespace(json_path=Path("/fake/graph.json")), node_id="N01")
+
+        with mock.patch.object(providers.claims, "silent_for", return_value=timedelta(seconds=5)), \
+             mock.patch.object(providers, "load", return_value={}), \
+             mock.patch.object(providers, "node_of", return_value={}):
+            esito = handle.wait()
+
+        self.assertTrue(processo.ucciso)
+        self.assertEqual("timeout", esito.status)
+        self.assertIn("no progress declared", esito.detail)
+
+    def test_agente_senza_alcun_passo_dichiarato_non_e_ucciso_per_silenzio(self):
+        """Il tetto assoluto resta l'unica difesa per chi non ha mai dichiarato
+        un passo (claims.silent_for torna None): un silenzio_ammesso minuscolo
+        non lo tocca, anche dopo diverse fette."""
+        import subprocess
+
+        class FinisceDopoQualcheFetta:
+            returncode = 0
+
+            def __init__(self, fette):
+                self.fette = fette
+                self.chiamate = 0
+                self.ucciso = False
+
+            def communicate(self, timeout=None):
+                self.chiamate += 1
+                if self.chiamate <= self.fette:
+                    raise subprocess.TimeoutExpired(cmd="finto", timeout=timeout)
+                return ("fatto", "")
+
+            def kill(self):
+                self.ucciso = True
+
+        processo = FinisceDopoQualcheFetta(fette=5)
+        handle = providers.ProcessHandle(
+            processo, timeout=3600, fetta=0.01, silenzio_ammesso=0.001,
+            graph=SimpleNamespace(json_path=Path("/fake/graph.json")), node_id="N01")
+
+        with mock.patch.object(providers.claims, "silent_for", return_value=None), \
+             mock.patch.object(providers, "load", return_value={}), \
+             mock.patch.object(providers, "node_of", return_value={}):
+            esito = handle.wait()
+
+        self.assertFalse(processo.ucciso)
+        self.assertEqual("closed", esito.status)
+        self.assertEqual(6, processo.chiamate)
+
+    def test_lettura_del_grafo_fallita_non_uccide_il_lavoro_per_un_guasto_suo(self):
+        """Una lettura che va storta a meta' fetta (disco, permessi, un grafo a
+        meta' scrittura) conta come 'non lo so', non come silenzio: il tentativo
+        resta protetto dal solo tetto assoluto, come se il grafo non ci fosse."""
+        import subprocess
+
+        class MaiFinisce:
+            returncode = None
+
+            def __init__(self):
+                self.ucciso = False
+
+            def communicate(self, timeout=None):
+                if not self.ucciso:
+                    raise subprocess.TimeoutExpired(cmd="finto", timeout=timeout)
+                return ("", "")
+
+            def kill(self):
+                self.ucciso = True
+
+        processo = MaiFinisce()
+        handle = providers.ProcessHandle(
+            processo, timeout=0.05, fetta=0.01, silenzio_ammesso=0.001,
+            graph=SimpleNamespace(json_path=Path("/fake/graph.json")), node_id="N01")
+
+        with mock.patch.object(providers, "load", side_effect=OSError("disco pieno")):
+            esito = handle.wait()
+
+        self.assertTrue(processo.ucciso)
+        self.assertEqual("crash", esito.status)
+        self.assertIn("no termination", esito.detail)
 
     def test_il_briefing_non_ordina_un_secondo_lucchetto_ne_ammette_domande(self):
         """Il figlio riceve un nodo gia' suo e nessuno a cui chiedere.
@@ -55,7 +241,7 @@ class ProviderProcessTest(unittest.TestCase):
             "ERROR: You've hit your usage limit. Upgrade to Plus to continue using "
             "Codex (https://chatgpt.com/explore/plus), or try again at Sep 30th, 2026 9:35 AM."
         )
-        popen.return_value = SimpleNamespace(returncode=1, communicate=lambda: (uscita, ""))
+        popen.return_value = SimpleNamespace(returncode=1, communicate=lambda timeout=None: (uscita, ""))
 
         outcome = providers.codex_adapter().launch(self.context).wait()
 
@@ -72,7 +258,7 @@ class ProviderProcessTest(unittest.TestCase):
         eco = providers._prompt(self.context)
         uscita = (f"OpenAI Codex v0.151.0\nuser\n{eco}\n"
                   "thinking\nERROR: the test suite failed, three assertions are red.")
-        popen.return_value = SimpleNamespace(returncode=1, communicate=lambda: (uscita, ""))
+        popen.return_value = SimpleNamespace(returncode=1, communicate=lambda timeout=None: (uscita, ""))
 
         outcome = providers.codex_adapter().launch(self.context).wait()
 
@@ -81,10 +267,12 @@ class ProviderProcessTest(unittest.TestCase):
 
     @mock.patch.object(providers.subprocess, "Popen")
     def test_lancio_non_interattivo_e_argomenti_non_passano_dalla_shell(self, popen):
-        process = SimpleNamespace(returncode=0, communicate=lambda: ("out", ""))
+        process = SimpleNamespace(returncode=0, communicate=lambda timeout=None: ("out", ""))
         popen.return_value = process
 
         handle = providers.SubprocessAdapter("future", ("agent", "--prompt", providers.PROMPT)).launch(self.context)
+        self.assertIs(handle._graph, self.context.run.graph)
+        self.assertEqual("N01", handle._node_id)
         outcome = handle.wait()
 
         argv = popen.call_args.args[0]
@@ -94,13 +282,13 @@ class ProviderProcessTest(unittest.TestCase):
         self.assertIs(popen.call_args.kwargs["stdin"], providers.subprocess.DEVNULL)
         self.assertFalse(popen.call_args.kwargs["shell"])
         self.assertEqual(Path("/project"), popen.call_args.kwargs["cwd"])
-        self.assertEqual("N01", popen.call_args.kwargs["env"]["ATLAS_AUTOMATA_NODE"])
+        self.assertEqual("N01", popen.call_args.kwargs["env"]["ATLAS_AUTOPILOT_NODE"])
         self.assertEqual("run-01", popen.call_args.kwargs["env"]["ATLAS_GRAPH"])
         self.assertEqual("closed", outcome.status)
 
     @mock.patch.object(providers.subprocess, "Popen")
     def test_ambiente_base_viene_preservato_e_i_metadati_atlas_sono_obbligatori(self, popen):
-        popen.return_value = SimpleNamespace(returncode=1, communicate=lambda: ("", "bad"))
+        popen.return_value = SimpleNamespace(returncode=1, communicate=lambda timeout=None: ("", "bad"))
         with mock.patch.dict(os.environ, {"PROVIDER_TOKEN": "secret"}):
             providers.SubprocessAdapter("future", ("agent", providers.PROMPT)).launch(self.context)
 

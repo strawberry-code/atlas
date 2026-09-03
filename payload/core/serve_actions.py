@@ -19,7 +19,7 @@ PERCORSO = re.compile(r"^/interactions/([^/]+)/([^/]+)$")
 
 def applica(ref: Graph, interaction_id: str, action_id: str) -> tuple[int, dict]:
     """Applica l'azione dentro la stessa transazione di ogni altra mutazione
-    Atlas: il commit e' cio' che risveglia Automata (mutate.editing pubblica
+    Atlas: il commit e' cio' che risveglia Autopilot (mutate.editing pubblica
     il ResolutionEvent), niente scorciatoia qui.
 
     Un'azione non fra quelle dichiarate per questa Interaction, o una

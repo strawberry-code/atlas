@@ -2,23 +2,31 @@
 azioni al massimo due per card, run in attesa come contesto senza azioni."""
 from __future__ import annotations
 
+import os
 import shutil
 import sys
 import tempfile
 import unittest
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 
 SORGENTE = Path(__file__).resolve().parent.parent / "payload"
 sys.path.insert(0, str(SORGENTE))
 
+_ENV_TELEGRAM = ("RELAY_HTTPS_HOSTNAME", "ATLAS_RELAY_TOKEN_REF", "ATLAS_CAPABILITY_KEY_REF")
+
 
 class RifGrafo:
-    """Sostituto minimo di config.Graph: render_notifiche usa solo run_state_path."""
+    """Sostituto minimo di config.Graph: render_notifiche usa run_state_path e
+    (per la levetta di render_notif_telegram) workspace.config."""
 
-    def __init__(self, cartella: Path):
+    def __init__(self, cartella: Path, notify: dict | None = None):
         self.run_state_path = cartella / "run-state.json"
+        self.notify_state_path = cartella / "notify-state.json"
+        self.slug = "prova"
+        self.workspace = SimpleNamespace(config={"notify": notify or {}})
 
 
 class NotificheTest(unittest.TestCase):
@@ -153,6 +161,40 @@ class NotificheTest(unittest.TestCase):
         self.assertIn("B02", html)
         self.assertNotIn("data-action=", html)
 
+    def test_run_in_attesa_con_consegna_esaurita_mostra_la_riga_di_guasto(self):
+        """SS7-ter/3: la mancata consegna si vede sulla dashboard, accanto al
+        nodo in attesa, senza aprire un nuovo giro di retry (grilling 22)."""
+        from core.notify import NotifyState
+        from core.run_state import RunState
+
+        stato = RunState(self.ref.run_state_path, "prova", run_id="run-01")
+        stato.start(1, ["B02"], 100.0)
+        stato.event("attempt-waiting", 101.0, node="B02", status="waiting")
+        ledger = NotifyState(self.ref.notify_state_path, "prova")
+        ledger.fail("I001::telegram", 3, "permanent-error", "bot bloccato", 101.0, delay=None)
+
+        from core import render_notifiche
+
+        html = render_notifiche.panel(self.ref, {"interactions": [self._interaction()]},
+                                      now=datetime.fromisoformat("2026-08-31T11:50:00+02:00"))
+
+        self.assertIn("notif-guasto", html)
+        self.assertIn("telegram", html)
+
+    def test_run_in_attesa_senza_consegne_esaurite_non_mostra_la_riga_di_guasto(self):
+        from core.run_state import RunState
+
+        stato = RunState(self.ref.run_state_path, "prova", run_id="run-01")
+        stato.start(1, ["B02"], 100.0)
+        stato.event("attempt-waiting", 101.0, node="B02", status="waiting")
+
+        from core import render_notifiche
+
+        html = render_notifiche.panel(self.ref, {"interactions": [self._interaction()]},
+                                      now=datetime.fromisoformat("2026-08-31T11:50:00+02:00"))
+
+        self.assertNotIn("notif-guasto", html)
+
     def test_senza_run_state_la_sezione_in_attesa_e_vuota(self):
         from core import render_notifiche
 
@@ -194,6 +236,69 @@ class NotificheTest(unittest.TestCase):
         self.assertIn("data-pairing-attesa=", html)
         self.assertIn("data-pairing-connesso=", html)
         self.assertIn("data-pairing-scaduto=", html)
+        self.assertIn("data-pairing-rifiutato=", html)
+        self.assertIn("data-pairing-senza-gestore=", html)
+
+    def test_il_pairing_dice_la_promessa_nulla_sul_bottone(self):
+        """A04/grilling 33: la promessa (servizio sperimentale, puo' finire
+        quando il gestore vuole) sta accanto al bottone che attiva il
+        pairing, sempre visibile, non solo dopo il tap e non in un doc."""
+        from core import render_notifiche
+        from core.strings import t
+
+        html = render_notifiche.panel(self.ref, {"interactions": []}, now=datetime.now().astimezone())
+
+        self.assertIn('class="pairing-nota"', html)
+        self.assertIn(t("render.notif_pairing_promessa"), html)
+        for termine_vietato in ("bearer", "capability", "graphId"):
+            self.assertNotIn(termine_vietato, html)
+
+    def test_senza_telegram_configurato_la_levetta_non_compare(self):
+        """SS7-ter/1/SS11-11: chi lavora offline (nessun relay in ambiente,
+        Telegram mai collegato su questa installazione) non deve vedere la
+        levetta ne' trovarne traccia nel markup."""
+        from core import render_notifiche
+        from core.strings import t
+
+        html = render_notifiche.panel(self.ref, {"interactions": []}, now=datetime.now().astimezone())
+
+        self.assertNotIn("notif-muto", html)
+        self.assertNotIn(t("render.notif_muto_silenzia"), html)
+
+    def test_con_telegram_configurato_la_levetta_compare_accesa_di_default(self):
+        from core import render_notifiche
+        from core.strings import t
+
+        os.environ.update({"RELAY_HTTPS_HOSTNAME": "relay.test", "ATLAS_RELAY_TOKEN_REF": "t",
+                           "ATLAS_CAPABILITY_KEY_REF": "k"})
+        try:
+            html = render_notifiche.panel(self.ref, {"interactions": []}, now=datetime.now().astimezone())
+        finally:
+            for chiave in _ENV_TELEGRAM:
+                os.environ.pop(chiave, None)
+
+        self.assertIn('class="notif-muto" data-muto="on"', html)
+        self.assertIn('aria-pressed="true"', html)
+        self.assertIn(t("render.notif_muto_attivo"), html)
+        self.assertIn(t("render.notif_muto_silenzia"), html)
+
+    def test_con_la_levetta_spenta_nel_config_il_pannello_mostra_lo_stato_spento(self):
+        from core import render_notifiche
+        from core.strings import t
+
+        self.ref.workspace.config["notify"]["telegram_enabled"] = False
+        os.environ.update({"RELAY_HTTPS_HOSTNAME": "relay.test", "ATLAS_RELAY_TOKEN_REF": "t",
+                           "ATLAS_CAPABILITY_KEY_REF": "k"})
+        try:
+            html = render_notifiche.panel(self.ref, {"interactions": []}, now=datetime.now().astimezone())
+        finally:
+            for chiave in _ENV_TELEGRAM:
+                os.environ.pop(chiave, None)
+
+        self.assertIn('class="notif-muto" data-muto="off"', html)
+        self.assertIn('aria-pressed="false"', html)
+        self.assertIn(t("render.notif_muto_silenziato"), html)
+        self.assertIn(t("render.notif_muto_riattiva"), html)
 
 
 if __name__ == "__main__":

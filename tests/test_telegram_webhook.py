@@ -1,6 +1,8 @@
-"""Test dell'adapter Telegram lato relay (D04): verifica del webhook,
+"""Test dell'adapter Telegram lato relay (D04): traduzione degli update,
 associazione, idempotenza dei callback. Nessuna rete reale: 'opener' e'
-sempre iniettato dove serve chiamare l'API Telegram.
+sempre iniettato dove serve chiamare l'API Telegram. Il webhook HTTPS e il
+suo segreto (verifica_segreto, GestoreWebhook.gestisci) sono stati smontati
+da G02: 'processa_update' e' l'unico ingresso, alimentato dal long polling.
 """
 from __future__ import annotations
 
@@ -12,8 +14,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "relay"))
 
 import telegram_webhook as tw
-
-SEGRETO = "il-segreto-del-webhook"
 
 
 def _update_callback(update_id=1, callback_id="cb-1", chat_id=42, data="approve"):
@@ -34,19 +34,6 @@ def _update_messaggio(update_id=1, chat_id=42, text=None):
     return {"update_id": update_id, "message": messaggio}
 
 
-class VerificaSegreto(unittest.TestCase):
-    def test_accetta_segreto_giusto(self):
-        tw.verifica_segreto(SEGRETO, SEGRETO)  # non solleva
-
-    def test_rifiuta_segreto_assente(self):
-        with self.assertRaises(tw.WebhookRejected):
-            tw.verifica_segreto(None, SEGRETO)
-
-    def test_rifiuta_segreto_sbagliato(self):
-        with self.assertRaises(tw.WebhookRejected):
-            tw.verifica_segreto("altro", SEGRETO)
-
-
 class EstraiEvento(unittest.TestCase):
     def test_callback(self):
         evento = tw._estrai_evento(_update_callback())
@@ -62,10 +49,26 @@ class EstraiEvento(unittest.TestCase):
         evento = tw._estrai_evento(_update_messaggio())
         self.assertEqual(evento, {"kind": "message", "chat_id": 42, "message_id": 3})
 
-    def test_messaggio_con_testo_porta_il_testo(self):
-        evento = tw._estrai_evento(_update_messaggio(text="/start abc123"))
+    def test_messaggio_con_testo_normale_non_porta_from_nome(self):
+        evento = tw._estrai_evento(_update_messaggio(text="ciao"))
+        self.assertEqual(evento, {"kind": "message", "chat_id": 42, "message_id": 3, "text": "ciao"})
+
+    def test_messaggio_start_porta_il_testo_e_il_nome_da_username(self):
+        update = _update_messaggio(text="/start abc123")
+        update["message"]["from"] = {"id": 1, "username": "tizio", "first_name": "Tizio"}
+        evento = tw._estrai_evento(update)
         self.assertEqual(evento, {"kind": "message", "chat_id": 42, "message_id": 3,
-                                   "text": "/start abc123"})
+                                   "text": "/start abc123", "from_nome": "@tizio"})
+
+    def test_messaggio_start_senza_username_usa_first_name(self):
+        update = _update_messaggio(text="/start abc123")
+        update["message"]["from"] = {"id": 1, "first_name": "Tizio"}
+        evento = tw._estrai_evento(update)
+        self.assertEqual(evento["from_nome"], "Tizio")
+
+    def test_messaggio_start_senza_from_nome_none(self):
+        evento = tw._estrai_evento(_update_messaggio(text="/start abc123"))
+        self.assertIsNone(evento["from_nome"])
 
     def test_update_ignoto_none(self):
         self.assertIsNone(tw._estrai_evento({"update_id": 1, "my_chat_member": {}}))
@@ -119,31 +122,27 @@ class CodaTapTest(unittest.TestCase):
 
 
 class GestoreWebhookTest(unittest.TestCase):
-    def _gestore(self, paired_chat_ids=(42,), pairing_start=None):
+    """G02: 'processa_update' e' l'unico ingresso (il long polling gli passa
+    un update gia' decodificato, senza nessun segreto da verificare)."""
+
+    def _gestore(self, paired_chat_ids=(42,), pairing_start=None, admin_decision=None,
+                 dispositivi_comando=None, comando_stato=None, comando_view=None):
         self.eventi = []
         self.risposte_callback = []
         return tw.GestoreWebhook(
-            segreto_atteso=SEGRETO,
             pairing=tw.MemoriaPairing(paired_chat_ids),
             sink=self.eventi.append,
             answer_callback=self.risposte_callback.append,
             pairing_start=pairing_start,
+            admin_decision=admin_decision,
+            dispositivi_comando=dispositivi_comando,
+            comando_stato=comando_stato,
+            comando_view=comando_view,
         )
-
-    def _corpo(self, update: dict) -> bytes:
-        import json
-        return json.dumps(update).encode("utf-8")
-
-    def test_rifiuta_segreto_sbagliato_senza_toccare_sink(self):
-        gestore = self._gestore()
-        with self.assertRaises(tw.WebhookRejected):
-            gestore.gestisci(self._corpo(_update_callback()), "sbagliato")
-        self.assertEqual(self.eventi, [])
-        self.assertEqual(self.risposte_callback, [])
 
     def test_callback_paired_arriva_al_sink_e_risponde(self):
         gestore = self._gestore()
-        gestore.gestisci(self._corpo(_update_callback()), SEGRETO)
+        gestore.processa_update(_update_callback())
         self.assertEqual(len(self.eventi), 1)
         self.assertEqual(self.eventi[0]["chat_id"], 42)
         self.assertEqual(self.risposte_callback, ["cb-1"])
@@ -151,90 +150,169 @@ class GestoreWebhookTest(unittest.TestCase):
     def test_callback_non_paired_risponde_comunque_e_non_arriva_al_sink(self):
         gestore = self._gestore(paired_chat_ids=())
         with self.assertRaises(tw.UnpairedUser):
-            gestore.gestisci(self._corpo(_update_callback()), SEGRETO)
+            gestore.processa_update(_update_callback())
         self.assertEqual(self.eventi, [])
         self.assertEqual(self.risposte_callback, ["cb-1"])  # ack Telegram gia' avvenuto
 
     def test_messaggio_non_chiama_answer_callback(self):
         gestore = self._gestore()
-        gestore.gestisci(self._corpo(_update_messaggio()), SEGRETO)
+        gestore.processa_update(_update_messaggio())
         self.assertEqual(self.risposte_callback, [])
         self.assertEqual(len(self.eventi), 1)
 
     def test_redelivery_stesso_update_id_non_arriva_due_volte_al_sink(self):
         gestore = self._gestore()
         update = _update_callback()
-        gestore.gestisci(self._corpo(update), SEGRETO)
-        gestore.gestisci(self._corpo(update), SEGRETO)  # stessa update_id: redelivery
+        gestore.processa_update(update)
+        gestore.processa_update(update)  # stessa update_id: redelivery
         self.assertEqual(len(self.eventi), 1)
         self.assertEqual(len(self.risposte_callback), 2)  # l'ack e' comunque idempotente lato Telegram
 
     def test_update_tipo_ignoto_non_solleva_e_non_tocca_sink(self):
         gestore = self._gestore()
-        gestore.gestisci(self._corpo({"update_id": 9, "poll": {}}), SEGRETO)
+        gestore.processa_update({"update_id": 9, "poll": {}})
         self.assertEqual(self.eventi, [])
 
-    def test_corpo_non_json_rifiutato(self):
-        gestore = self._gestore()
-        with self.assertRaises(tw.WebhookRejected):
-            gestore.gestisci(b"non e' json", SEGRETO)
-
-    def test_start_chiama_pairing_start_e_non_tocca_sink_ne_pairing(self):
+    def test_start_chiama_pairing_start_con_codice_chat_e_nome_e_non_tocca_sink_ne_pairing(self):
         chiamate = []
-        gestore = self._gestore(paired_chat_ids=(),
-                                 pairing_start=lambda codice, chat_id: chiamate.append((codice, chat_id)))
+        gestore = self._gestore(paired_chat_ids=(), pairing_start=lambda c, i, n: chiamate.append((c, i, n)))
         update = _update_messaggio(chat_id=999, text="/start il-codice")
-        gestore.gestisci(self._corpo(update), SEGRETO)  # non solleva UnpairedUser
-        self.assertEqual(chiamate, [("il-codice", 999)])
+        update["message"]["from"] = {"id": 1, "username": "tizio"}
+        gestore.processa_update(update)  # non solleva UnpairedUser
+        self.assertEqual(chiamate, [("il-codice", 999, "@tizio")])
         self.assertEqual(self.eventi, [])
 
     def test_start_senza_pairing_start_configurato_non_solleva(self):
         gestore = self._gestore(paired_chat_ids=())
         update = _update_messaggio(chat_id=999, text="/start il-codice")
-        gestore.gestisci(self._corpo(update), SEGRETO)  # nessun gestore iniettato: ignorato, non un errore
+        gestore.processa_update(update)  # nessun gestore iniettato: ignorato, non un errore
         self.assertEqual(self.eventi, [])
 
     def test_start_redelivery_non_richiama_pairing_start_due_volte(self):
         chiamate = []
-        gestore = self._gestore(paired_chat_ids=(),
-                                 pairing_start=lambda codice, chat_id: chiamate.append((codice, chat_id)))
+        gestore = self._gestore(paired_chat_ids=(), pairing_start=lambda c, i, n: chiamate.append((c, i, n)))
         update = _update_messaggio(update_id=7, chat_id=999, text="/start il-codice")
-        gestore.gestisci(self._corpo(update), SEGRETO)
-        gestore.gestisci(self._corpo(update), SEGRETO)
+        gestore.processa_update(update)
+        gestore.processa_update(update)
         self.assertEqual(len(chiamate), 1)
+
+    def test_computer_chiama_dispositivi_comando_anche_senza_pairing(self):
+        chiamate = []
+        gestore = self._gestore(paired_chat_ids=(), dispositivi_comando=chiamate.append)
+        update = _update_messaggio(chat_id=999, text="/computer")
+        gestore.processa_update(update)  # non solleva UnpairedUser
+        self.assertEqual(chiamate, [999])
+        self.assertEqual(self.eventi, [])
+
+    def test_computer_senza_dispositivi_comando_configurato_prosegue_verso_is_paired(self):
+        gestore = self._gestore(paired_chat_ids=())
+        with self.assertRaises(tw.UnpairedUser):
+            gestore.processa_update(_update_messaggio(chat_id=999, text="/computer"))
+
+    def test_messaggio_normale_non_chiama_dispositivi_comando(self):
+        chiamate = []
+        gestore = self._gestore(dispositivi_comando=chiamate.append)
+        gestore.processa_update(_update_messaggio(text="ciao"))
+        self.assertEqual(chiamate, [])
 
     def test_messaggio_normale_da_chat_non_associata_resta_unpaired(self):
         chiamate = []
-        gestore = self._gestore(paired_chat_ids=(),
-                                 pairing_start=lambda codice, chat_id: chiamate.append((codice, chat_id)))
+        gestore = self._gestore(paired_chat_ids=(), pairing_start=lambda c, i, n: chiamate.append((c, i, n)))
         with self.assertRaises(tw.UnpairedUser):
-            gestore.gestisci(self._corpo(_update_messaggio(chat_id=999, text="ciao")), SEGRETO)
+            gestore.processa_update(_update_messaggio(chat_id=999, text="ciao"))
         self.assertEqual(chiamate, [])
         self.assertEqual(self.eventi, [])
+
+    def test_admin_decision_gestito_ferma_lo_smistamento_prima_di_is_paired(self):
+        chiamate = []
+        gestore = self._gestore(paired_chat_ids=(), admin_decision=lambda d, c, m: chiamate.append((d, c, m)) or True)
+        gestore.processa_update(_update_callback(chat_id=100, data="gestore:approva:xyz"))
+        self.assertEqual(chiamate, [("gestore:approva:xyz", 100, 7)])
+        self.assertEqual(self.eventi, [])  # mai arrivato al sink dei tap di grafo
+
+    def test_admin_decision_non_gestito_prosegue_verso_is_paired(self):
+        gestore = self._gestore(paired_chat_ids=(), admin_decision=lambda d, c, m: False)
+        with self.assertRaises(tw.UnpairedUser):
+            gestore.processa_update(_update_callback(chat_id=100, data="altro"))
+
+    def test_senza_admin_decision_configurato_il_callback_segue_il_percorso_normale(self):
+        gestore = self._gestore()  # chat 42 e' paired, nessun admin_decision
+        gestore.processa_update(_update_callback(data="gestore:approva:xyz"))
+        self.assertEqual(len(self.eventi), 1)
+
+    def test_comando_stato_gestito_ferma_lo_smistamento_e_non_tocca_sink(self):
+        chiamate = []
+        gestore = self._gestore(comando_stato=lambda t, c: chiamate.append((t, c)) or True)
+        gestore.processa_update(_update_messaggio(text="/stato"))
+        self.assertEqual(chiamate, [("/stato", 42)])
+        self.assertEqual(self.eventi, [])
+
+    def test_comando_stato_non_gestito_prosegue_verso_il_sink(self):
+        gestore = self._gestore(comando_stato=lambda t, c: False)
+        gestore.processa_update(_update_messaggio(text="ciao"))
+        self.assertEqual(len(self.eventi), 1)
+
+    def test_comando_stato_richiede_pairing_a_differenza_di_computer(self):
+        chiamate = []
+        gestore = self._gestore(paired_chat_ids=(),
+                                comando_stato=lambda t, c: chiamate.append((t, c)) or True)
+        with self.assertRaises(tw.UnpairedUser):
+            gestore.processa_update(_update_messaggio(chat_id=999, text="/stato"))
+        self.assertEqual(chiamate, [])
+
+    def test_senza_comando_stato_configurato_il_messaggio_segue_il_percorso_normale(self):
+        gestore = self._gestore()  # nessun comando_stato iniettato
+        gestore.processa_update(_update_messaggio(text="/stato"))
+        self.assertEqual(len(self.eventi), 1)
+
+    def test_comando_view_gestito_ferma_lo_smistamento_e_non_tocca_sink(self):
+        chiamate = []
+        gestore = self._gestore(comando_view=lambda t, c: chiamate.append((t, c)) or True)
+        gestore.processa_update(_update_messaggio(text="/view"))
+        self.assertEqual(chiamate, [("/view", 42)])
+        self.assertEqual(self.eventi, [])
+
+    def test_comando_view_non_gestito_prosegue_verso_il_sink(self):
+        gestore = self._gestore(comando_view=lambda t, c: False)
+        gestore.processa_update(_update_messaggio(text="ciao"))
+        self.assertEqual(len(self.eventi), 1)
+
+    def test_comando_view_richiede_pairing_a_differenza_di_computer(self):
+        chiamate = []
+        gestore = self._gestore(paired_chat_ids=(),
+                                comando_view=lambda t, c: chiamate.append((t, c)) or True)
+        with self.assertRaises(tw.UnpairedUser):
+            gestore.processa_update(_update_messaggio(chat_id=999, text="/view"))
+        self.assertEqual(chiamate, [])
+
+    def test_senza_comando_view_configurato_il_messaggio_segue_il_percorso_normale(self):
+        gestore = self._gestore()  # nessun comando_view iniettato
+        gestore.processa_update(_update_messaggio(text="/view"))
+        self.assertEqual(len(self.eventi), 1)
 
     def test_senza_capability_resolver_il_callback_data_passa_cosi_com_e(self):
         """Comportamento di prima di D08: se il confine non e' configurato,
         nessuno tocca il campo."""
         gestore = self._gestore()
-        gestore.gestisci(self._corpo(_update_callback(data="il-token-per-intero")), SEGRETO)
+        gestore.processa_update(_update_callback(data="il-token-per-intero"))
         self.assertEqual(self.eventi[0]["callback_data"], "il-token-per-intero")
 
     def test_capability_resolver_sostituisce_lidentificativo_col_token(self):
         eventi, risposte = [], []
         gestore = tw.GestoreWebhook(
-            segreto_atteso=SEGRETO, pairing=tw.MemoriaPairing((42,)), sink=eventi.append,
+            pairing=tw.MemoriaPairing((42,)), sink=eventi.append,
             answer_callback=risposte.append,
             capability_resolver=lambda ident: "il-token-vero" if ident == "id-corto" else None)
-        gestore.gestisci(self._corpo(_update_callback(data="id-corto")), SEGRETO)
+        gestore.processa_update(_update_callback(data="id-corto"))
         self.assertEqual(eventi[0]["callback_data"], "il-token-vero")
 
     def test_capability_resolver_sconosciuto_non_arriva_al_sink(self):
         eventi, risposte = [], []
         gestore = tw.GestoreWebhook(
-            segreto_atteso=SEGRETO, pairing=tw.MemoriaPairing((42,)), sink=eventi.append,
+            pairing=tw.MemoriaPairing((42,)), sink=eventi.append,
             answer_callback=risposte.append,
             capability_resolver=lambda ident: None)
-        gestore.gestisci(self._corpo(_update_callback(data="id-mai-esistito")), SEGRETO)
+        gestore.processa_update(_update_callback(data="id-mai-esistito"))
         self.assertEqual(eventi, [])
         self.assertEqual(risposte, ["cb-1"])  # l'ack Telegram avviene comunque
 
@@ -352,6 +430,66 @@ class InviaBottoniTest(unittest.TestCase):
             invia(42, "x", [("Conferma", "tok-1")])
 
 
+class InviaFileTest(unittest.TestCase):
+    """sendPhoto/sendDocument (D02): la risposta di '/view'. Unica chiamata
+    Telegram di questo modulo con un corpo multipart, non JSON: non assorbe
+    il guasto, stesso principio di InviaBottoniTest."""
+
+    def test_chiama_sendphoto_con_multipart_per_kind_photo(self):
+        chiamate = []
+
+        class FakeRisposta:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        def opener(richiesta, timeout):
+            chiamate.append(richiesta)
+            return FakeRisposta()
+
+        invia = tw.costruisci_invia_file("BOT:TOKEN", opener=opener)
+        invia(42, "dashboard.png", b"\x89PNG\r\n", "image/png", "photo")
+
+        self.assertEqual(len(chiamate), 1)
+        richiesta = chiamate[0]
+        self.assertIn("BOT:TOKEN", richiesta.full_url)
+        self.assertIn("sendPhoto", richiesta.full_url)
+        self.assertIn("multipart/form-data", richiesta.get_header("Content-type"))
+        self.assertIn(b'name="chat_id"', richiesta.data)
+        self.assertIn(b'name="photo"; filename="dashboard.png"', richiesta.data)
+        self.assertIn(b"\x89PNG\r\n", richiesta.data)
+
+    def test_kind_document_usa_senddocument_e_campo_document(self):
+        chiamate = []
+
+        class FakeRisposta:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        def opener(richiesta, timeout):
+            chiamate.append(richiesta)
+            return FakeRisposta()
+
+        invia = tw.costruisci_invia_file("BOT:TOKEN", opener=opener)
+        invia(42, "dashboard.html", b"<html></html>", "text/html", "document")
+
+        self.assertIn("sendDocument", chiamate[0].full_url)
+        self.assertIn(b'name="document"; filename="dashboard.html"', chiamate[0].data)
+
+    def test_url_error_risale_al_chiamante(self):
+        def opener(richiesta, timeout):
+            raise urllib.error.URLError("giu'")
+
+        invia = tw.costruisci_invia_file("BOT:TOKEN", opener=opener)
+        with self.assertRaises(urllib.error.URLError):
+            invia(42, "x.png", b"y", "image/png", "photo")
+
+
 class CostruisciGestoreDaAmbiente(unittest.TestCase):
     def test_none_senza_prerequisiti(self):
         self.assertIsNone(tw.costruisci_gestore_da_ambiente({}))
@@ -359,19 +497,38 @@ class CostruisciGestoreDaAmbiente(unittest.TestCase):
     def test_gestore_con_prerequisiti_completi(self):
         gestore = tw.costruisci_gestore_da_ambiente({
             "TELEGRAM_BOT_TOKEN_REF": "op://vault/telegram-bot-token",
-            "TELEGRAM_WEBHOOK_SECRET_REF": SEGRETO,
         })
         self.assertIsInstance(gestore, tw.GestoreWebhook)
 
     def test_capability_resolver_passato_al_gestore(self):
-        # Nessuna chiamata a gestisci() qui: farebbe scattare l'answer_callback
-        # vero (rete verso api.telegram.org), non pertinente a questo test,
-        # che verifica solo il passaggio del parametro attraverso il confine.
+        # Nessuna chiamata a processa_update() qui: farebbe scattare
+        # l'answer_callback vero (rete verso api.telegram.org), non
+        # pertinente a questo test, che verifica solo il passaggio del
+        # parametro attraverso il confine.
         gestore = tw.costruisci_gestore_da_ambiente(
-            {"TELEGRAM_BOT_TOKEN_REF": "op://vault/telegram-bot-token",
-             "TELEGRAM_WEBHOOK_SECRET_REF": SEGRETO},
+            {"TELEGRAM_BOT_TOKEN_REF": "op://vault/telegram-bot-token"},
             capability_resolver=lambda ident: f"risolto:{ident}")
         self.assertEqual(gestore._capability_resolver("id-corto"), "risolto:id-corto")
+
+    def test_admin_decision_passato_al_gestore(self):
+        gestore = tw.costruisci_gestore_da_ambiente(
+            {"TELEGRAM_BOT_TOKEN_REF": "op://vault/telegram-bot-token"},
+            admin_decision=lambda d, c, m: True)
+        self.assertTrue(gestore._admin_decision("gestore:approva:x", 1, 2))
+
+    def test_dispositivi_comando_passato_al_gestore(self):
+        chiamate = []
+        gestore = tw.costruisci_gestore_da_ambiente(
+            {"TELEGRAM_BOT_TOKEN_REF": "op://vault/telegram-bot-token"},
+            dispositivi_comando=chiamate.append)
+        gestore._dispositivi_comando(42)
+        self.assertEqual(chiamate, [42])
+
+    def test_comando_view_passato_al_gestore(self):
+        gestore = tw.costruisci_gestore_da_ambiente(
+            {"TELEGRAM_BOT_TOKEN_REF": "op://vault/telegram-bot-token"},
+            comando_view=lambda t, c: True)
+        self.assertTrue(gestore._comando_view("/view", 42))
 
 
 if __name__ == "__main__":

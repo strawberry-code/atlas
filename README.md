@@ -27,7 +27,7 @@ Install Atlas in the project, then ask your coding agent to create and run the g
 You: Create an Atlas graph to build a Millennium Falcon model. Break the work
 into AFK nodes with real dependencies and leave model empty unless it matters.
 
-You: Orchestrate its execution with Atlas Automata, one Luna agent at a time,
+You: Orchestrate its execution with Atlas Autopilot, one Luna agent at a time,
 until every node is closed. Report the result when the graph reaches END.
 ```
 
@@ -56,13 +56,15 @@ Install the CLI, install it in a project (creates `.atlas/`, registers the proje
 4. **Work it**: if the node is AFK, the agent does it alone; if it's HITL, the `atlas-work` skill asks its questions one at a time and waits.
 5. **Close it** with `atlas close <ID> -s "summary"`, after writing the Answer section in the ticket. The map and dashboard regenerate on their own.
 
-For an Automata run, `atlas run-status` shows the persistent state and `atlas run-log` shows the event history; `atlas run-log --tail N` limits the diagnosis to the latest events.
+Closing is not the only way to finish, and the other two matter most when an agent works with nobody watching. `atlas give-up <ID> --motivo <REASON>` declares that the work cannot be done, picking the reason from `infeasible`, `missing-resource`, `blocked-environment` and `needs-redesign`: Autopilot treats it as final and moves on, instead of throwing the same agent at the same wall again. `atlas ask-human <ID> -q "proposal"` declares that a person is needed: it opens an Interaction and the node waits without spending attempts. And while working, `atlas progress <ID> <STEP>` declares where the work has got to, so an agent that is stuck can be told apart from one that is thinking.
 
-## Atlas Automata
+For an Autopilot run, `atlas run-status` shows the persistent state and `atlas run-log` shows the event history; `atlas run-log --tail N` limits the diagnosis to the latest events.
 
-Atlas Automata is the mechanical runner for AFK work already described by a graph. Start each run with the required per-run limit, for example `atlas run --parallelism 1` for strict serial execution or a higher value for bounded parallelism. The value is not written into the graph. Automata keeps Atlas as the source of truth for the frontier, claims, dependencies and terminal states; its ledgers are diagnostic state, not a second scheduler.
+## Atlas Autopilot
 
-The node field `model` is optional and stays absent or empty unless the graph author specifies it. Empty means Codex Luna (`codex-luna`). An explicit value must match a registered adapter exactly. If the default Luna adapter is unavailable, Automata makes one observable fallback to Claude Sonnet (`claude`); an explicit model is never silently replaced. Gemini and Code Terra are additional supported adapter identities.
+Atlas Autopilot is the mechanical runner for AFK work already described by a graph. Start each run with the required per-run limit, for example `atlas run --parallelism 1` for strict serial execution or a higher value for bounded parallelism. The value is not written into the graph. Autopilot keeps Atlas as the source of truth for the frontier, claims, dependencies and terminal states; its ledgers are diagnostic state, not a second scheduler.
+
+The node field `model` is optional and stays absent or empty unless the graph author specifies it. Empty means Codex Luna (`codex-luna`). An explicit value must match a registered adapter exactly. If the default Luna adapter is unavailable, Autopilot makes one observable fallback to Claude Sonnet (`claude`); an explicit model is never silently replaced. Gemini and Code Terra are additional supported adapter identities.
 
 Every provider runs AFK, outside the sandbox and with permission bypass. To add a provider, implement `AgentAdapter` or configure `SubprocessAdapter`, register it in `AdapterRegistry`, and pass the registry to `launcher_from_registry`; the runner's frontier, parallelism and termination logic do not change. A subprocess adapter must use a validated argv, closed stdin and the provider's non-interactive flags.
 
@@ -72,7 +74,7 @@ One way to orchestrate several nodes at once, if the project has many available:
 
 ## Atlas Interactions
 
-The dashboard's right-side Notifications panel turns HITL nodes, blocked runs, exhausted retries and END into actionable cards, resolved with `atlas serve` running, no polling: a valid response resumes Automata straight from the commit. Browser and system notifications work with no setup; a Himalaya profile already configured on the machine adds email alerts and escalation; a one-tap Telegram pairing button (no token, chat ID or hostname to type in) adds inline-button actions through an opt-in Atlas Relay. Setup, diagnostics and the deploy prerequisites for the Telegram relay are in `docs/atlas-interactions-quickstart.md`.
+The dashboard's right-side Notifications panel turns HITL nodes, blocked runs, exhausted retries and END into actionable cards, resolved with `atlas serve` running, no polling: a valid response resumes Autopilot straight from the commit. Browser and system notifications work with no setup; a Himalaya profile already configured on the machine adds email alerts and escalation; a one-tap Telegram pairing button (no token, chat ID or hostname to type in) adds inline-button actions through an opt-in Atlas Relay. Setup, diagnostics and the deploy prerequisites for the Telegram relay are in `docs/atlas-interactions-quickstart.md`.
 
 ## Installing the CLI
 
@@ -94,6 +96,7 @@ Lands in `~/.local/bin/atlas` (`%USERPROFILE%\.local\bin\atlas` on Windows, over
 atlas install .                      # or atlas install /path/to/project
 atlas install . --graph my-epic      # create the first graph right away
 atlas install . --lang en            # content and skills in English instead of Italian
+atlas uninstall .                    # removes Atlas from the project, leaves the data in .atlas/
 ```
 
 Only the project's own data lands in `.atlas/`: `config.json`, the graphs, the mutation scripts, the skills, the contract, and a `README.md` telling whoever finds that folder how to get `atlas`. The engine doesn't go in there: it lives in the executable, one per machine. Outside `.atlas/` you get one symlink per skill in `.claude/skills/`, the end-of-session hook in `.claude/settings.json`, and the contract in `CLAUDE.md`. The project also gets registered in `~/.config/atlas.json` under a slug (default: the folder name; `--slug` for a different one).
@@ -123,12 +126,22 @@ atlas status                         # frontier, locks, progress
 atlas next                           # frontier ranked by impact, as a suggestion
 atlas take F01                       # claims it and prints its context in one step
 # work it, then write the Answer section in .atlas/graphs/<slug>/tickets/F01.md
+atlas progress F01 verifying           # declare the step you have reached, while working
 atlas close F01 -s "one-line summary"
+atlas give-up F01 --motivo missing-resource -d "the bot token is needed"
+atlas ask-human F01 -q "I would go with schema A, confirm?"
 atlas amend F01 --artefatti src/a.py # fixes the bookkeeping of an already closed node
+atlas fog "what surfaced and has no node yet"
+atlas fog --list                     # the fog collected so far
+atlas ask "the question" --assumption "how I proceed meanwhile"
+atlas asks                           # open questions, from everyone
+atlas answer Q001 -r "the answer"
+atlas validate                       # graph shape: ids, edges, cycles
+atlas doctor                         # diagnosis that holds even on a broken graph
 atlas render --open                  # dashboard
 atlas serve --no-open                # dashboard on a local server, live (Ctrl-C to stop)
 atlas serve --port 8080              # same, on a port you choose
-atlas run --parallelism 1            # Automata run: 1 means serial
+atlas run --parallelism 1            # Autopilot run: 1 means serial
 atlas doctor                         # health check: dangling nodes, stale locks, stale dashboard
 atlas conflicts                      # the active graph's unresolved merge conflicts
 atlas conflicts --resolve            # declare them resolved, once graph.json is fixed by hand

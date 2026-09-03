@@ -8,14 +8,18 @@ non ha deciso. Il tunnel puo' sparire e riapparire quante volte vuole finche'
 'stop' non e' segnalato: l'unica fonte di verita' resta il grafo locale.
 
 Trasporto: GET a lungo termine in stile SSE su '<base>/tunnel' (D01), identita'
-di sessione (graph, runId) in query string, bearer ATLAS_RELAY_TOKEN_REF
-nell'header Authorization. Nessun polling: una sola richiesta tenuta aperta e
-riletta riga per riga; alla caduta (errore di trasporto o timeout di lettura,
-oltre due battiti mancati del relay) backoff esponenziale con full jitter e
-nuova connessione, all'infinito.
+di installazione (A05, non piu' di sessione: docs/atlas-relay-design.md
+SS4-bis) in query string, bearer ATLAS_RELAY_TOKEN_REF nell'header
+Authorization, piu' l'header 'X-Atlas-Protocol' (A01, relay_identity.PROTOCOLLO)
+che dichiara la versione di protocollo che questa installazione parla: serve
+a E02, che avvisa su Telegram prima che il relay smetta di servirla. Nessun
+polling: una sola richiesta tenuta aperta e riletta riga per riga; alla caduta
+(errore di trasporto o timeout di lettura, oltre due battiti mancati del
+relay) backoff esponenziale con full jitter e nuova connessione, all'infinito.
 """
 from __future__ import annotations
 
+import base64
 import json
 import random
 import urllib.error
@@ -24,6 +28,8 @@ from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
 from threading import Event
 from urllib.parse import urlencode
+
+from . import relay_identity
 
 ENV_URL = "RELAY_PUBLIC_URL"
 ENV_HOSTNAME = "RELAY_HTTPS_HOSTNAME"
@@ -47,8 +53,8 @@ class TunnelConfig:
     base_url: str
     token: str
 
-    def url_tunnel(self, graph: str, run_id: str) -> str:
-        query = urlencode({"graph": graph, "runId": run_id})
+    def url_tunnel(self, installation_id: str) -> str:
+        query = urlencode({"installation": installation_id})
         return f"{self.base_url.rstrip('/')}/tunnel?{query}"
 
 
@@ -94,11 +100,12 @@ def _decodifica_sse(risposta) -> Iterator[dict]:
         # altre righe (es. 'event: tap') non servono: il payload JSON basta
 
 
-def _connetti_e_consuma(config: TunnelConfig, graph: str, run_id: str, on_event: OnEvent,
+def _connetti_e_consuma(config: TunnelConfig, installation_id: str, on_event: OnEvent,
                         stop: Event, opener) -> None:
     richiesta = urllib.request.Request(
-        config.url_tunnel(graph, run_id),
-        headers={"Authorization": f"Bearer {config.token}"},
+        config.url_tunnel(installation_id),
+        headers={"Authorization": f"Bearer {config.token}",
+                 relay_identity.INTESTAZIONE_PROTOCOLLO: str(relay_identity.PROTOCOLLO)},
     )
     with opener(richiesta, timeout=TIMEOUT_LETTURA) as risposta:
         if risposta.status != 200:
@@ -134,16 +141,17 @@ def aggiorna_messaggio(config: TunnelConfig, chat_id: int, message_id: int, test
         pass
 
 
-def invia_messaggio(config: TunnelConfig, graph: str, testo: str, bottoni: list[tuple[str, str]],
-                    opener=urllib.request.urlopen) -> None:
+def invia_messaggio(config: TunnelConfig, installation_id: str, testo: str,
+                    bottoni: list[tuple[str, str]], opener=urllib.request.urlopen) -> None:
     """POST '<base>/tunnel/deliver' (D07): il deliver iniziale di
     un'Interazione aperta, un bottone per azione ammessa. A differenza di
     aggiorna_messaggio questa chiamata NON assorbe il guasto: la consegna non
-    e' ancora avvenuta, quindi un relay irraggiungibile, non deployato o un
-    progetto non ancora appaiato (D05) devono risalire a notify.dispatch
-    (C01), che li registra nel ledger di consegna e decide se ritentare."""
+    e' ancora avvenuta, quindi un relay irraggiungibile, non deployato o
+    un'installazione non ancora appaiata (D05/A02) devono risalire a
+    notify.dispatch (C01), che li registra nel ledger di consegna e decide
+    se ritentare."""
     corpo = json.dumps({
-        "graph": graph, "text": testo,
+        "installation": installation_id, "text": testo,
         "buttons": [{"label": etichetta, "data": dato} for etichetta, dato in bottoni],
     }).encode("utf-8")
     richiesta = urllib.request.Request(
@@ -156,7 +164,27 @@ def invia_messaggio(config: TunnelConfig, graph: str, testo: str, bottoni: list[
             raise ConnessioneRelayRifiutata(f"deliver rifiutato dal relay: HTTP {risposta.status}")
 
 
-def esegui(config: TunnelConfig, graph: str, run_id: str, on_event: OnEvent, stop: Event,
+def invia_file(config: TunnelConfig, installation_id: str, filename: str, content: bytes,
+              mime: str, kind: str, opener=urllib.request.urlopen) -> None:
+    """POST '<base>/tunnel/deliver-file' (D02): la risposta di '/view', un
+    file binario in base64 dentro lo stesso JSON di ogni altra richiesta.
+    'kind' e' 'photo' o 'document' (S7-bis/9), la scelta la fa
+    telegram_view.py. NON assorbe il guasto, come invia_messaggio."""
+    corpo = json.dumps({
+        "installation": installation_id, "filename": filename, "mime": mime, "kind": kind,
+        "content": base64.b64encode(content).decode("ascii"),
+    }).encode("utf-8")
+    richiesta = urllib.request.Request(
+        f"{config.base_url.rstrip('/')}/tunnel/deliver-file",
+        data=corpo, method="POST",
+        headers={"Authorization": f"Bearer {config.token}", "Content-Type": "application/json"},
+    )
+    with opener(richiesta, timeout=20) as risposta:
+        if risposta.status != 200:
+            raise ConnessioneRelayRifiutata(f"deliver-file rifiutato dal relay: HTTP {risposta.status}")
+
+
+def esegui(config: TunnelConfig, installation_id: str, on_event: OnEvent, stop: Event,
           opener=urllib.request.urlopen, rand: Callable[[], float] = random.random,
           wait: Callable[[float], None] | None = None) -> None:
     """Il ciclo di vita del tunnel: connette, consuma, riconnette all'infinito.
@@ -170,7 +198,7 @@ def esegui(config: TunnelConfig, graph: str, run_id: str, on_event: OnEvent, sto
     tentativo = 0
     while not stop.is_set():
         try:
-            _connetti_e_consuma(config, graph, run_id, on_event, stop, opener)
+            _connetti_e_consuma(config, installation_id, on_event, stop, opener)
             tentativo = 0   # il relay ha accettato la connessione: si riparte da capo
         except (OSError, urllib.error.URLError, ConnessioneRelayRifiutata, TimeoutError):
             pass

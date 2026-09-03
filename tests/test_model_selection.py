@@ -10,7 +10,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "payload"))
 
-from core import adapters, automata  # noqa: E402
+from core import adapters, autopilot  # noqa: E402
 
 
 class Handle:
@@ -89,7 +89,7 @@ class ModelSelectionTest(unittest.TestCase):
         run = mock.Mock()
         run.log = []
 
-        handle = automata.launcher_from_registry(registry)(run, {"id": "N01"})
+        handle = autopilot.launcher_from_registry(registry)(run, {"id": "N01"})
 
         self.assertIsInstance(handle, Handle)
         self.assertIs(run, self.claude.context.run)
@@ -106,7 +106,7 @@ class ModelSelectionTest(unittest.TestCase):
         run = mock.Mock()
         run.log = []
         logger = mock.Mock()
-        launcher = automata.launcher_from_registry(self.registry, logger)
+        launcher = autopilot.launcher_from_registry(self.registry, logger)
 
         handle = launcher(run, {"id": "N01", "model": adapters.CLAUDE})
 
@@ -119,7 +119,7 @@ class ModelSelectionTest(unittest.TestCase):
     def test_launcher_registra_il_default_nel_log_del_run(self):
         run = mock.Mock()
         run.log = []
-        launcher = automata.launcher_from_registry(self.registry)
+        launcher = autopilot.launcher_from_registry(self.registry)
 
         launcher(run, {"id": "N01"})
 
@@ -131,7 +131,7 @@ class ModelSelectionTest(unittest.TestCase):
         registry = adapters.AdapterRegistry([luna, self.claude])
         run = mock.Mock()
         run.log = []
-        launcher = automata.launcher_from_registry(registry)
+        launcher = autopilot.launcher_from_registry(registry)
 
         handle = launcher(run, {"id": "N01"})
 
@@ -151,7 +151,7 @@ class ModelSelectionTest(unittest.TestCase):
         run = mock.Mock()
         run.log = []
 
-        handle = automata.launcher_from_registry(registry)(run, {"id": "N01"})
+        handle = autopilot.launcher_from_registry(registry)(run, {"id": "N01"})
 
         self.assertEqual("closed", handle.wait().status)
         self.assertEqual(
@@ -171,7 +171,7 @@ class ModelSelectionTest(unittest.TestCase):
         run.log = []
 
         with self.assertRaises(adapters.ProviderUnavailableError):
-            automata.launcher_from_registry(registry)(run, {"id": "N01"})
+            autopilot.launcher_from_registry(registry)(run, {"id": "N01"})
 
         self.assertEqual(
             [
@@ -188,7 +188,7 @@ class ModelSelectionTest(unittest.TestCase):
         run = mock.Mock()
         run.log = []
 
-        handle = automata.launcher_from_registry(registry)(run, {"id": "N01"})
+        handle = autopilot.launcher_from_registry(registry)(run, {"id": "N01"})
 
         self.assertEqual("error", handle.wait().status)
         self.assertEqual(
@@ -201,7 +201,7 @@ class ModelSelectionTest(unittest.TestCase):
         run.log = []
 
         with self.assertRaises(adapters.ProviderUnavailableError):
-            automata.launcher_from_registry(registry)(
+            autopilot.launcher_from_registry(registry)(
                 run, {"id": "N01", "model": adapters.CODEX_LUNA})
 
         self.assertEqual(
@@ -211,7 +211,7 @@ class ModelSelectionTest(unittest.TestCase):
         run = mock.Mock()
         run.log = []
         logger = mock.Mock()
-        launcher = automata.launcher_from_registry(self.registry, logger)
+        launcher = autopilot.launcher_from_registry(self.registry, logger)
 
         with self.assertRaises(adapters.AdapterRegistryError):
             launcher(run, {"id": "N01", "model": "sonnet-unknown"})

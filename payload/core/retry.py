@@ -1,4 +1,4 @@
-"""Retry bounded e stato durevole del run Automata.
+"""Retry bounded e stato durevole del run Autopilot.
 
 Il ledger contiene solo il tentativo del nodo e il prossimo istante utile. Non
 salva il processo agente: dopo un riavvio il claim Atlas resta la sola prova che
@@ -19,7 +19,7 @@ from .store import StateError, scrivi_atomico
 
 FailureKind = Literal[
     "timeout", "crash", "rate-limit", "provider-unavailable",
-    "ambiguous-termination", "permanent-error",
+    "ambiguous-termination", "permanent-error", "surrendered", "orphaned-answer",
 ]
 
 RETRYABLE_FAILURES = frozenset({
@@ -41,6 +41,13 @@ class AmbiguousTerminationError(RuntimeError):
 
 class PermanentError(RuntimeError):
     """Il lavoro non puo' riuscire con un nuovo tentativo identico."""
+
+
+class SurrenderedError(RuntimeError):
+    """L'agente ha dichiarato la resa (H01/2): terminale per costruzione, mai un
+    guasto da ritentare, a differenza di 'ambiguous-termination' che oggi lo
+    inghiotte (H04). Autopilot la costruisce leggendo data['surrenders'], non un
+    dettaglio di provider: non passa da _da_dettaglio come gli altri guasti."""
 
 
 def _da_dettaglio(dettaglio: str | None) -> FailureKind:
@@ -93,6 +100,8 @@ def classify_failure(value: object) -> FailureKind | None:
         return "ambiguous-termination"
     if isinstance(value, PermanentError):
         return "permanent-error"
+    if isinstance(value, SurrenderedError):
+        return "surrendered"
     if isinstance(value, CrashError):
         return "crash"
     if isinstance(value, BaseException):
@@ -146,14 +155,40 @@ class RetryState:
 
     VERSION = 1
 
-    def __init__(self, path: Path, graph_slug: str):
+    def __init__(self, path: Path, graph_slug: str, run_id: str | None = None):
         self.path = Path(path)
         self.graph_slug = graph_slug
+        self.run_id = run_id
         self._data = self._read()
+        # Il budget dei tentativi appartiene al run che li ha spesi, non al grafo
+        # per sempre. Un nodo esaurito ieri lasciava un record 'terminal' che oggi
+        # faceva morire il run appena partito, con una diagnosi che parlava di un
+        # tentativo mai fatto in questa esecuzione. Il ledger di un altro run si
+        # butta: chi vuole sapere com'e' andata legge la cronologia, non il budget.
+        if run_id is not None and self._data.get("run") != run_id:
+            esisteva = self.path.is_file()
+            if self._data.get("run") is None:
+                # Ledger scritto prima di questa regola: non si sa di chi sia, e
+                # buttarlo perderebbe la riconciliazione di un'interruzione vera.
+                # Si adotta, togliendo pero' i record esauriti: sono quelli che
+                # facevano morire in partenza un run che non aveva ancora speso
+                # nulla, con una diagnosi su un tentativo mai fatto.
+                self._data["nodes"] = {node_id: record
+                                       for node_id, record in self._data["nodes"].items()
+                                       if record.get("status") != "terminal"}
+            else:
+                self._data = {"version": self.VERSION, "graph": self.graph_slug,
+                              "nodes": {}}
+            self._data["run"] = run_id
+            # Si scrive solo se c'era gia' un file: crearlo a ogni avvio lascerebbe
+            # sul disco il ledger di un run che non ha ancora speso un tentativo.
+            if esisteva:
+                self._save()
 
     def _read(self) -> dict:
         if not self.path.is_file():
-            return {"version": self.VERSION, "graph": self.graph_slug, "nodes": {}}
+            return {"version": self.VERSION, "graph": self.graph_slug,
+                    "run": self.run_id, "nodes": {}}
         try:
             data = json.loads(self.path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as errore:

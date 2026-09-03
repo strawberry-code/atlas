@@ -59,7 +59,7 @@ def e_mio(node: dict) -> bool:
 def mio_come(node: dict, me: str) -> bool:
     """Come e_mio, ma per un'identita' dichiarata invece di quella dell'ambiente.
 
-    Automata rivendica un nodo per conto del provider che sta per lanciare, quindi
+    Autopilot rivendica un nodo per conto del provider che sta per lanciare, quindi
     l'identita' da confrontare non e' quella del processo che chiama.
     """
     return nota(me) and holder(node).get("identity") == me

@@ -64,7 +64,7 @@ class ConsumatiJti:
     """jti gia' visti, tenuti solo finche' la loro scadenza non e' passata.
 
     Potabile per costruzione (un jti scaduto non serve piu' a nessuno): senza
-    questo limite un processo Automata long-running accumulerebbe un jti per
+    questo limite un processo Autopilot long-running accumulerebbe un jti per
     ogni tap per sempre.
     """
 

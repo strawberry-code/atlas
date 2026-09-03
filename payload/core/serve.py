@@ -21,7 +21,7 @@ http.server, socketserver, threading e webbrowser sono tutti stdlib.
 'atlas serve' e' anche l'unico posto dove un bottone del pannello Notifiche
 puo' rispondere davvero: POST /interactions/<id>/<action> applica l'azione al
 lifecycle atomico (interactions.resolve_interaction, dentro mutate.editing) e
-il commit e' cio' che risveglia Automata. Da un file aperto con 'atlas
+il commit e' cio' che risveglia Autopilot. Da un file aperto con 'atlas
 render' (file://) quei bottoni restano disabilitati in JS: non c'e' server a
 cui parlare.
 
@@ -33,6 +33,9 @@ in dashboard.js.
 'atlas serve' e' anche l'unico posto dove parte il pairing Telegram one-tap
 (serve_pairing.py, D05): POST/GET /pairing/telegram* parlano col relay al
 posto del browser, cosi' il bearer del relay non lascia mai questo processo.
+
+POST /notify/telegram/toggle (serve_notify.py, SS7-ter/1) capovolge la
+levetta muto del progetto: tocca solo config.json, mai il relay.
 """
 from __future__ import annotations
 
@@ -229,7 +232,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         if self.path == serve_pairing.PERCORSO_AVVIA:
-            stato, payload = serve_pairing.avvia(self.server.dash.ref)
+            stato, payload = serve_pairing.avvia()
+            self._json(stato, payload)
+            return
+        if self.path == serve_notify.PERCORSO_TOGGLE:
+            stato, payload = serve_notify.alterna_telegram(self.server.dash.ref)
             self._json(stato, payload)
             return
         corrispondenza = serve_actions.PERCORSO.match(self.path)

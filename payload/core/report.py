@@ -6,7 +6,7 @@ from datetime import timedelta
 from . import claims, docs, drift, questions
 from .config import Graph, Workspace
 from .model import (blocked, blocks, claimed, fog_for, frontier, is_done, node_of,
-                    owners, owners_of, progress, unowned)
+                    owners, owners_of, progress, unowned, waiting_human)
 from .topology import ranked_frontier
 from .run_state import RunState
 from .store import load
@@ -42,6 +42,13 @@ def show_status(ref: Graph, data: dict) -> None:
     elif not totale:
         print(t("report.grafo_vuoto_1"))
         print(t("report.grafo_vuoto_2"))
+    elif in_attesa := waiting_human(data):
+        # H05: distinto da 'finito' e da 'bloccato da un arco', altrimenti chi
+        # legge lo status di un run fermo su una domanda per una persona lo
+        # crederebbe concluso: i blocker di questi nodi sono gia' tutti soddisfatti.
+        print(t("report.in_attesa_persona"))
+        for node in in_attesa:
+            print(f"    {node['id']}  {node['title']}")
     elif not blocked(data) and not claimed(data):
         print(t("report.finito"))
     else:
@@ -66,7 +73,7 @@ def show_status(ref: Graph, data: dict) -> None:
 
 
 def show_run_status(ref: Graph, quiet: bool = False) -> None:
-    """Mostra lo snapshot durevole dell'ultima esecuzione Automata."""
+    """Mostra lo snapshot durevole dell'ultima esecuzione Autopilot."""
     stato = RunState.read(ref.run_state_path)
     if stato is None:
         if not quiet:
@@ -83,6 +90,10 @@ def show_run_status(ref: Graph, quiet: bool = False) -> None:
             dettagli.append(f"provider={stato['provider']}")
         if stato.get("attempt") is not None:
             dettagli.append(f"attempt={stato['attempt']}")
+        if stato.get("failure"):
+            # Distingue una resa dichiarata (H01/2) da un crash o un altro guasto
+            # (H04): il campo esiste gia' nel ledger degli eventi, mancava solo qui.
+            dettagli.append(t("report.run_guasto", failure=stato["failure"]))
         print("    " + " ".join(dettagli))
     if stato.get("reason"):
         print(t("report.run_motivo", reason=stato["reason"]))
@@ -223,6 +234,20 @@ def show_brief(ref: Graph, data: dict, node_id: str) -> None:
         print(t("report.brief_rilasci"))
         for r in rilasci:
             print(f"    {r['at']}: {r['reason']}")
+
+    # H05: chi riprende un nodo dopo un ask-human deve vedere qui la scelta della
+    # persona (l'interazione risolta), non doverla ricostruire rileggendo il
+    # ledger a mano. Generico su ogni evento, non solo 'human-needed': e' lo
+    # stesso ledger che gia' apre gate/decision/run-stopped.
+    interazioni = [i for i in data.get("interactions", []) if i["nodeId"] == node_id]
+    if interazioni:
+        print(t("report.brief_interazioni"))
+        for i in interazioni:
+            if i["status"] == "resolved":
+                print(f"    {i['updatedAt']}: {i['summary']} -> {i['resolution']['effect']}")
+            else:
+                print(t("report.brief_interazione_riga", quando=i["updatedAt"],
+                        sintesi=i["summary"], stato=i["status"]))
     print()
 
 

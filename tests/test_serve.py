@@ -171,7 +171,7 @@ class Http(Base):
 
 class Azioni(Base):
     """POST /interactions/<id>/<action>: il pannello Notifiche parla col
-    lifecycle atomico (A04) e con la ripresa di Automata (A05) solo da qui."""
+    lifecycle atomico (A04) e con la ripresa di Autopilot (A05) solo da qui."""
 
     def _server(self):
         dash = self.serve.Dashboard(self.ref)
@@ -261,7 +261,7 @@ class Azioni(Base):
         self.assertEqual(404, ctx.exception.code)
 
     def test_la_risoluzione_risveglia_chi_aspetta_in_process(self):
-        """Collega il pannello alla ripresa di Automata: resolve_interaction
+        """Collega il pannello alla ripresa di Autopilot: resolve_interaction
         dentro mutate.editing pubblica il ResolutionEvent che sblocca
         wait_for_resolution, lo stesso meccanismo che usa il runner (A05)."""
         from core import interactions
@@ -320,8 +320,8 @@ class Pairing(Base):
         chiamate = []
         originale = serve_pairing.avvia
 
-        def finto(ref, env=None, opener=None):
-            chiamate.append(ref.slug)
+        def finto(env=None, opener=None):
+            chiamate.append(True)
             return 200, {"ok": True, "url": "https://t.me/atlas_bot?start=abc", "code": "abc"}
 
         serve_pairing.avvia = finto
@@ -333,13 +333,13 @@ class Pairing(Base):
             self.assertEqual(risposta.status, 200)
             self.assertEqual(json.loads(risposta.read()),
                               {"ok": True, "url": "https://t.me/atlas_bot?start=abc", "code": "abc"})
-        self.assertEqual(chiamate, [self.ref.slug])
+        self.assertEqual(chiamate, [True])
 
     def test_avvia_senza_relay_configurato_torna_503(self):
         from core import serve_pairing
 
         originale = serve_pairing.avvia
-        serve_pairing.avvia = lambda ref, env=None, opener=None: (503, {"ok": False})
+        serve_pairing.avvia = lambda env=None, opener=None: (503, {"ok": False})
         self.addCleanup(setattr, serve_pairing, "avvia", originale)
 
         server = self._server()
@@ -366,6 +366,51 @@ class Pairing(Base):
             self.assertEqual(risposta.status, 200)
             self.assertEqual(json.loads(risposta.read()), {"ok": True, "status": "associato"})
         self.assertEqual(chiamate, ["abc123"])
+
+
+class Muto(Base):
+    """POST /notify/telegram/toggle: la levetta per progetto di SS7-ter/1,
+    dal pannello Notifiche al config.json del progetto servito."""
+
+    def _server(self):
+        dash = self.serve.Dashboard(self.ref)
+        dash.aggiorna()
+        server = self.serve.Server(("127.0.0.1", 0), self.serve.Handler)
+        server.dash = dash
+        server.spettatori = self.serve.Viewers()
+        server.fermo = threading.Event()
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(self._ferma, server)
+        return server
+
+    def _ferma(self, server):
+        server.fermo.set()
+        server.shutdown()
+        server.server_close()
+
+    def _url(self, server, percorso):
+        return f"http://127.0.0.1:{server.server_address[1]}{percorso}"
+
+    def _post(self, server, percorso):
+        richiesta = urllib.request.Request(self._url(server, percorso), method="POST")
+        return urllib.request.urlopen(richiesta, timeout=5)
+
+    def test_il_toggle_spegne_poi_riaccende_e_torna_lo_stato_nuovo(self):
+        server = self._server()
+        with self._post(server, "/notify/telegram/toggle") as risposta:
+            self.assertEqual(200, risposta.status)
+            self.assertEqual({"ok": True, "enabled": False}, json.loads(risposta.read()))
+        with self._post(server, "/notify/telegram/toggle") as risposta:
+            self.assertEqual({"ok": True, "enabled": True}, json.loads(risposta.read()))
+
+    def test_il_toggle_scrive_sul_config_json_del_progetto_servito(self):
+        server = self._server()
+        with self._post(server, "/notify/telegram/toggle"):
+            pass
+        dati = json.loads((self.root / "config.json").read_text(encoding="utf-8"))
+        self.assertEqual(False, dati["notify"]["telegram_enabled"])
+        self.assertEqual("prova", dati["project"])   # le altre chiavi restano
 
 
 class StubTrasporto:

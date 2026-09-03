@@ -1,15 +1,16 @@
-"""Entry point e ciclo bounded per una singola esecuzione di Automata."""
+"""Entry point e ciclo bounded per una singola esecuzione di Autopilot."""
 from __future__ import annotations
 
 import argparse
 import os
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
-from . import capability, claims, interactions, mutate, relay_client, telegram_actions
+from . import (capability, claims, docs, interactions, mutate, relay_client,
+              relay_identity, render, telegram_actions, telegram_status, telegram_view)
 from .adapters import (
     DEFAULT_MODEL,
     FALLBACK_MODEL,
@@ -20,9 +21,9 @@ from .adapters import (
     ProviderUnavailableError,
 )
 from .config import Graph
-from .model import blocked, claimed, frontier, is_done, node_of
+from .model import blocked, claimed, frontier, is_done, istante, node_of, waiting_human
 from .retry import (RETRYABLE_FAILURES, AmbiguousTerminationError, RetryPolicy,
-                    RetryState, classify_failure)
+                    RetryState, SurrenderedError, classify_failure)
 from .run_state import RunState
 from .store import CLAIMED, StateError, load, read_transaction
 from .strings import t
@@ -115,9 +116,12 @@ def start(graph: Graph, parallelism: object, retry_policy: RetryPolicy | None = 
           retry_state_path=None, run_state_path=None) -> Run:
     """Crea un run dopo aver validato il limite richiesto dall'utente."""
     if type(parallelism) is not int or parallelism <= 0:
-        raise ValueError(t("automata.parallelism_invalid"))
-    state = RetryState(retry_state_path or graph.retry_state_path, graph.slug)
+        raise ValueError(t("autopilot.parallelism_invalid"))
+    # L'ordine conta: RunState decide se questa e' una ripresa o un run nuovo, e
+    # il ledger dei tentativi deve saperlo per non spendere il budget di un altro.
     run_state = RunState(run_state_path or graph.run_state_path, graph.slug)
+    state = RetryState(retry_state_path or graph.retry_state_path, graph.slug,
+                       run_id=run_state.run_id)
     return Run(graph=graph, parallelism=parallelism,
                retry_policy=retry_policy or RetryPolicy(), retry_state=state,
                run_state=run_state)
@@ -227,9 +231,9 @@ def parse_parallelism(value: str) -> int:
     try:
         parallelism = int(value)
     except (TypeError, ValueError) as errore:
-        raise argparse.ArgumentTypeError(t("automata.parallelism_invalid")) from errore
+        raise argparse.ArgumentTypeError(t("autopilot.parallelism_invalid")) from errore
     if parallelism <= 0:
-        raise argparse.ArgumentTypeError(t("automata.parallelism_invalid"))
+        raise argparse.ArgumentTypeError(t("autopilot.parallelism_invalid"))
     return parallelism
 
 
@@ -250,7 +254,11 @@ def execute(run: Run, launcher: Launcher, wait_for: Waiter | None = None,
     try:
         return _execute(run, launcher, wait_for, now, sleeper, interaction_waiter)
     except RunnerError as errore:
-        status = "blocked" if "run bloccato" in str(errore) else "failed"
+        # H05: una pausa su una persona non e' un fallimento del run, e non deve
+        # leggersi come tale su dashboard e run-log. Stesso riconoscimento, gia'
+        # fragile, con cui 'run bloccato' evita la stessa etichetta sbagliata.
+        status = ("blocked" if "run bloccato" in str(errore)
+                            or "in attesa di una persona" in str(errore) else "failed")
         _event(run, "run-blocked" if status == "blocked" else "run-failed",
                status=status, reason=str(errore))
         raise
@@ -261,21 +269,43 @@ def execute(run: Run, launcher: Launcher, wait_for: Waiter | None = None,
 def _avvia_tunnel_telegram(run: Run) -> tuple[threading.Event | None, threading.Thread | None]:
     """Apre il tunnel D03 per questa sessione (D06) se il relay e la chiave
     delle capability (D01) sono entrambi configurati nell'ambiente;
-    altrimenti il run procede come sempre, senza Telegram. Gira in un thread
-    demone: non deve mai impedire al processo di uscire."""
+    altrimenti il run procede come sempre, senza Telegram. La linea si apre
+    sotto l'identita' di questa installazione (A05, SS4-bis), non sotto il
+    grafo: 'carica_o_crea' la genera al primo utilizzo su questa macchina.
+    Gira in un thread demone: non deve mai impedire al processo di uscire."""
     config = relay_client.da_ambiente(os.environ)
     chiave = capability.da_ambiente(os.environ)
     if config is None or chiave is None:
         return None, None
+    installazione = relay_identity.carica_o_crea()
     fermo = threading.Event()
-    on_event = telegram_actions.gestore(run.graph, run.run_state.run_id, chiave, config)
+    on_event = _combina_on_event(
+        telegram_actions.gestore(run.graph, run.run_state.run_id, chiave, config),
+        telegram_status.gestore(run.graph, installazione.installation_id, config),
+        telegram_view.gestore(run.graph, installazione.installation_id, config),
+    )
     thread = threading.Thread(
         target=relay_client.esegui,
-        args=(config, run.graph.slug, run.run_state.run_id, on_event, fermo),
+        args=(config, installazione.installation_id, on_event, fermo),
         daemon=True,
     )
     thread.start()
     return fermo, thread
+
+
+def _combina_on_event(*gestori: relay_client.OnEvent) -> relay_client.OnEvent:
+    """Un solo on_event per il tunnel D03, che prova ogni gestore iniettato:
+    telegram_actions risolve un tap (evento 'callback'), telegram_status
+    risponde ai tre comandi di stato (evento 'message', D01), telegram_view
+    risponde a '/view' con una foto o la pagina alleggerita (evento
+    'message', D02). Ognuno ignora da solo cio' che non e' il proprio tipo o
+    testo, quindi comporli qui non duplica nessuna decisione: e' lo stesso
+    principio di 'admin_decision' nel relay, un solo slot che prova piu'
+    confini in sequenza."""
+    def _on_event(evento: Mapping[str, object]) -> None:
+        for gestore in gestori:
+            gestore(evento)
+    return _on_event
 
 
 def _ferma_tunnel_telegram(fermo: threading.Event | None, thread: threading.Thread | None) -> None:
@@ -306,15 +336,20 @@ def _execute(run: Run, launcher: Launcher, wait_for: Waiter | None = None,
             if candidato["mode"] != "AFK" or candidato["type"] == "gate":
                 event = "gate-required" if candidato["type"] == "gate" else "decision-required"
                 _attendi_interazione(run, candidato, event, interaction_waiter, now())
-                raise RunnerError(t("automata.hitl", id=candidato["id"]))
+                raise RunnerError(t("autopilot.hitl", id=candidato["id"]))
             if candidato["id"] in run._started and not run.retry_state.pending(candidato["id"]):
-                raise RunnerError(t("automata.already_started", id=candidato["id"]))
+                raise RunnerError(t("autopilot.already_started", id=candidato["id"]))
 
             previsto = _identita_prevista(launcher, candidato)
             nodo = claims.claim(run.graph, candidato["id"], assignee=previsto,
                                 on_behalf_of=previsto)
             run._started.add(nodo["id"])
             _event(run, "node-claimed", node=nodo["id"], status="active")
+            # La dashboard si rigenera alla chiusura di un nodo, cioe' quando il
+            # successivo non e' ancora rivendicato: senza questa riga il nodo in
+            # lavorazione non compare mai come tale, e chi guarda vede il run
+            # fermo sulla frontiera mentre un agente ci sta lavorando sopra.
+            render.write(run.graph, load(run.graph.json_path))
             tentativo = run.retry_state.begin(nodo["id"], now())
             _event(run, "attempt-started", node=nodo["id"], attempt=tentativo,
                    status="active", reason=None, failure=None, next_at=None)
@@ -345,11 +380,20 @@ def _execute(run: Run, launcher: Launcher, wait_for: Waiter | None = None,
             with read_transaction(run.graph.json_path) as data:
                 osservato = node_of(data, node_id)
             if not is_done(osservato):
+                if interactions.has_open(data, node_id, "human-needed"):
+                    # H01/3, H05: l'agente ha dichiarato che la decisione non gli
+                    # spetta, non che ha fallito. claims.ask_human ha gia' rilasciato
+                    # il lucchetto: qui si chiude solo il tentativo, senza spendere
+                    # budget retry ne' scrivere un guasto che non c'e' stato.
+                    run.retry_state.complete(node_id)
+                    _event(run, "node-waiting-human", node=node_id, attempt=tentativo,
+                           status="active", reason="human-needed interaction open")
+                    continue
                 # Il nodo indeciso e' un guasto del nodo, non del run: passa dal
                 # budget retry, che rilascia il lucchetto prima di riprovare, e il
                 # resto della frontiera continua ad avanzare.
                 _gestisci_fallimento(run, node_id, tentativo,
-                                     _guasto(node_id, osservato, osservazione), now())
+                                     _guasto(run, node_id, osservato, osservazione, data), now())
                 continue
             run.retry_state.complete(node_id)
             _event(run, "node-closed", node=node_id, attempt=tentativo, status="active")
@@ -358,7 +402,13 @@ def _execute(run: Run, launcher: Launcher, wait_for: Waiter | None = None,
                 terminali.append(node_id)
             continue
 
-        if prossimo := run.retry_state.next_at():
+        # Un backoff pendente non giustifica un'attesa se il grafo e' gia' finito:
+        # il ledger dei tentativi conserva il nodo che ha fallito, e se nel
+        # frattempo quel nodo lo chiude qualcun altro (una sessione umana, un
+        # recupero a mano) il risveglio non troverebbe piu' niente da fare. Senza
+        # questa guardia il run resta vivo a ciclare su un orario passato, con il
+        # grafo completo e nessuno che se ne accorge.
+        if (prossimo := run.retry_state.next_at()) and not all(is_done(n) for n in data["nodes"]):
             _event(run, "backoff-waiting", status="waiting", next_at=prossimo,
                    reason="retry backoff")
             sleeper(max(0.0, prossimo - now()))
@@ -366,21 +416,29 @@ def _execute(run: Run, launcher: Launcher, wait_for: Waiter | None = None,
         if presi := claimed(data):
             _event(run, "active-claims", status="waiting",
                    reason=f"active claims: {', '.join(n['id'] for n in presi)}")
-            raise RunnerError(t("automata.active_claims", ids=", ".join(n["id"] for n in presi)))
+            raise RunnerError(t("autopilot.active_claims", ids=", ".join(n["id"] for n in presi)))
         if falliti := [node_id for node_id in run.retry_state.records()
                        if run.retry_state.terminal(node_id)]:
             _attendi_interazione(run, node_of(data, falliti[0]), "run-stopped",
                                  interaction_waiter, now(), ", ".join(falliti))
-            raise RunnerError(t("automata.retry_exhausted", ids=", ".join(falliti),
+            raise RunnerError(t("autopilot.retry_exhausted", ids=", ".join(falliti),
                                 path=run.graph.retry_state_path))
         if aperti := blocked(data):
             _frontier_event(run, data, now(), status="blocked",
                             reason=f"residual blockers: {', '.join(n['id'] for n in aperti)}")
             _attendi_interazione(run, aperti[0], "run-stopped", interaction_waiter, now(),
                                  ", ".join(n["id"] for n in aperti))
-            raise RunnerError(t("automata.blocked", ids=", ".join(n["id"] for n in aperti)))
+            raise RunnerError(t("autopilot.blocked", ids=", ".join(n["id"] for n in aperti)))
+        if in_attesa := waiting_human(data):
+            # H01/3, H05: non e' un guasto ne' un arco non chiuso, e la card che lo
+            # spiega esiste gia' (claims.ask_human l'ha aperta quando l'ha
+            # dichiarato): il run si ferma qui senza aprirne una seconda e senza
+            # cadere nel verdetto generico sotto, che descriverebbe un'attesa
+            # legittima come uno stato invalido.
+            raise RunnerError(t("autopilot.waiting_human",
+                                ids=", ".join(n["id"] for n in in_attesa)))
         if not all(is_done(n) for n in data["nodes"]):
-            raise RunnerError(t("automata.invalid_termination"))
+            raise RunnerError(t("autopilot.invalid_termination"))
         _frontier_event(run, data, now())
         if any(node["id"] == "END" for node in data["nodes"]):
             _apri_interazione(run, node_of(data, "END"), "run-ended", now())
@@ -389,9 +447,12 @@ def _execute(run: Run, launcher: Launcher, wait_for: Waiter | None = None,
         return RunResult(tuple(terminali))
 
 
-# Quanto resta aperta una card, secondo cosa chiede a chi la legge.
+# Quanto resta aperta una card, secondo cosa chiede a chi la legge. La finestra
+# lunga (SCADENZA_DECISIONE) vive in interactions.py: da H05 anche claims.ask_human
+# ne apre una con la stessa attesa, e un valore solo evita due copie da tenere
+# allineate a mano.
 SCADENZA_GUASTO = timedelta(minutes=15)
-SCADENZA_DECISIONE = timedelta(days=1)
+SCADENZA_DECISIONE = interactions.SCADENZA_DECISIONE
 
 
 def _scadenza(timestamp: float, event: str) -> str:
@@ -410,17 +471,20 @@ def _scadenza(timestamp: float, event: str) -> str:
 
 
 def _card(event: str, node: dict, detail: str | None = None) -> tuple[str, list[dict]]:
+    """Il testo e le azioni sono nella lingua del progetto (grilling 34 di
+    docs/atlas-relay-design.md), letta da t(): stessa lingua di pannello e
+    ticket, coerente con cio' che poi il canale Telegram (B01) mostra."""
     if event == "run-ended":
-        return (f"{node['title']} e' terminato.",
-                [{"id": "acknowledge", "label": "Preso atto", "effect": "acknowledged"}])
+        return (t("autopilot.card_run_ended", title=node["title"]),
+                [{"id": "acknowledge", "label": t("autopilot.action_acknowledge"), "effect": "acknowledged"}])
     if event == "run-stopped":
-        return (f"Il lavoro si e' fermato: {detail or node['id']}.", [
-            {"id": "retry", "label": "Riprova", "effect": "retry"},
-            {"id": "cancel", "label": "Annulla", "effect": "cancel"},
+        return (t("autopilot.card_run_stopped", detail=detail or node["id"]), [
+            {"id": "retry", "label": t("autopilot.action_retry"), "effect": "retry"},
+            {"id": "cancel", "label": t("autopilot.action_cancel"), "effect": "cancel"},
         ])
-    return (f"Serve una decisione per {node['id']}.", [
-        {"id": "confirm", "label": "Conferma", "effect": "resume"},
-        {"id": "decline", "label": "Rifiuta", "effect": "cancel"},
+    return (t("autopilot.card_decision_required", node=node["id"]), [
+        {"id": "confirm", "label": t("autopilot.action_confirm"), "effect": "resume"},
+        {"id": "decline", "label": t("autopilot.action_decline"), "effect": "cancel"},
     ])
 
 
@@ -509,6 +573,18 @@ def _eventi_da_attesa(osservazione: object) -> tuple[ClosureEvent, ...]:
 def _gestisci_fallimento(run: Run, node_id: str, tentativo: int, valore: object,
                          timestamp: float) -> None:
     failure = classify_failure(valore) or "ambiguous-termination"
+    # Un tentativo puo' fallire dopo che il lavoro e' stato fatto e scritto: basta
+    # che l'agente muoia fra l'ultima riga del ticket e la chiusura del nodo, e in
+    # questo repo lo fa anche un hook di fine sessione che va storto. Rilanciarlo
+    # come un crash o un'ambiguita' qualunque rifa' da capo un lavoro che c'e' gia':
+    # e' successo per cinque tentativi di fila sullo stesso nodo (run del
+    # 2026-09-03). Qui il dubbio non c'e': la risposta e' leggibile, quindi non e'
+    # piu' un guasto da cui si puo' sperare un esito diverso al tentativo dopo, e
+    # diventa terminale al primo colpo come una resa, ma distinguibile da essa nel
+    # ledger perche' non e' stata una scelta dell'agente.
+    ha_gia_risposto = docs.answer_written(run.graph, node_id)
+    if ha_gia_risposto and failure in RETRYABLE_FAILURES:
+        failure = "orphaned-answer"
     delay = (run.retry_policy.delay_for(tentativo)
              if failure in RETRYABLE_FAILURES and run.retry_policy.can_retry(tentativo, failure)
              else None)
@@ -517,6 +593,10 @@ def _gestisci_fallimento(run: Run, node_id: str, tentativo: int, valore: object,
     run.log.append(f"retry-classified node={node_id} class={failure} attempt={tentativo}")
     _event(run, "attempt-failed", node=node_id, attempt=tentativo, failure=failure,
            reason=dettaglio, status="active")
+    if ha_gia_risposto:
+        _event(run, "work-not-lost", node=node_id, attempt=tentativo, failure=failure,
+               status="active",
+               reason="ticket answer already written: recover it instead of redoing the work")
     _rilascia_se_tenuto(run, node_id)
     if delay is None:
         # Il budget del nodo e' finito, non quello del run: fermare qui l'intero
@@ -539,20 +619,49 @@ def _e_notifica(osservazione: object) -> bool:
             and not isinstance(osservazione, BaseException))
 
 
-def _guasto(node_id: str, osservato: dict, osservazione: object) -> object:
+def _guasto(run: Run, node_id: str, osservato: dict, osservazione: object, data: dict) -> object:
     """Il valore da classificare quando Atlas non mostra il nodo terminale.
 
-    Un esito che parla gia' da se' (un'eccezione, un outcome che non e' 'closed')
-    si classifica per quello che e'. Restano il successo dichiarato e la notifica
-    senza chiusura: li' il processo e' finito bene e il lavoro non c'e', che e'
-    una terminazione ambigua e non un guasto del run.
+    La resa (H01/2, H04) si controlla per prima: e' un esito che l'agente ha gia'
+    dichiarato scrivendo in data['surrenders'], non una diagnosi da dedurre
+    dall'output del processo, e senza questa precedenza rientrava fra i guasti
+    testuali e finiva classificata 'ambiguous-termination'. Un esito che parla
+    gia' da se' (un'eccezione, un outcome che non e' 'closed') si classifica per
+    quello che e'. Restano il successo dichiarato e la notifica senza chiusura:
+    li' il processo e' finito bene e il lavoro non c'e', che e' una terminazione
+    ambigua e non un guasto del run.
     """
+    if (resa := _resa_recente(run, data, node_id)) is not None:
+        return SurrenderedError(f"{resa['reason']}: {resa['detail']}")
     if isinstance(osservazione, BaseException) or (
             _is_agent_outcome(osservazione) and osservazione.status != "closed"):
         return osservazione
     return AmbiguousTerminationError(
-        t("automata.not_terminal", id=node_id, status=osservato["status"])
+        t("autopilot.not_terminal", id=node_id, status=osservato["status"])
         + _ultima_parola(osservazione))
+
+
+def _resa_recente(run: Run, data: dict, node_id: str) -> dict | None:
+    """L'ultima resa dichiarata per questo nodo dentro il tentativo in corso.
+
+    Una resa di un run precedente, gia' esaurita e mai ripulita da data['surrenders']
+    (e' un ledger append-only, H01), non deve rientrare su un nuovo tentativo dello
+    stesso nodo: si guarda solo cio' che e' arrivato dopo l'inizio di QUESTO
+    tentativo, lo stesso istante che retry_state gia' registra in 'started_at'.
+    """
+    record = run.retry_state.record(node_id)
+    # started_at ha precisione al microsecondo (time.time()), l'ISO di una resa solo
+    # al secondo (timespec='seconds', come ogni timestamp del grafo): confrontarli
+    # senza troncare fa apparire 'prima dell'inizio' una resa arrivata un istante
+    # dopo begin() ma dentro lo stesso secondo di orologio.
+    inizio = float(int(record["started_at"])) if record else 0.0
+    for resa in reversed(data.get("surrenders", [])):
+        if resa["node"] != node_id:
+            continue
+        quando = istante(resa["at"])
+        if quando is not None and quando.timestamp() >= inizio:
+            return resa
+    return None
 
 
 def _rilascia_se_tenuto(run: Run, node_id: str) -> None:
@@ -603,7 +712,7 @@ def _riconcilia_retry(run: Run, timestamp: float) -> None:
         if stato == "live":
             _event(run, "claim-live", node=node["id"], status="waiting",
                    reason="existing agent is still alive")
-            raise RunnerError(t("automata.retry_active", id=node["id"]))
+            raise RunnerError(t("autopilot.retry_active", id=node["id"]))
         claims.release(run.graph, node["id"])
         _event(run, "claim-reconciled", node=node["id"], status="active",
                reason=f"stale claim: {stato}")
@@ -669,7 +778,7 @@ def _wait(handle: object, wait_for: Waiter | None, node_id: str) -> tuple[Closur
         if evento.status == "closed":
             return (ClosureEvent(node_id),)
         dettaglio = evento.detail or "nessun dettaglio"
-        raise RunnerError(t("automata.adapter_outcome", id=node_id,
+        raise RunnerError(t("autopilot.adapter_outcome", id=node_id,
                             status=evento.status, detail=dettaglio))
     if evento is None:
         return ()

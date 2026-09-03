@@ -1,4 +1,4 @@
-"""Presidia il confine estensibile fra Automata e i provider agente."""
+"""Presidia il confine estensibile fra Autopilot e i provider agente."""
 from __future__ import annotations
 
 import sys
@@ -92,7 +92,7 @@ class AdapterRegistryTest(unittest.TestCase):
             adapters.AgentOutcome("unknown")
 
     def test_runner_traduce_chiusura_e_rifiuta_esiti_non_terminali(self):
-        from core import automata
+        from core import autopilot
 
         class ClosedHandle:
             def wait(self):
@@ -103,11 +103,11 @@ class AdapterRegistryTest(unittest.TestCase):
                 return adapters.AgentOutcome("error", "process exited")
 
         self.assertEqual(
-            (automata.ClosureEvent("N01"),),
-            automata._wait(ClosedHandle(), None, "N01"),
+            (autopilot.ClosureEvent("N01"),),
+            autopilot._wait(ClosedHandle(), None, "N01"),
         )
-        with self.assertRaises(automata.RunnerError):
-            automata._wait(FailedHandle(), None, "N01")
+        with self.assertRaises(autopilot.RunnerError):
+            autopilot._wait(FailedHandle(), None, "N01")
 
 
 if __name__ == "__main__":

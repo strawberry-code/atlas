@@ -56,7 +56,33 @@ atlas fog "what came up, in one line" --for <ID>
 
 and propose it to the user once the node is done. The graph's shape changes only through a mutation script, never on impulse in the middle of other work. To turn one into a node there's a ready example at `.atlas/scripts/000-promote-fog.py`: fill in the entry's index and the node's fields, then run it with `atlas exec`.
 
-## 5. Close it
+## 5. Signal while you work, or stop with a reason
+
+While you work, declare the step you've reached, often: it's cheap, and it's the signal that tells the runner you're still working instead of stuck.
+
+```sh
+atlas progress <ID> <PASSO> ["<nota>"]
+```
+
+`PASSO` is one of `investigating`, `implementing`, `verifying`, `writing-answer`, `blocked`. It's not an outcome: it never touches the node's status. Staying silent for more than an hour after the first declared step ends the attempt as a retryable failure; with no `progress` call at all, only the ninety-minute absolute cap protects you.
+
+If the node has no valid answer in this run, declare it instead of forcing one:
+
+```sh
+atlas give-up <ID> --motivo <MOTIVO> -d "<dettaglio>"
+```
+
+`MOTIVO` is one of `infeasible` (the question is internally contradictory or impossible), `missing-resource` (it needs a secret, an access, or a service you don't have and can't get on your own), `blocked-environment` (the local environment can't carry the work, and it's not a transient glitch), `needs-redesign` (the design upstream needs to change first). It's terminal for this node in this run: it's never retried, the node returns to the frontier with the surrender recorded.
+
+If the next move is a decision that isn't yours to make, don't decide it for the user and don't stall in silence: propose a binary alternative and suspend the node.
+
+```sh
+atlas ask-human <ID> -q "<I'll proceed with X, confirm?>"
+```
+
+It's not an open question: the only possible answer is a tap on an action already proposed. The claim releases until a person answers, and it doesn't count as a failure.
+
+## 6. Close it
 
 ```sh
 atlas close <ID> -s "the one-line summary"

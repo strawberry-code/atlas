@@ -12,7 +12,9 @@ from __future__ import annotations
 import base64
 import hashlib
 import io
+import json
 import shutil
+import sys
 import tarfile
 import tempfile
 import zipapp
@@ -130,7 +132,48 @@ def build_cli() -> None:
     print(f"  {CLI_SHA.relative_to(ROOT)}")
 
 
-def main() -> int:
+# Stati di run-state.json che descrivono un run ancora in piedi. Gli altri
+# ('completed', 'failed', 'blocked') descrivono un run finito, che non sta piu'
+# eseguendo l'archivio.
+RUN_VIVI = {"active", "waiting"}
+
+
+def run_in_corso() -> list[str]:
+    """I grafi di questo repo con un run non ancora concluso.
+
+    'dist/atlas' e' uno zipapp, e zipimport tiene gli offset del file aperto
+    all'avvio: sovrascriverlo mentre un run lo sta eseguendo non si nota subito,
+    perche' quel che e' gia' in memoria continua a funzionare, e poi il primo
+    import differito muore con 'bad local file header'. E' lo stesso guasto che
+    il contratto descrive per 'atlas update', vissuto dall'altro lato. E' gia'
+    successo: un nodo lavorato da Autopilot ha rifatto la build mentre il pilota
+    ci girava sopra, ed e' sopravvissuto per fortuna, non per costruzione.
+    """
+    graphs = ROOT / ".atlas" / "graphs"
+    if not graphs.is_dir():
+        return []
+    vivi = []
+    for stato in sorted(graphs.glob("*/run-state.json")):
+        try:
+            dati = json.loads(stato.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            # Un ledger illeggibile non e' una prova che un run stia girando, e
+            # bloccare la build su un file corrotto sarebbe peggio del rischio.
+            continue
+        if dati.get("status") in RUN_VIVI:
+            vivi.append(stato.parent.name)
+    return vivi
+
+
+def main(argv: list[str] | None = None) -> int:
+    argomenti = list(sys.argv[1:] if argv is None else argv)
+    forza = "--force" in argomenti
+    if not forza and (vivi := run_in_corso()):
+        print(f"  run in corso su {', '.join(vivi)}: build annullata.")
+        print("  Sostituire dist/atlas mentre un run lo esegue lo fa morire piu' tardi,")
+        print("  su un import differito, con un errore che non nomina la causa.")
+        print("  Aspetta la fine del run, oppure forza con --force se sai cosa stai facendo.")
+        return 1
     build_cli()
     return 0
 

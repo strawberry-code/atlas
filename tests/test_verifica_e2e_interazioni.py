@@ -1,9 +1,9 @@
-"""Verifica end-to-end del percorso Automata + Interazione + UI (E01).
+"""Verifica end-to-end del percorso Autopilot + Interazione + UI (E01).
 
 Ogni nodo del grafo Interactions ha gia' una sua suite fitta in isolamento
 (A03/A04 il lifecycle, A05 il risveglio, B03 l'HTTP, C01/C02/C03 gli avvisi,
 D01-D06 relay e Telegram). Quello che nessuna di quelle prova e' l'incrocio:
-un automata.execute() vero, in un thread, che si sblocca da un vero POST di
+un autopilot.execute() vero, in un thread, che si sblocca da un vero POST di
 'atlas serve' in un altro thread, nello stesso processo (esattamente come
 'atlas run' e 'atlas serve' insieme sulla stessa macchina); e cosa succede a
 quel run quando il processo si ferma e un altro riparte, con o senza il nodo
@@ -38,9 +38,9 @@ class Base(unittest.TestCase):
         os.environ["ATLAS_ROOT"] = str(self.root)
         for module in [m for m in sys.modules if m == "core" or m.startswith("core.")]:
             del sys.modules[module]
-        from core import automata, config, docs, mutate, serve, store
+        from core import autopilot, config, docs, mutate, serve, store
 
-        self.automata = automata
+        self.autopilot = autopilot
         self.config = config
         self.docs = docs
         self.mutate = mutate
@@ -66,7 +66,7 @@ class Base(unittest.TestCase):
         with mock.patch.dict(os.environ, {"ATLAS_IDENTITY": "Luna"}):
             try:
                 run.execute(lambda r, n: None)
-            except self.automata.RunnerError:
+            except self.autopilot.RunnerError:
                 pass
 
     def _server(self):
@@ -107,13 +107,13 @@ class Base(unittest.TestCase):
 
 
 class RisoluzioneDalVeroServerHttp(Base):
-    """A05 (Automata apre e attende) + B03 (Handler risolve via HTTP) nello
+    """A05 (Autopilot apre e attende) + B03 (Handler risolve via HTTP) nello
     stesso processo: e' lo scenario reale, senza alcuno stub sul lifecycle."""
 
     def test_un_run_vero_si_sblocca_da_un_vero_post_e_il_nodo_resta_a_un_umano(self):
         self._aggiungi_nodo_hitl()
         server = self._server()
-        run = self.automata.start(self.ref, 1)
+        run = self.autopilot.start(self.ref, 1)
         runner = threading.Thread(target=self._esegui_e_ignora_hitl, args=(run,))
         runner.start()
 
@@ -132,7 +132,7 @@ class RisoluzioneDalVeroServerHttp(Base):
     def test_un_secondo_post_sulla_stessa_card_torna_409_col_run_ancora_appeso(self):
         self._aggiungi_nodo_hitl()
         server = self._server()
-        run = self.automata.start(self.ref, 1)
+        run = self.autopilot.start(self.ref, 1)
         runner = threading.Thread(target=self._esegui_e_ignora_hitl, args=(run,))
         runner.start()
         self.addCleanup(runner.join, 10)
@@ -146,12 +146,12 @@ class RisoluzioneDalVeroServerHttp(Base):
 
 
 class RiavvioDelProcesso(Base):
-    """Cosa succede a run_state quando il processo che tiene Automata si
+    """Cosa succede a run_state quando il processo che tiene Autopilot si
     ferma. Le due meta' non sono simmetriche: un crash a meta' attesa lascia
     lo stato a 'waiting' (non terminale) e il run successivo riprende lo
     stesso run_id, senza duplicare la card; uno stop pulito su una domanda
-    HITL chiude invece run_state a 'failed' (terminale, vedi automata.execute
-    e la stringa 'automata.hitl' che non contiene 'run bloccato'), quindi un
+    HITL chiude invece run_state a 'failed' (terminale, vedi autopilot.execute
+    e la stringa 'autopilot.hitl' che non contiene 'run bloccato'), quindi un
     riavvio prima di chiudere a mano il nodo apre un run_id nuovo e con lui
     una seconda card per lo stesso nodo."""
 
@@ -159,7 +159,7 @@ class RiavvioDelProcesso(Base):
         self._aggiungi_nodo_hitl()
         server = self._server()
 
-        run1 = self.automata.start(self.ref, 1)
+        run1 = self.autopilot.start(self.ref, 1)
         runner1 = threading.Thread(target=self._esegui_e_ignora_hitl, args=(run1,))
         runner1.start()
         prima_id = self._attendi_interaction_aperta()
@@ -167,7 +167,7 @@ class RiavvioDelProcesso(Base):
         # Un secondo processo che interrogasse Atlas ora (il primo e' ancora
         # appeso in attesa, come dopo un crash prima di una risposta) vedrebbe
         # run_state.json a 'waiting': non terminale, quindi 'resumable'.
-        run_dopo_crash = self.automata.start(self.ref, 1)
+        run_dopo_crash = self.autopilot.start(self.ref, 1)
         self.assertEqual(run1.run_state.run_id, run_dopo_crash.run_state.run_id,
                           "un crash mentre si attende la card non deve inventare un run nuovo")
 
@@ -182,7 +182,7 @@ class RiavvioDelProcesso(Base):
         # 'failed', terminale. Il nodo H01 resta pero' aperto (la risoluzione
         # sblocca il run, non lo chiude). Un secondo 'atlas run' lanciato
         # senza aver chiuso H01 a mano non riprende quel run_id.
-        run3 = self.automata.start(self.ref, 1)
+        run3 = self.autopilot.start(self.ref, 1)
         self.assertNotEqual(run1.run_state.run_id, run3.run_state.run_id,
                              "dopo uno stop pulito il run_state e' terminale: non e' resumable")
 

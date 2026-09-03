@@ -26,6 +26,7 @@ DEFAULTS = {
               "idle_hours": 4, "max_claims_per_session": 1,
               "lease_ttl_seconds": 3600},
     "lock": {"remote": None},
+    "notify": {"telegram_enabled": True},
     "drift": {"collector_paths": []},
     "git": {"commit_on_close": False, "commit_type": "feat", "stage": "node-paths"},
     "vocab": {"types": ["grilling", "research", "prototype", "task"],

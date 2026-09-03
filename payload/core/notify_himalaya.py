@@ -34,6 +34,7 @@ _ETICHETTA_EVENTO = {
     "decision-required": "decisione richiesta",
     "run-stopped": "run fermo",
     "run-ended": "run terminato",
+    "human-needed": "serve una persona",
 }
 
 

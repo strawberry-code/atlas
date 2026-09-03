@@ -13,7 +13,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import adapters, automata, claims, docs, doctor, drift, gitscan, howto, merge, mutate, providers, render as dash, report, scripts, serve, strings, topology
+from . import adapters, autopilot, claims, docs, doctor, drift, gitscan, howto, merge, mutate, peer_notify, providers, render as dash, report, scripts, serve, strings, topology
 from .config import ENV_IDENTITY, ConfigError, Workspace, workspace
 from .model import fog_line, node_of
 from .mutate import editing, validate
@@ -318,16 +318,16 @@ def cmd_assegna(ws: Workspace, ref, args) -> None:
 
 
 def default_adapter_registry() -> adapters.AdapterRegistry:
-    """Gli unici provider presenti di default in un run locale di Automata."""
+    """Gli unici provider presenti di default in un run locale di Autopilot."""
     return adapters.AdapterRegistry((providers.codex_adapter(), providers.claude_adapter()))
 
 
 def cmd_run(ref, args) -> int:
-    """Avvia il ciclo Automata con i provider locali di default."""
-    run = automata.start(ref, args.parallelism)
-    modalita = t("automata.serial") if run.serial else t("automata.limited")
-    print(t("automata.configured", parallelism=run.parallelism, mode=modalita))
-    run.execute(automata.launcher_from_registry(default_adapter_registry()))
+    """Avvia il ciclo Autopilot con i provider locali di default."""
+    run = autopilot.start(ref, args.parallelism)
+    modalita = t("autopilot.serial") if run.serial else t("autopilot.limited")
+    print(t("autopilot.configured", parallelism=run.parallelism, mode=modalita))
+    run.execute(autopilot.launcher_from_registry(default_adapter_registry()))
     return 0
 
 
@@ -361,12 +361,12 @@ def _grafo(p: argparse.ArgumentParser) -> None:
 # (driver git) e conflicts (lettura diagnostica del merge).
 _RINNOVA_BATTITO = frozenset((
     "status", "next", "show", "brief",
-    "claim", "take", "release", "close", "amend",
+    "claim", "take", "release", "give-up", "ask-human", "close", "amend", "progress",
     "ask", "asks", "answer", "fog", "assign", "unassign", "render",
 ))
 
 COMANDI = ("status", "next", "graphs", "use", "show", "brief", "claim", "take", "release",
-           "close", "ask", "asks", "answer", "drift", "fog", "assign", "unassign", "whoami", "render", "serve", "run", "run-status", "run-log", "merge-graph",
+           "give-up", "ask-human", "close", "ask", "asks", "answer", "drift", "fog", "assign", "unassign", "whoami", "render", "serve", "run", "run-status", "run-log", "merge-graph",
            "conflicts", "new", "new-script", "exec", "renumber", "validate", "doctor", "how-to")
 
 
@@ -431,6 +431,16 @@ def aggiungi_comandi(sub) -> None:
     _identity(p); _grafo(p)
     p = sub.add_parser("release", help=t("help.release")); p.add_argument("node")
     p.add_argument("-r", "--ragione", default=None); _identity(p); _grafo(p)
+    p = sub.add_parser("give-up", help=t("help.give_up"))
+    p.add_argument("node")
+    p.add_argument("--motivo", required=True, choices=list(claims.MOTIVI_RESA),
+                   help=t("help.give_up_motivo"))
+    p.add_argument("-d", "--dettaglio", required=True, help=t("help.give_up_dettaglio"))
+    _identity(p); _grafo(p)
+    p = sub.add_parser("ask-human", help=t("help.ask_human"))
+    p.add_argument("node")
+    p.add_argument("-q", "--domanda", required=True, help=t("help.ask_human_domanda"))
+    _identity(p); _grafo(p)
     p = sub.add_parser("close", help=t("help.close"))
     p.add_argument("node"); p.add_argument("-s", "--sintesi", required=True)
     p.add_argument("-t", "--tipo", default=None); p.add_argument("--force", action="store_true")
@@ -440,6 +450,11 @@ def aggiungi_comandi(sub) -> None:
     p.add_argument("node"); p.add_argument("--artefatti", action="append", nargs="?", default=None)
     p.add_argument("-c", "--costo", default=None); p.add_argument("-s", "--sintesi", default=None)
     _identity(p); _grafo(p)
+    p = sub.add_parser("progress", help=t("help.progress"))
+    p.add_argument("node")
+    p.add_argument("step", choices=list(claims.PASSI), help=t("help.progress_step"))
+    p.add_argument("nota", nargs="?", default=None, help=t("help.progress_nota"))
+    _grafo(p)
     p = sub.add_parser("ask", help=t("help.ask")); p.add_argument("node")
     p.add_argument("-q", "--question", required=True); p.add_argument("-a", "--assumption", required=True)
     _identity(p); _grafo(p)
@@ -477,7 +492,7 @@ def aggiungi_comandi(sub) -> None:
     p = sub.add_parser("run-log", help=t("help.run_log")); p.add_argument("--tail", type=int, default=None)
     _grafo(p)
     p = sub.add_parser("run", help=t("help.run"))
-    p.add_argument("--parallelism", required=True, type=automata.parse_parallelism,
+    p.add_argument("--parallelism", required=True, type=autopilot.parse_parallelism,
                    help=t("help.run_parallelism")); _grafo(p)
 
     p = sub.add_parser("merge-graph", help=t("help.merge_graph"))
@@ -569,7 +584,25 @@ def dispatch(ws: Workspace, args) -> int:
             refresh(ref, data)
         report.show_status(ref, data)      # stampare non vuole il lock: data e' gia' in memoria
         commit(ws, ref, node, args.tipo or ws.config["git"]["commit_type"])
+        peer_notify.avvisa(ws)   # E01: best-effort, muto se il relay non e' configurato
         print(t("attrito.issue"))
+        return 0
+
+    if args.cmd == "progress":
+        # H01/4: costa poco e non fa mai fallire il lavoro. Niente refresh degli
+        # artefatti derivati (e' il costo vero di ogni altro comando), e qualunque
+        # guasto del segnale stesso (lock conteso, nodo non piu' nostro, grafo
+        # illeggibile) si stampa e si assorbe: chi chiama non deve trattarlo come un
+        # fallimento del proprio lavoro sul nodo.
+        try:
+            node = claims.progress(ref, args.node, args.step, args.nota)
+        except Exception as errore:
+            print(t("progress.fallito", errore=errore))
+            return 0
+        riga = t("progress.fatto", id=node["id"], step=node["claim"]["progress"]["step"])
+        if node["claim"]["progress"]["note"]:
+            riga += t("progress.con_nota", nota=node["claim"]["progress"]["note"])
+        print(riga)
         return 0
 
     if args.cmd == "amend":
@@ -622,6 +655,13 @@ def dispatch(ws: Workspace, args) -> int:
         print(t("claim.fatto", id=node["id"], path=ref.ticket_path(node["id"])))
     elif args.cmd == "release":
         print(t("release.fatto", id=claims.release(ref, args.node, args.ragione)["id"]))
+    elif args.cmd == "give-up":
+        node = claims.give_up(ref, args.node, args.motivo, args.dettaglio)
+        print(t("give_up.fatto", id=node["id"], motivo=args.motivo))
+    elif args.cmd == "ask-human":
+        interazione = claims.ask_human(ref, args.node, args.domanda)
+        print(t("ask_human.fatto", id=args.node, interazione=interazione["id"],
+               scadenza=interazione["expiresAt"]))
     elif args.cmd == "fog":
         if args.elenca:
             report.show_fog(ref, load(ref.json_path))

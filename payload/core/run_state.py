@@ -1,4 +1,4 @@
-"""Ledger persistente per osservare una singola esecuzione Automata."""
+"""Ledger persistente per osservare una singola esecuzione Autopilot."""
 from __future__ import annotations
 
 import json

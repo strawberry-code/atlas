@@ -5,6 +5,12 @@ token bot, chat ID, hostname o file di configurazione: tutto cio' che serve
 (D03, relay_client.da_ambiente) - 'atlas serve' lo rilegge a ogni richiesta,
 niente di nuovo da configurare nel progetto.
 
+Il gesto e' per macchina, non per progetto (A04, grilling 9): il codice
+monouso appaia l'installazione di questa macchina alla chat, non il grafo
+aperto in questo momento nella dashboard. L'identita' che viaggia nel corpo
+della richiesta e' quella di relay_identity (A01), la stessa per tutti i
+progetti presenti e futuri di questa macchina.
+
 Spezzato da serve.py per la stessa ragione di serve_actions.py: qui c'e' solo
 il pairing, la' resta il resto del server. Il bearer del relay non lascia mai
 questo processo: il browser parla solo con 'atlas serve' su 127.0.0.1, mai
@@ -19,8 +25,7 @@ import urllib.request
 from collections.abc import Mapping
 from urllib.parse import quote
 
-from . import relay_client
-from .config import Graph
+from . import relay_client, relay_identity
 
 PERCORSO_AVVIA = "/pairing/telegram"
 PERCORSO_STATO = "/pairing/telegram/status"
@@ -30,18 +35,20 @@ def _ambiente(env: Mapping[str, str] | None) -> Mapping[str, str]:
     return env if env is not None else os.environ
 
 
-def avvia(ref: Graph, env: Mapping[str, str] | None = None,
+def avvia(env: Mapping[str, str] | None = None,
           opener=urllib.request.urlopen) -> tuple[int, dict]:
-    """POST /pairing/telegram: chiede al relay un codice monouso per questo
-    progetto. 503 se il relay non e' configurato in questo ambiente (stesso
-    gate del tunnel D03), 502 se il relay non risponde o rifiuta la richiesta
-    (non ancora deployato, pairing disattivato, bearer scaduto...)."""
-    config = relay_client.da_ambiente(_ambiente(env))
+    """POST /pairing/telegram: chiede al relay un codice monouso per questa
+    installazione. 503 se il relay non e' configurato in questo ambiente
+    (stesso gate del tunnel D03), 502 se il relay non risponde o rifiuta la
+    richiesta (non ancora deployato, pairing disattivato, bearer scaduto...)."""
+    ambiente = _ambiente(env)
+    config = relay_client.da_ambiente(ambiente)
     if config is None:
         return 503, {"ok": False}
+    installazione = relay_identity.carica_o_crea(env=ambiente)
     richiesta = urllib.request.Request(
         f"{config.base_url.rstrip('/')}/pairing",
-        data=json.dumps({"graph": ref.slug}).encode("utf-8"),
+        data=json.dumps({"installation": installazione.installation_id}).encode("utf-8"),
         headers={"Authorization": f"Bearer {config.token}", "Content-Type": "application/json"},
         method="POST",
     )

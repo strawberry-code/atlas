@@ -191,7 +191,11 @@ class Installer:
             self.dice(t("install.config_presente"))
             return
         nome = self.target.name if self.args.yes else self._nome_chiesto()
-        cfg = dict(CONFIG, project=nome, language=self.lingua)
+        # E01: nasce qui, non lazy, cosi' la primissima copia versionata del
+        # progetto porta gia' il codice opaco che il relay usa per instradare
+        # l'avviso 'qualcosa e' cambiato' (docs/atlas-relay-design.md SS11-bis).
+        from core.project_code import genera
+        cfg = dict(CONFIG, project=nome, language=self.lingua, projectCode=genera())
         self.scrive(path, json.dumps(cfg, ensure_ascii=False, indent=2) + "\n")
         self.dice(t("install.config_creato", nome=nome))
 

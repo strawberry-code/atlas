@@ -1,4 +1,4 @@
-"""Verifica il ledger durevole e atomico di Automata."""
+"""Verifica il ledger durevole e atomico di Autopilot."""
 from __future__ import annotations
 
 import json

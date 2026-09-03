@@ -1,13 +1,16 @@
-"""Test del pairing Telegram lato client (D05): serve_pairing.avvia/stato
+"""Test del pairing Telegram lato client (D05/A04): serve_pairing.avvia/stato
 parlano col relay con lo stesso 'opener' iniettabile di relay_client, mai
 rete vera. Il gate (relay non configurato in questo ambiente) e' lo stesso
 di relay_client.da_ambiente, gia' testato in isolamento in
-tests/test_relay_client.py.
+tests/test_relay_client.py. Il gesto e' per macchina (A04): ogni test isola
+l'identita' di relay_identity in una ATLAS_INSTALL_HOME temporanea, mai la
+vera '~/.config/atlas'.
 """
 from __future__ import annotations
 
 import json
 import sys
+import tempfile
 import urllib.error
 from pathlib import Path
 
@@ -15,17 +18,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "payload"))
 
 import unittest
 
-from core import serve_pairing
+from core import relay_identity, serve_pairing
 
 ENV = {
     "RELAY_HTTPS_HOSTNAME": "relay.test",
     "ATLAS_RELAY_TOKEN_REF": "il-bearer",
 }
-
-
-class RifGrafo:
-    def __init__(self, slug: str) -> None:
-        self.slug = slug
 
 
 class FakeRisposta:
@@ -44,8 +42,13 @@ class FakeRisposta:
 
 
 class Avvia(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.env = dict(ENV, ATLAS_INSTALL_HOME=self._tmp.name)
+
     def test_503_senza_relay_configurato(self):
-        stato, payload = serve_pairing.avvia(RifGrafo("prova"), env={})
+        stato, payload = serve_pairing.avvia(env={})
         self.assertEqual(stato, 503)
         self.assertFalse(payload["ok"])
 
@@ -58,20 +61,21 @@ class Avvia(unittest.TestCase):
                                  "expiresAt": 123.0}).encode("utf-8")
             return FakeRisposta(200, corpo)
 
-        stato, payload = serve_pairing.avvia(RifGrafo("prova"), env=ENV, opener=opener)
+        stato, payload = serve_pairing.avvia(env=self.env, opener=opener)
         self.assertEqual(stato, 200)
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["code"], "abc123")
         self.assertEqual(payload["url"], "https://t.me/atlas_bot?start=abc123")
         self.assertEqual(len(chiamate), 1)
         self.assertIn("Bearer il-bearer", chiamate[0].headers["Authorization"])
-        self.assertEqual(json.loads(chiamate[0].data), {"graph": "prova"})
+        installazione = relay_identity.carica_o_crea(env=self.env)
+        self.assertEqual(json.loads(chiamate[0].data), {"installation": installazione.installation_id})
 
     def test_502_se_il_relay_rifiuta(self):
         def opener(richiesta, timeout):
             raise urllib.error.URLError("giu'")
 
-        stato, payload = serve_pairing.avvia(RifGrafo("prova"), env=ENV, opener=opener)
+        stato, payload = serve_pairing.avvia(env=self.env, opener=opener)
         self.assertEqual(stato, 502)
         self.assertFalse(payload["ok"])
 
@@ -79,7 +83,7 @@ class Avvia(unittest.TestCase):
         def opener(richiesta, timeout):
             return FakeRisposta(404, b"{}")
 
-        stato, payload = serve_pairing.avvia(RifGrafo("prova"), env=ENV, opener=opener)
+        stato, payload = serve_pairing.avvia(env=self.env, opener=opener)
         self.assertEqual(stato, 502)
 
 

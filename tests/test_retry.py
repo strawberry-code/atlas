@@ -56,6 +56,19 @@ class RetryClassifierTest(unittest.TestCase):
     def test_chiusura_non_e_un_guasto(self):
         self.assertIsNone(self.retry.classify_failure(self.adapters.AgentOutcome("closed")))
 
+    def test_la_resa_si_classifica_a_parte_e_non_e_ritentabile(self):
+        """H01/2 + H04: SurrenderedError non passa da _da_dettaglio come gli altri
+        guasti testuali, e 'surrendered' resta fuori da RETRYABLE_FAILURES."""
+        self.assertEqual(
+            "surrendered",
+            self.retry.classify_failure(self.retry.SurrenderedError("infeasible: non si puo' fare")))
+        self.assertNotIn("surrendered", self.retry.RETRYABLE_FAILURES)
+
+    def test_lorfano_di_risposta_non_e_ritentabile(self):
+        """H07: chi legge il log sa gia' cosa fare (recuperare, non rifare), quindi
+        'orphaned-answer' resta fuori da RETRYABLE_FAILURES come 'surrendered'."""
+        self.assertNotIn("orphaned-answer", self.retry.RETRYABLE_FAILURES)
+
     def test_backoff_cresce_fino_al_cap_di_un_ora(self):
         policy = self.retry.RetryPolicy()
 
@@ -121,9 +134,9 @@ class RetryRunnerTest(unittest.TestCase):
         os.environ["ATLAS_ROOT"] = str(self.root)
         for modulo in [m for m in sys.modules if m == "core" or m.startswith("core.")]:
             del sys.modules[modulo]
-        from core import automata, claims, docs, mutate, retry, store
+        from core import autopilot, claims, docs, mutate, retry, store
 
-        self.automata, self.claims = automata, claims
+        self.autopilot, self.claims = autopilot, claims
         self.docs, self.mutate, self.retry, self.store = docs, mutate, retry, store
         self.ws = __import__("core.config", fromlist=["workspace"]).workspace(self.tmp)
         self.ref = mutate.create_graph(self.ws, "prova", "Grafo", "Verificare")
@@ -154,12 +167,12 @@ class RetryRunnerTest(unittest.TestCase):
 
         def wait_for(_handle):
             if len(tentativi) == 1:
-                return self.automata.AgentOutcome("timeout", "provider timed out")
+                return self.autopilot.AgentOutcome("timeout", "provider timed out")
             self._chiudi()
-            return self.automata.ClosureEvent("N01")
+            return self.autopilot.ClosureEvent("N01")
 
         with mock.patch.dict(os.environ, {"ATLAS_IDENTITY": "Luna"}):
-            risultato = self.automata.start(self.ref, 1, retry_policy=policy).execute(
+            risultato = self.autopilot.start(self.ref, 1, retry_policy=policy).execute(
                 launcher, wait_for=wait_for, sleeper=lambda _seconds: None)
 
         self.assertEqual(("N01",), risultato.terminal_nodes)
@@ -175,20 +188,56 @@ class RetryRunnerTest(unittest.TestCase):
             return node["id"]
 
         def wait_for(_handle):
-            return self.automata.AgentOutcome("permanent-error", "invalid request")
+            return self.autopilot.AgentOutcome("permanent-error", "invalid request")
 
         from core import interactions
 
         from tests import waiter_risolutore
 
         with mock.patch.dict(os.environ, {"ATLAS_IDENTITY": "Luna"}):
-            with self.assertRaises(self.automata.RunnerError):
-                self.automata.start(self.ref, 1, retry_policy=policy).execute(
+            with self.assertRaises(self.autopilot.RunnerError):
+                self.autopilot.start(self.ref, 1, retry_policy=policy).execute(
                     launcher, wait_for=wait_for, sleeper=lambda _seconds: None,
                     interaction_waiter=waiter_risolutore(self.ref, self.mutate, interactions))
 
         self.assertEqual(["N01"], tentativi)
         self.assertEqual("terminal", json.loads(self.ref.retry_state_path.read_text())["nodes"]["N01"]["status"])
+
+    def test_resa_e_terminale_e_non_ritenta(self):
+        """H01/2 + H04: oggi lo stesso caso finiva in 'ambiguous-termination', che
+        e' fra i guasti ritentabili. Una resa dichiarata deve fermarsi al primo
+        tentativo, restare distinguibile da un crash nel ledger e riaprire il
+        nodo, non lasciarlo rivendicato come fa un guasto qualunque."""
+        tentativi = []
+        policy = self.retry.RetryPolicy(max_attempts=3, initial_delay=0)
+
+        def launcher(_run, node):
+            tentativi.append(node["id"])
+            return node["id"]
+
+        def wait_for(_handle):
+            self.claims.give_up(self.ref, "N01", "infeasible",
+                                "il vincolo dichiarato e' impossibile da rispettare")
+            return None
+
+        from core import interactions
+
+        from tests import waiter_risolutore
+
+        with mock.patch.dict(os.environ, {"ATLAS_IDENTITY": "Luna"}):
+            with self.assertRaises(self.autopilot.RunnerError):
+                self.autopilot.start(self.ref, 1, retry_policy=policy).execute(
+                    launcher, wait_for=wait_for, sleeper=lambda _seconds: None,
+                    interaction_waiter=waiter_risolutore(self.ref, self.mutate, interactions))
+
+        self.assertEqual(["N01"], tentativi, "una resa non deve far ripartire un secondo tentativo")
+        record = json.loads(self.ref.retry_state_path.read_text())["nodes"]["N01"]
+        self.assertEqual("terminal", record["status"])
+        self.assertEqual("surrendered", record["failure"])
+        self.assertEqual("open", json.loads(self.ref.json_path.read_text())["nodes"][0]["status"])
+        eventi = json.loads(self.ref.run_state_path.read_text())["events"]
+        falliti = [e for e in eventi if e["type"] == "attempt-failed"]
+        self.assertEqual(["surrendered"], [e["failure"] for e in falliti])
 
     def test_retry_applica_il_backoff_persistito_prima_del_secondo_lancio(self):
         tentativi, attese = [], []
@@ -201,16 +250,16 @@ class RetryRunnerTest(unittest.TestCase):
 
         def wait_for(_handle):
             if len(tentativi) == 1:
-                return self.automata.AgentOutcome("rate-limit", "429")
+                return self.autopilot.AgentOutcome("rate-limit", "429")
             self._chiudi()
-            return self.automata.ClosureEvent("N01")
+            return self.autopilot.ClosureEvent("N01")
 
         def sleeper(secondi):
             attese.append(secondi)
             orologio[0] += secondi
 
         with mock.patch.dict(os.environ, {"ATLAS_IDENTITY": "Luna"}):
-            risultato = self.automata.start(self.ref, 1, retry_policy=policy).execute(
+            risultato = self.autopilot.start(self.ref, 1, retry_policy=policy).execute(
                 launcher, wait_for=wait_for, now=lambda: orologio[0], sleeper=sleeper)
 
         self.assertEqual(("N01",), risultato.terminal_nodes)
@@ -231,9 +280,9 @@ class RetryRunnerTest(unittest.TestCase):
 
             def wait_for(_handle):
                 self._chiudi()
-                return self.automata.ClosureEvent("N01")
+                return self.autopilot.ClosureEvent("N01")
 
-            risultato = self.automata.start(self.ref, 1, retry_policy=policy).execute(
+            risultato = self.autopilot.start(self.ref, 1, retry_policy=policy).execute(
                 launcher, wait_for=wait_for, now=lambda: 100.0,
                 sleeper=lambda _seconds: None)
 
@@ -247,10 +296,10 @@ class RetryRunnerTest(unittest.TestCase):
                         claim={"pid": 123, "identity": "Luna", "host": "host"})
         stato = self.retry.RetryState(self.ref.retry_state_path, self.ref.slug)
         stato.begin("N01", 100.0)
-        run = self.automata.start(self.ref, 1)
+        run = self.autopilot.start(self.ref, 1)
 
-        with mock.patch.object(self.automata.claims, "claim_state", return_value="live"):
-            with self.assertRaises(self.automata.RunnerError):
+        with mock.patch.object(self.autopilot.claims, "claim_state", return_value="live"):
+            with self.assertRaises(self.autopilot.RunnerError):
                 run.execute(lambda _run, _node: self.fail("agente duplicato"),
                             now=lambda: 100.0, sleeper=lambda _seconds: None)
 
@@ -264,13 +313,13 @@ class RetryRunnerTest(unittest.TestCase):
             return node["id"]
 
         def primo_wait(_handle):
-            return self.automata.AgentOutcome("timeout", "provider timed out")
+            return self.autopilot.AgentOutcome("timeout", "provider timed out")
 
         def interrompi(_seconds):
             raise KeyboardInterrupt
 
         with mock.patch.dict(os.environ, {"ATLAS_IDENTITY": "Luna"}):
-            primo = self.automata.start(self.ref, 1, retry_policy=policy)
+            primo = self.autopilot.start(self.ref, 1, retry_policy=policy)
             with self.assertRaises(KeyboardInterrupt):
                 primo.execute(launcher, wait_for=primo_wait,
                               now=lambda: orologio[0], sleeper=interrompi)
@@ -282,10 +331,10 @@ class RetryRunnerTest(unittest.TestCase):
 
             def secondo_wait(_handle):
                 self._chiudi()
-                return self.automata.ClosureEvent("N01")
+                return self.autopilot.ClosureEvent("N01")
 
             orologio[0] = 160.0
-            ripreso = self.automata.start(self.ref, 1, retry_policy=policy)
+            ripreso = self.autopilot.start(self.ref, 1, retry_policy=policy)
             risultato = ripreso.execute(launcher, wait_for=secondo_wait,
                                          now=lambda: orologio[0],
                                          sleeper=lambda _seconds: None)
@@ -309,10 +358,10 @@ class RetryRunnerTest(unittest.TestCase):
 
             def wait_for(_handle):
                 self._chiudi()
-                return self.automata.ClosureEvent("N01")
+                return self.autopilot.ClosureEvent("N01")
 
-            with mock.patch.object(self.automata.claims, "claim_state", return_value="dead"):
-                risultato = self.automata.start(
+            with mock.patch.object(self.autopilot.claims, "claim_state", return_value="dead"):
+                risultato = self.autopilot.start(
                     self.ref, 1, retry_policy=policy).execute(
                         launcher, wait_for=wait_for, now=lambda: 100.0,
                         sleeper=lambda _seconds: None)
@@ -326,10 +375,10 @@ class RetryRunnerTest(unittest.TestCase):
     def test_resume_non_avvia_un_claim_vivo_senza_record_retry(self):
         with mock.patch.dict(os.environ, {"ATLAS_IDENTITY": "Luna"}):
             self.claims.claim(self.ref, "N01")
-            run = self.automata.start(self.ref, 1)
+            run = self.autopilot.start(self.ref, 1)
 
-            with mock.patch.object(self.automata.claims, "claim_state", return_value="live"):
-                with self.assertRaises(self.automata.RunnerError):
+            with mock.patch.object(self.autopilot.claims, "claim_state", return_value="live"):
+                with self.assertRaises(self.autopilot.RunnerError):
                     run.execute(lambda _run, _node: self.fail("agente duplicato"),
                                 now=lambda: 100.0,
                                 sleeper=lambda _seconds: None)
@@ -337,8 +386,25 @@ class RetryRunnerTest(unittest.TestCase):
         self.assertFalse(self.ref.retry_state_path.exists())
         self.assertEqual("claimed", self.store.load(self.ref.json_path)["nodes"][0]["status"])
 
+    def test_un_ledger_di_un_altro_run_non_spende_il_budget_di_questo(self):
+        """Il budget dei tentativi appartiene al run che li ha spesi.
+
+        Regressione del 2026-09-01: un nodo esaurito il giorno prima lasciava un
+        record 'terminal' che faceva morire in un secondo il run successivo, con
+        una diagnosi che parlava di tentativi mai fatti in quella esecuzione.
+        """
+        vecchio = self.retry.RetryState(self.ref.retry_state_path, self.ref.slug, run_id="run-vecchio")
+        vecchio.begin("N01", 100.0)
+        vecchio.record_failure("N01", 8, "crash", "budget finito", 100.0, None)
+        self.assertTrue(vecchio.terminal("N01"))
+
+        nuovo = self.retry.RetryState(self.ref.retry_state_path, self.ref.slug, run_id="run-nuovo")
+
+        self.assertFalse(nuovo.terminal("N01"))
+        self.assertEqual(1, nuovo.begin("N01", 200.0))
+
     def test_resume_considera_chiuso_un_nodo_chiuso_durante_l_arresto(self):
-        run = self.automata.start(self.ref, 1)
+        run = self.autopilot.start(self.ref, 1)
         run.run_state.start(1, ["N01"], 100.0)
         with mock.patch.dict(os.environ, {"ATLAS_IDENTITY": "Luna"}):
             self.claims.claim(self.ref, "N01")
@@ -346,7 +412,7 @@ class RetryRunnerTest(unittest.TestCase):
             stato_retry.begin("N01", 100.0)
             self._chiudi()
 
-            ripreso = self.automata.start(self.ref, 1)
+            ripreso = self.autopilot.start(self.ref, 1)
             risultato = ripreso.execute(
                 lambda _run, _node: self.fail("nodo gia' chiuso rilanciato"),
                 now=lambda: 100.0, sleeper=lambda _seconds: None)

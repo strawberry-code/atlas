@@ -27,7 +27,7 @@ In un altro avvia un run:
 atlas run --parallelism 1
 ```
 
-Quando Automata arriva al nodo HITL apre l'Interaction: la card compare nel
+Quando Autopilot arriva al nodo HITL apre l'Interaction: la card compare nel
 pannello **notifiche** della dashboard, sotto **attenzione richiesta**, col
 testo `Serve una decisione per <nodo>.` e i bottoni `Conferma`/`Rifiuta`. Nello
 stesso momento arrivano, senza nessuna configurazione:
@@ -52,11 +52,17 @@ polling, e la card passa a **risolte oggi**.
 ### 2. Collega Telegram con un bottone
 
 In cima al pannello notifiche c'è un solo bottone, **collega Telegram**,
-senza campi da compilare: nessun token bot, chat ID o hostname da inserire a
-mano. Un clic chiede al relay un codice monouso; se lo ottiene, la dashboard
-mostra il link `https://t.me/<bot>?start=<codice>` da aprire e resta in
-attesa (`apri Telegram e premi Avvia per completare`), interrogando lo stato
-finché non arriva `Telegram collegato` o il codice scade.
+sempre presente e senza campi da compilare: nessun token bot, chat ID o
+hostname da inserire a mano. Sotto il bottone c'è anche la promessa che
+questo servizio è sperimentale e può fermarsi quando chi lo gestisce vuole
+(mai solo scritta qui in un documento). Il gesto è per questa macchina, non
+per il singolo progetto: fatto una volta, vale per tutti i grafi che gira su
+questo computer. Un clic chiede al relay un codice monouso; se lo ottiene, la
+dashboard mostra il link `https://t.me/<bot>?start=<codice>` da aprire e
+resta in attesa (`in attesa del via libera su Telegram`), interrogando lo
+stato finché non arriva un esito: `Telegram collegato`, `richiesta
+rifiutata`, `il servizio non è ancora pronto, riprova più tardi` (nessun
+gestore ancora registrato sul relay) o il codice scade.
 
 Perché il bottone funzioni serve un Atlas Relay già raggiungibile, con bot e
 pairing configurati: in questo ambiente non c'è (vedi Diagnostica), quindi
@@ -87,7 +93,7 @@ in silenzio.
 - **Pannello notifiche**: una card ancora `open` mostra quanto manca alla
   scadenza (`scade tra <t>`) o da quanto è scaduta (`scaduta da <t>`); il
   `<details>` **registro** della card elenca apertura, risposta o scadenza con
-  l'orario. Attenzione: lo stato passa a `expired` solo quando Automata
+  l'orario. Attenzione: lo stato passa a `expired` solo quando Autopilot
   ritorna a controllare quella card (nel suo giro di attesa), non da solo a
   orologio: un run fermo non riletto la lascia `open` anche oltre la
   scadenza dichiarata. `atlas run-status` dice se il run che l'ha aperta è
@@ -101,10 +107,13 @@ in silenzio.
   avvisi browser esistono solo mentre la pagina è caricata), `ATLAS_HIMALAYA_TO`
   non è dichiarata sulla macchina che ha eseguito il run (l'unico canale
   rimasto è allora l'avviso di sistema, utile solo se qualcuno guardava lo
-  schermo), oppure il canale è Telegram e il relay non è configurato, non è
-  raggiungibile o il progetto non è ancora appaiato a nessuna chat: in
-  ognuno di questi casi il ledger di consegna registra `pending` o `failed`
-  per quel canale, mai un tentativo silenzioso.
+  schermo), il canale è Telegram e il relay non è configurato, non è
+  raggiungibile o il progetto non è ancora appaiato a nessuna chat, oppure
+  qualcuno ha silenziato Telegram per questo progetto dalla levetta in cima
+  al pannello (accesa di default appena Telegram è collegato, §7-ter/1: chi
+  apre un progetto riservato la spegne a mano). In ognuno di questi casi il
+  ledger di consegna registra `pending` o `failed` per quel canale, mai un
+  tentativo silenzioso.
 - `atlas run-log --tail 20` mostra la sequenza vera: `interaction-opened`,
   l'attesa, un eventuale `retry`, la chiusura. Utile per distinguere "nessuno
   ha risposto" da "il run non è mai arrivato a chiedere".
@@ -114,15 +123,16 @@ in silenzio.
 Questa sezione esiste perché il percorso sopra non deve mostrarli, non perché
 siano opzionali da sapere quando qualcosa non torna.
 
-- **Stato del deploy**: nessun relay OCI, bot Telegram o hostname HTTPS è mai
-  stato messo in piedi in questo ambiente. Il gate dei prerequisiti
+- **Stato del deploy**: nessun relay OCI o bot Telegram è mai stato messo in
+  piedi in questo ambiente. Il gate dei prerequisiti
   ([A01](../.atlas/graphs/260830-atlas-interactions/tickets/A01.md)) resta
-  chiuso, quindi tunnel, webhook e pairing restano codice pronto e testato,
-  mai eseguito contro un host reale. `relay/README.md` è il documento
-  operativo completo: cosa c'è in `relay/`, quali variabili d'ambiente
-  servono (`RELAY_HTTPS_HOSTNAME`, `ATLAS_RELAY_TOKEN_REF`,
-  `ATLAS_RELAY_DEPLOY_HOST`, `ATLAS_RELAY_DEPLOY_PATH`,
-  `TELEGRAM_BOT_TOKEN_REF`, `TELEGRAM_WEBHOOK_SECRET_REF`,
+  chiuso, quindi tunnel, il traduttore Telegram (alimentato dal long polling
+  verso `getUpdates`, non da un webhook: nessuna porta pensata per restare
+  raggiungibile da Internet) e pairing restano codice pronto e testato, mai
+  eseguito contro un host reale. `relay/README.md` è il documento operativo
+  completo: cosa c'è in `relay/`, quali variabili d'ambiente servono
+  (`ATLAS_RELAY_TOKEN_REF`, `ATLAS_RELAY_DEPLOY_HOST`,
+  `ATLAS_RELAY_DEPLOY_PATH`, `TELEGRAM_BOT_TOKEN_REF`,
   `TELEGRAM_BOT_USERNAME`) e come lanciare `relay/deploy.py` quando quelle
   variabili esistono davvero.
 - **Protocollo client-relay**: un tunnel outbound in stile SSE su HTTPS (mai

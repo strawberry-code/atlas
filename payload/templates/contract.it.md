@@ -15,19 +15,30 @@ atlas fog "una riga" --for <ID>  # appunta ciò che è emerso, indirizzato a un 
 
 `atlas serve` tiene la dashboard viva su `http://127.0.0.1`, la rigenera quando `graph.json` cambia e spinge il reload al browser già aperto; con `lock.remote` attivo mostra anche i lucchetti delle altre macchine.
 
-Automata conserva l'ultima esecuzione in `run-state.json` accanto a `graph.json`. `atlas run-status` mostra se il run è attivo, in attesa, fallito, bloccato o completato, insieme a nodo, provider, tentativo, retry, frontiera e blocker residui. `atlas run-log` stampa la cronologia persistente di claim, provider, fallback, attese, backoff, chiusure e aggiornamenti della frontiera; `--tail N` limita l'uscita. Il ledger descrive ciò che è accaduto, ma non conserva processi e non autorizza il resume di un agente dopo un'interruzione.
+Autopilot conserva l'ultima esecuzione in `run-state.json` accanto a `graph.json`. `atlas run-status` mostra se il run è attivo, in attesa, fallito, bloccato o completato, insieme a nodo, provider, tentativo, retry, frontiera e blocker residui. `atlas run-log` stampa la cronologia persistente di claim, provider, fallback, attese, backoff, chiusure e aggiornamenti della frontiera; `--tail N` limita l'uscita. Il ledger descrive ciò che è accaduto, ma non conserva processi e non autorizza il resume di un agente dopo un'interruzione.
 
-### Run Automata
+### Run Autopilot
 
 Ogni run parte con `atlas run --parallelism N`. Il valore è obbligatorio per quel run, `1` significa esecuzione strettamente seriale e un valore maggiore significa parallelismo limitato. È una configurazione runtime e non viene mai scritta nel grafo. Il comando configura e valida il run; le decisioni di scheduling e terminazione restano del runner guidato da Atlas.
 
-Il campo `model` del nodo è opzionale e resta assente o vuoto salvo indicazione dell'autore del grafo. Vuoto seleziona Codex Luna (`codex-luna`). Un valore esplicito deve corrispondere esattamente a un'identità di adapter registrata. Se il provider Luna di default non è disponibile, Automata registra un solo fallback a Claude Sonnet (`claude`); un modello esplicito non viene mai sostituito in silenzio. Gemini e Code Terra sono identità aggiuntive supportate.
+Il campo `model` del nodo è opzionale e resta assente o vuoto salvo indicazione dell'autore del grafo. Vuoto seleziona Codex Luna (`codex-luna`). Un valore esplicito deve corrispondere esattamente a un'identità di adapter registrata. Se il provider Luna di default non è disponibile, Autopilot registra un solo fallback a Claude Sonnet (`claude`); un modello esplicito non viene mai sostituito in silenzio. Gemini e Code Terra sono identità aggiuntive supportate.
 
 Il runner rivendica il nodo per conto del provider che sta per lanciare: il lucchetto porta l'identità di quell'agente, quindi l'agente lanciato riceve un nodo già suo, non deve fare `atlas take` e chiude con `atlas close`. Un agente che termina senza chiudere il nodo vale come terminazione ambigua di quel nodo: viene ritentato con un tetto stretto e, se non chiude, il run prosegue sui rami che non dipendono da lui invece di fermarsi.
 
-Ogni provider lanciato da Automata è AFK, viene eseguito fuori sandbox e usa il bypass dei permessi. Per aggiungere un provider, implementa `AgentAdapter` oppure configura `SubprocessAdapter`, registralo in `AdapterRegistry` e passa il registry a `launcher_from_registry`. Il runner non cambia. Un adapter di processo deve usare una argv validata, stdin chiuso e i flag non interattivi del provider.
+Ogni provider lanciato da Autopilot è AFK, viene eseguito fuori sandbox e usa il bypass dei permessi. Per aggiungere un provider, implementa `AgentAdapter` oppure configura `SubprocessAdapter`, registralo in `AdapterRegistry` e passa il registry a `launcher_from_registry`. Il runner non cambia. Un adapter di processo deve usare una argv validata, stdin chiuso e i flag non interattivi del provider.
 
 Usa `atlas run-status` per leggere lo stato corrente e il motivo. Usa `atlas run-log` oppure `atlas run-log --tail N` per esaminare selezione del modello, fallback, claim, guasti, backoff, chiusure e aggiornamenti della frontiera. Timeout, crash, rate limit, provider non disponibile e terminazione ambigua sono ritentabili; gli errori permanenti no. La policy di retry predefinita cresce da un minuto fino a un'ora ed è bounded. Un claim vivo impedisce un lancio duplicato; questa versione non riprende il processo provider dopo un'interruzione.
+
+### Il protocollo di esito
+
+Un agente AFK dichiara quel che sta succedendo su un nodo attraverso quattro canali chiusi, mai un quinto inventato al volo: chi legge questi valori è un programma, non un modello, quindi fuori da questo elenco non c'è niente da interpretare.
+
+- **Lavoro finito**: `atlas close <ID> -s "<sintesi>"`, il canale già visto sopra.
+- **Resa con motivo**: `atlas give-up <ID> --motivo <MOTIVO> -d "<dettaglio>"`, quando la domanda non ha risposta valida in questo run. `MOTIVO` è uno tra `infeasible`, `missing-resource`, `blocked-environment`, `needs-redesign`. È terminale per quel nodo in questo run: non passa dal budget dei retry, il nodo torna alla frontiera con la resa registrata.
+- **Serve una persona**: `atlas ask-human <ID> -q "<proposta>"`. La proposta è un'alternativa binaria già formulata ("procedo con X, confermi?"), non una domanda aperta: il canale è a bottoni. Apre un'Interazione, sospende il nodo senza contarlo come fallimento; alla risposta il nodo torna prendibile.
+- **Passo di avanzamento**: `atlas progress <ID> <PASSO> ["<nota>"]`, da chiamare spesso mentre lavori, costa poco. `PASSO` è uno tra `investigating`, `implementing`, `verifying`, `writing-answer`, `blocked`. Non è un esito: non tocca lo stato del nodo, aggiorna solo il battito. Un agente che ha già dichiarato un passo e poi resta silenzioso più di un'ora viene considerato fermo e il tentativo termina come un fallimento ritentabile (`timeout`); un agente che non chiama mai `progress` resta protetto solo dal tetto assoluto di novanta minuti, che vale come ultima difesa.
+
+`close`, `give-up` e `ask-human` sono mutuamente esclusivi per costruzione: ciascuno pretende il nodo ancora rivendicato da chi chiama, quindi solo il primo che arriva vince e gli altri falliscono con lo stesso errore già esistente per "nodo non rivendicato".
 
 Se arrivi qui senza sapere niente di Atlas, `atlas how-to` è il punto di ingresso: stampa questo contratto, l'elenco dei comandi, le mutazioni chiamabili da uno script, le skill installate e i path di questo progetto. È la stessa dottrina che stai leggendo, raggiungibile da un comando invece che da un file.
 

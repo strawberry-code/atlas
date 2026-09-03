@@ -1,6 +1,6 @@
 """Confine provider-agnostico fra il coordinatore notifiche e un canale.
 
-Stesso ruolo di adapters.py per Automata, per un dominio diverso: notify.py
+Stesso ruolo di adapters.py per Autopilot, per un dominio diverso: notify.py
 decide quando una consegna e' dovuta, un canale (locale, Himalaya, Telegram,
 ...) sa solo come farla arrivare.
 """

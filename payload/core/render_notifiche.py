@@ -18,18 +18,16 @@ La card aperta porta anche 'data-interaction' sul suo <li>, non solo sui
 bottoni: e' quanto basta a dashboard.js (C02) per riconoscere una card gia'
 vista da una nuova, senza inventare un secondo indice.
 
-In cima al corpo del pannello c'e' anche il bottone del pairing Telegram
-one-tap (D05, '_pairing_telegram'): un solo <button>, senza campi da
-compilare. Il flusso vero (POST/GET /pairing/telegram*, apertura del link
-t.me, poll dello stato) e' tutto in dashboard.js e serve_pairing.py, qui c'e'
-solo il markup e i testi via data-attribute.
+In cima al corpo del pannello c'e' anche il blocco Telegram (pairing one-tap
+e levetta muto per progetto): render_notif_telegram.py, spezzato via per la
+stessa ragione di serve_pairing.py rispetto a serve.py.
 """
 from __future__ import annotations
 
 from datetime import datetime, timedelta
 from html import escape
 
-from . import interactions_view
+from . import interactions_view, notify, render_notif_telegram
 from .config import Graph
 from .run_state import RunState
 from .strings import t
@@ -102,7 +100,27 @@ def _card_risolta(data: dict, voce: dict, now: datetime) -> str:
     )
 
 
-def _in_attesa(ref: Graph) -> list[str]:
+def _consegna_fallita(ref: Graph, data: dict, node_id: str) -> str:
+    """SS7-ter/3: se l'Interaction aperta su questo nodo ha un canale la cui
+    consegna si e' esaurita senza riuscire, la riga lo dice qui. Non si
+    cattura NotifyStateError: un notify-state.json corrotto e' una diagnosi
+    per chi guarda la dashboard, non un dettaglio da inghiottire in silenzio
+    (stesso comportamento di RunStateError, qui sopra). Nessun ritentativo
+    ne' coda in piu' (grilling 22): si legge solo cio' che notify.dispatch
+    ha gia' concluso."""
+    interazione = next((r for r in data.get("interactions", [])
+                        if r["nodeId"] == node_id and r["status"] == "open"), None)
+    if interazione is None:
+        return ""
+    stato = notify.NotifyState(ref.notify_state_path, ref.slug)
+    falliti = stato.failed_channels(interazione["id"])
+    if not falliti:
+        return ""
+    testo = t("render.notif_consegna_fallita", canale=", ".join(falliti))
+    return f'<p class="notif-guasto">{escape(testo)}</p>'
+
+
+def _in_attesa(ref: Graph, data: dict) -> list[str]:
     """Il run in attesa (contesto, nessuna azione): niente se non c'e' un run
     attivo, o se non e' fermo su 'waiting'. Non si cattura RunStateError: un
     run-state.json corrotto e' una diagnosi per chi guarda la dashboard, non un
@@ -112,26 +130,13 @@ def _in_attesa(ref: Graph) -> list[str]:
         return []
     frase = (t("render.notif_run_nodo", nodo=stato["node"]) if stato.get("node")
              else t("render.notif_run_generico"))
-    return [f'<li class="notif-card notif-contesto"><p class="notif-testo">{escape(frase)}</p></li>']
+    guasto = _consegna_fallita(ref, data, stato["node"]) if stato.get("node") else ""
+    return [f'<li class="notif-card notif-contesto"><p class="notif-testo">{escape(frase)}</p>{guasto}</li>']
 
 
 def _sezione(titolo: str, cards: list[str], vuoto: str) -> str:
     corpo = "".join(cards) or f'<p class="notif-vuoto">{escape(vuoto)}</p>'
     return f'<section class="notif-sezione"><h3>{escape(titolo)}</h3><ul>{corpo}</ul></section>'
-
-
-def _pairing_telegram() -> str:
-    """Il bottone unico del pairing one-tap (D05): dashboard.js fa il resto
-    (POST /pairing/telegram, apre il link t.me, interroga lo stato). Nessun
-    campo da compilare qui: token bot, chat ID e hostname restano fuori dalla
-    UI per costruzione, non solo per scelta di questo markup."""
-    return (
-        '<div class="notif-canali">'
-        f'<button type="button" class="pairing-telegram" data-pairing="telegram">'
-        f'{escape(t("render.notif_pairing_bottone"))}</button>'
-        '<span class="pairing-stato" aria-live="polite"></span>'
-        '</div>'
-    )
 
 
 def panel(ref: Graph, data: dict, now: datetime | None = None) -> str:
@@ -145,10 +150,10 @@ def panel(ref: Graph, data: dict, now: datetime | None = None) -> str:
     risolte_oggi = [v for v in righe if v["status"] != "open"
                     and (momento - v["resolvedAge"]).date() == momento.date()]
     sezioni = (
-        _pairing_telegram()
+        render_notif_telegram.blocco(ref)
         + _sezione(t("render.notif_attenzione"), [_card_aperta(data, v, momento) for v in aperte],
                    t("render.notif_attenzione_vuota"))
-        + _sezione(t("render.notif_in_attesa"), _in_attesa(ref), t("render.notif_in_attesa_vuota"))
+        + _sezione(t("render.notif_in_attesa"), _in_attesa(ref, data), t("render.notif_in_attesa_vuota"))
         + _sezione(t("render.notif_risolte"), [_card_risolta(data, v, momento) for v in risolte_oggi],
                    t("render.notif_risolte_vuota"))
     )
@@ -161,7 +166,9 @@ def panel(ref: Graph, data: dict, now: datetime | None = None) -> str:
         f' data-azione-errore="{escape(t("render.notif_azione_errore"))}"'
         f' data-pairing-attesa="{escape(t("render.notif_pairing_attesa"))}"'
         f' data-pairing-connesso="{escape(t("render.notif_pairing_connesso"))}"'
-        f' data-pairing-scaduto="{escape(t("render.notif_pairing_scaduto"))}">'
+        f' data-pairing-scaduto="{escape(t("render.notif_pairing_scaduto"))}"'
+        f' data-pairing-rifiutato="{escape(t("render.notif_pairing_rifiutato"))}"'
+        f' data-pairing-senza-gestore="{escape(t("render.notif_pairing_senza_gestore"))}">'
         '<button type="button" class="notifiche-toggle" aria-expanded="true">'
         '<svg class="bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
         'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'

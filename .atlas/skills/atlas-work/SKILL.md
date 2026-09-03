@@ -56,7 +56,33 @@ atlas fog "quel che è emerso, in una riga" --for <ID>
 
 e proponilo all'utente a fine nodo. La forma del grafo si cambia solo con uno script di mutazione, mai di slancio in mezzo a un altro lavoro. Per farne un nodo c'è un esempio pronto in `.atlas/scripts/000-promote-fog.py`: si compila con l'indice della voce e i campi del nodo, e si lancia con `atlas exec`.
 
-## 5. Chiudi
+## 5. Segnala mentre lavori, o fermati con un motivo
+
+Mentre lavori dichiara il passo raggiunto, spesso: costa poco ed è il segnale che tiene il runner al corrente che sei ancora al lavoro invece che appeso.
+
+```sh
+atlas progress <ID> <PASSO> ["<nota>"]
+```
+
+`PASSO` è uno tra `investigating`, `implementing`, `verifying`, `writing-answer`, `blocked`. Non è un esito: non tocca lo stato del nodo. Un silenzio di oltre un'ora dopo il primo passo dichiarato fa terminare il tentativo come un fallimento ritentabile; senza nessuna chiamata a `progress` resta solo il tetto assoluto di novanta minuti.
+
+Se il nodo non ha risposta valida in questo run, dichiaralo invece di forzarla:
+
+```sh
+atlas give-up <ID> --motivo <MOTIVO> -d "<dettaglio>"
+```
+
+`MOTIVO` è uno tra `infeasible` (la domanda è contraddittoria o impossibile), `missing-resource` (serve un segreto, un accesso o un servizio che non hai e non puoi procurarti da solo), `blocked-environment` (l'ambiente locale non regge il lavoro, non è un guasto transitorio), `needs-redesign` (serve prima cambiare il disegno a monte). È terminale per questo nodo in questo run: non viene ritentato, il nodo torna alla frontiera con la resa registrata.
+
+Se la prossima mossa è una decisione che non ti spetta, non deciderla al posto dell'utente e non fermarti in silenzio: proponi un'alternativa binaria e sospendi il nodo.
+
+```sh
+atlas ask-human <ID> -q "<procedo con X, confermi?>"
+```
+
+Non è una domanda aperta: la sola risposta possibile è il tap su un'azione già proposta. Il claim si rilascia finché una persona non risponde, e non conta come fallimento.
+
+## 6. Chiudi
 
 ```sh
 atlas close <ID> -s "la sintesi in una riga"

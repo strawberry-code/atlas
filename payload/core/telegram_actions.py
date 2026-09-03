@@ -2,7 +2,7 @@
 dell'Interaction (A04), con la capability (D01) come unico lasciapassare.
 
 Il gestore costruito qui gira nel thread del tunnel dentro il processo di
-Automata (automata.py lo avvia e lo ferma insieme al run): 'resolve_interaction'
+Autopilot (autopilot.py lo avvia e lo ferma insieme al run): 'resolve_interaction'
 pubblica il ResolutionEvent in-process, quindi una risposta valida sveglia
 subito il runner in attesa (A05), senza aspettare la rilettura periodica del
 grafo. Non solleva mai fuori da 'gestore': un tap che non supera un controllo

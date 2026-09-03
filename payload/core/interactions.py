@@ -4,7 +4,7 @@ from __future__ import annotations
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from threading import Condition
 
 from .identity import identity
@@ -13,6 +13,13 @@ from .store import StateError
 
 STATUSES = frozenset(("open", "resolved", "cancelled", "expired"))
 ACTION_IDS = frozenset(("confirm", "decline", "retry", "cancel", "acknowledge"))
+# Quanto puo' aspettare una card che chiede una decisione a una persona: la
+# giornata di chi deve guardarla, non i minuti di un avviso di guasto (quello
+# resta SCADENZA_GUASTO in autopilot.py, che non lo condivide con nessun altro
+# chiamante). Vive qui, non in autopilot.py, perche' da H05 anche claims.ask_human
+# apre una card con la stessa attesa: un valore solo invece di due copie da tenere
+# allineate a mano.
+SCADENZA_DECISIONE = timedelta(days=1)
 _REQUIRED = frozenset((
     "id", "graph", "runId", "nodeId", "event", "summary", "allowedActions",
     "expiresAt", "idempotencyKey", "status", "createdAt", "updatedAt", "resolution", "events",
@@ -70,6 +77,20 @@ def is_expired(record: dict, now: datetime | None = None) -> bool:
     if record.get("status") != "open":
         return False
     return _as_datetime(record["expiresAt"]) < (now or datetime.now().astimezone())
+
+
+def has_open(data: dict, node_id: str, event: str) -> bool:
+    """Vero se esiste una card aperta di quell'evento per quel nodo (H05).
+
+    E' il filtro che tiene un nodo fuori dalla frontiera e dal prossimo claim
+    finche' una persona non ha risposto: 'open' basta da solo, senza bisogno del
+    controllo per-tentativo che serve invece alle rese (data['surrenders'] e'
+    append-only e sopravvive alla propria risoluzione; qui la card cambia stato
+    non appena qualcuno risponde, e finche' resta aperta il nodo non puo' comunque
+    essere ripreso da un nuovo tentativo).
+    """
+    return any(record["nodeId"] == node_id and record["event"] == event
+              and record["status"] == "open" for record in data.get("interactions", []))
 
 
 def _invalid(detail: str) -> StateError:

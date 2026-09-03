@@ -6,45 +6,50 @@ strings_cli.py e strings_docs.py per il resto del catalogo.
 from __future__ import annotations
 
 STRINGS: dict[str, dict[str, str]] = {
-    "automata.parallelism_invalid": {
+    "autopilot.parallelism_invalid": {
         "it": "parallelism deve essere un intero positivo",
         "en": "parallelism must be a positive integer"},
-    "automata.serial": {"it": "seriale", "en": "serial"},
-    "automata.limited": {"it": "parallelo limitato", "en": "limited parallelism"},
-    "automata.configured": {
-        "it": "  run Automata avviato: parallelism={parallelism} · {mode} · model vuoto = Codex Luna, fallback Claude Sonnet",
-        "en": "  Automata run started: parallelism={parallelism} · {mode} · empty model = Codex Luna, Claude Sonnet fallback"},
-    "automata.active_claims": {
+    "autopilot.serial": {"it": "seriale", "en": "serial"},
+    "autopilot.limited": {"it": "parallelo limitato", "en": "limited parallelism"},
+    "autopilot.configured": {
+        "it": "  run Autopilot avviato: parallelism={parallelism} · {mode} · model vuoto = Codex Luna, fallback Claude Sonnet",
+        "en": "  Autopilot run started: parallelism={parallelism} · {mode} · empty model = Codex Luna, Claude Sonnet fallback"},
+    "autopilot.active_claims": {
         "it": "run non terminabile: nodi ancora in lavorazione: {ids}",
         "en": "run cannot terminate: nodes still in progress: {ids}"},
-    "automata.blocked": {
+    "autopilot.blocked": {
         "it": "run bloccato: nessun nodo eleggibile, restano aperti: {ids}",
         "en": "run blocked: no eligible node, open nodes remain: {ids}"},
-    "automata.hitl": {
+    "autopilot.hitl": {
         "it": "nodo {id} HITL: un run AFK non puo' rispondere al posto dell'umano",
         "en": "node {id} is HITL: an AFK run cannot answer for the human"},
-    "automata.not_terminal": {
+    "autopilot.not_terminal": {
         "it": "il nodo {id} non e' terminale dopo l'attesa: stato '{status}'",
         "en": "node {id} is not terminal after waiting: status '{status}'"},
-    "automata.adapter_outcome": {
+    "autopilot.adapter_outcome": {
         "it": "adapter del nodo {id} ha terminato con esito '{status}': {detail}",
         "en": "adapter for node {id} terminated with '{status}': {detail}"},
-    "automata.already_started": {
+    "autopilot.already_started": {
         "it": "il nodo {id} e' gia' stato avviato da questo run",
         "en": "node {id} was already started by this run"},
-    "automata.retry_active": {
+    "autopilot.retry_active": {
         "it": "retry non avviato: il nodo {id} ha ancora un agente attivo",
         "en": "retry not started: node {id} still has an active agent"},
-    "automata.retry_exhausted": {
+    "autopilot.retry_exhausted": {
         "it": "run non riuscito: retry esauriti o errore permanente sui nodi: {ids}. "
               "Se la causa e' risolta, rimuovi la voce del nodo (o il file) da {path} "
               "prima di rilanciare: il budget resta segnato esaurito da un run precedente.",
         "en": "run failed: retries exhausted or permanent error on nodes: {ids}. "
               "If the cause is fixed, remove the node's entry (or the file) at {path} "
               "before relaunching: the budget stays marked exhausted from a previous run."},
-    "automata.invalid_termination": {
+    "autopilot.invalid_termination": {
         "it": "run non terminabile: la frontiera e' vuota ma restano nodi non terminali",
         "en": "run cannot terminate: the frontier is empty but non-terminal nodes remain"},
+    "autopilot.waiting_human": {
+        "it": "run in pausa: in attesa di una persona sui nodi: {ids}. Non e' un guasto: "
+              "risolvi l'Interazione aperta (dashboard o Telegram) e rilancia il run.",
+        "en": "run paused: waiting on a person on nodes: {ids}. Not a failure: "
+              "resolve the open Interaction (dashboard or Telegram) and relaunch the run."},
     # --- claims.py ---
     "claim.non_aperto": {"it": "{id} non è aperto: sta a '{stato}'",
                          "en": "{id} is not open: it's at '{stato}'"},
@@ -55,8 +60,28 @@ STRINGS: dict[str, dict[str, str]] = {
                     "en": "this session already holds {tenuti}: the cap is {tetto} per session.\n"
                           "  Release with 'atlas release {primo}', open another session,\n"
                           "  or force with --force if you know what you're doing."},
+    "claim.in_attesa_di_persona": {
+        "it": "{id} è in attesa di una persona: risolvi l'Interazione aperta prima di riprenderlo,\n"
+              "  oppure forza con --force se sai cosa stai facendo.",
+        "en": "{id} is waiting on a person: resolve the open Interaction before resuming it,\n"
+              "  or force with --force if you know what you're doing."},
     "release.non_rivendicato": {"it": "{id} non è rivendicato: sta a '{stato}'",
                                 "en": "{id} is not claimed: it's at '{stato}'"},
+    "give_up.motivo_invalido": {"it": "'{motivo}' non è un motivo di resa valido: {elenco}",
+                                "en": "'{motivo}' is not a valid surrender reason: {elenco}"},
+    "give_up.dettaglio_vuoto": {"it": "il dettaglio della resa non può essere vuoto: spiega il motivo",
+                                "en": "the surrender detail cannot be empty: explain the reason"},
+    "give_up.non_rivendicato": {"it": "{id} non è rivendicato: sta a '{stato}'",
+                                "en": "{id} is not claimed: it's at '{stato}'"},
+    "progress.passo_invalido": {"it": "'{passo}' non è un passo valido: {elenco}",
+                                "en": "'{passo}' is not a valid step: {elenco}"},
+    "progress.non_rivendicato": {"it": "{id} non è rivendicato: sta a '{stato}'",
+                                 "en": "{id} is not claimed: it's at '{stato}'"},
+    "ask_human.domanda_vuota": {
+        "it": "la proposta per la persona non può essere vuota: descrivi l'alternativa",
+        "en": "the proposal for the human cannot be empty: describe the alternative"},
+    "ask_human.non_rivendicato": {"it": "{id} non è rivendicato: sta a '{stato}'",
+                                  "en": "{id} is not claimed: it's at '{stato}'"},
     "close.gia_chiuso": {"it": "{id} è già chiuso", "en": "{id} is already closed"},
     "close.altra_sessione": {"it": "{id} è rivendicato da un'altra sessione viva ({owner})",
                              "en": "{id} is claimed by another live session ({owner})"},
@@ -300,4 +325,48 @@ STRINGS: dict[str, dict[str, str]] = {
     "telegram_actions.rejected": {
         "it": "Questa richiesta non è più valida (scaduta o già risolta).",
         "en": "This request is no longer valid (expired or already resolved)."},
+
+    # --- autopilot.py (card delle Interazioni, B01) ---
+    "autopilot.card_run_ended": {"it": "{title} è terminato.", "en": "{title} has ended."},
+    "autopilot.card_run_stopped": {"it": "Il lavoro si è fermato: {detail}.",
+                                   "en": "Work has stopped: {detail}."},
+    "autopilot.card_decision_required": {"it": "Serve una decisione per {node}.",
+                                         "en": "A decision is needed for {node}."},
+    "autopilot.action_acknowledge": {"it": "Preso atto", "en": "Acknowledged"},
+    "autopilot.action_retry": {"it": "Riprova", "en": "Retry"},
+    "autopilot.action_cancel": {"it": "Annulla", "en": "Cancel"},
+    "autopilot.action_confirm": {"it": "Conferma", "en": "Confirm"},
+    "autopilot.action_decline": {"it": "Rifiuta", "en": "Decline"},
+
+    # --- notify_telegram.py (B01) ---
+    "notify_telegram.evento_gate_required": {"it": "conferma richiesta", "en": "confirmation required"},
+    "notify_telegram.evento_decision_required": {"it": "decisione richiesta", "en": "decision required"},
+    "notify_telegram.evento_run_stopped": {"it": "run fermo", "en": "run stopped"},
+    "notify_telegram.evento_run_ended": {"it": "run terminato", "en": "run ended"},
+    "notify_telegram.evento_human_needed": {"it": "serve una persona", "en": "human needed"},
+
+    # --- telegram_status.py (D01, 260902-atlas-relay) ---
+    "telegram_status.stato_in_corso": {
+        "it": "{fatti}/{totale} nodi chiusi. In lavorazione ora: {node} ({provider}).",
+        "en": "{fatti}/{totale} nodes closed. Working on {node} now ({provider})."},
+    "telegram_status.stato_frontiera": {
+        "it": "{fatti}/{totale} nodi chiusi. Frontiera prendibile: {elenco}.",
+        "en": "{fatti}/{totale} nodes closed. Open frontier: {elenco}."},
+    "telegram_status.stato_fermo": {
+        "it": "{fatti}/{totale} nodi chiusi. Nessun nodo prendibile adesso.",
+        "en": "{fatti}/{totale} nodes closed. No node is open to take right now."},
+    "telegram_status.aspetta_nessuna": {
+        "it": "Nessuna decisione in sospeso al momento.",
+        "en": "No decision is pending right now."},
+    "telegram_status.aspetta_titolo": {
+        "it": "In attesa di una persona:", "en": "Waiting on a person:"},
+    "telegram_status.aspetta_riga": {"it": "  {node} · {summary}", "en": "  {node} · {summary}"},
+    "telegram_status.storto_nessun_run": {
+        "it": "Nessun run mai partito su questo progetto.",
+        "en": "No run has ever started on this project."},
+    "telegram_status.storto_nulla": {
+        "it": "Niente di anomalo al momento.", "en": "Nothing wrong at the moment."},
+    "telegram_status.storto_motivo": {"it": "Motivo: {reason}", "en": "Reason: {reason}"},
+    "telegram_status.storto_riga": {
+        "it": "  {node}: {failure}", "en": "  {node}: {failure}"},
 }

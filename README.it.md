@@ -28,7 +28,7 @@ Tu: Crea un grafo Atlas per costruire un modellino del Millennium Falcon.
 Suddividi il lavoro in nodi AFK con dipendenze reali e lascia vuoto model
 salvo quando sia rilevante.
 
-Tu: Orchestra l'esecuzione con Atlas Automata, un agente Luna alla volta,
+Tu: Orchestra l'esecuzione con Atlas Autopilot, un agente Luna alla volta,
 fino alla chiusura di ogni nodo. Riporta il risultato quando il grafo arriva a END.
 ```
 
@@ -57,13 +57,15 @@ Si installa il CLI, si installa in un progetto (crea `.atlas/`, registra il prog
 4. **Si lavora**: se il nodo è AFK lo fa l'agente da solo, se è HITL la skill `atlas-work` porta le domande una alla volta e aspetta.
 5. **Si chiude** con `atlas close <ID> -s "sintesi"`, dopo aver scritto la Risposta nel ticket. Mappa e dashboard si rigenerano da sole.
 
-Per un run Automata, `atlas run-status` mostra lo stato persistente e `atlas run-log` la cronologia degli eventi; `atlas run-log --tail N` limita la diagnosi agli ultimi eventi.
+Chiudere non è l'unico modo di finire, e gli altri due contano soprattutto quando a lavorare è un agente senza nessuno che guarda. Con `atlas give-up <ID> --motivo <MOTIVO>` si dichiara di non potercela fare, scegliendo il motivo fra `infeasible`, `missing-resource`, `blocked-environment` e `needs-redesign`: Autopilot lo prende per definitivo e passa oltre, invece di rilanciare lo stesso agente contro lo stesso muro. Con `atlas ask-human <ID> -q "proposta"` si dichiara che serve una persona: si apre un'Interazione e il nodo aspetta senza consumare tentativi. E mentre si lavora, `atlas progress <ID> <PASSO>` dichiara dove si è arrivati, così un agente fermo si distingue da uno che sta pensando.
 
-## Atlas Automata
+Per un run Autopilot, `atlas run-status` mostra lo stato persistente e `atlas run-log` la cronologia degli eventi; `atlas run-log --tail N` limita la diagnosi agli ultimi eventi.
 
-Atlas Automata è il runner meccanico per il lavoro AFK già descritto da un grafo. Ogni run parte con il limite obbligatorio del run, per esempio `atlas run --parallelism 1` per l'esecuzione strettamente seriale oppure un valore maggiore per il parallelismo limitato. Il valore non viene scritto nel grafo. Automata mantiene Atlas come fonte di verità per frontiera, claim, dipendenze e stati terminali; i suoi ledger sono diagnostici, non un secondo scheduler.
+## Atlas Autopilot
 
-Il campo `model` del nodo è opzionale e resta assente o vuoto salvo indicazione dell'autore del grafo. Vuoto significa Codex Luna (`codex-luna`). Un valore esplicito deve corrispondere esattamente a un adapter registrato. Se l'adapter Luna di default non è disponibile, Automata esegue un solo fallback osservabile a Claude Sonnet (`claude`); un modello esplicito non viene mai sostituito in silenzio. Gemini e Code Terra sono identità di adapter aggiuntive supportate.
+Atlas Autopilot è il runner meccanico per il lavoro AFK già descritto da un grafo. Ogni run parte con il limite obbligatorio del run, per esempio `atlas run --parallelism 1` per l'esecuzione strettamente seriale oppure un valore maggiore per il parallelismo limitato. Il valore non viene scritto nel grafo. Autopilot mantiene Atlas come fonte di verità per frontiera, claim, dipendenze e stati terminali; i suoi ledger sono diagnostici, non un secondo scheduler.
+
+Il campo `model` del nodo è opzionale e resta assente o vuoto salvo indicazione dell'autore del grafo. Vuoto significa Codex Luna (`codex-luna`). Un valore esplicito deve corrispondere esattamente a un adapter registrato. Se l'adapter Luna di default non è disponibile, Autopilot esegue un solo fallback osservabile a Claude Sonnet (`claude`); un modello esplicito non viene mai sostituito in silenzio. Gemini e Code Terra sono identità di adapter aggiuntive supportate.
 
 Ogni provider viene eseguito AFK, fuori sandbox e con bypass dei permessi. Per aggiungere un provider, implementa `AgentAdapter` oppure configura `SubprocessAdapter`, registralo in `AdapterRegistry` e passa il registry a `launcher_from_registry`; la logica del runner per frontiera, parallelismo e terminazione non cambia. Un adapter di processo deve usare una argv validata, stdin chiuso e i flag non interattivi del provider.
 
@@ -73,7 +75,7 @@ Un modo di orchestrare più nodi insieme, se il progetto ne ha molti prendibili:
 
 ## Atlas Interactions
 
-Il pannello Notifiche sulla destra della dashboard trasforma nodi HITL, run bloccati, retry esauriti e END in card azionabili, risolte con `atlas serve` attivo, senza polling: una risposta valida risveglia Automata subito al commit. Gli avvisi browser e di sistema funzionano senza configurazione; un profilo Himalaya già configurato sulla macchina aggiunge alert ed escalation via email; un bottone di pairing Telegram one-tap (nessun token, chat ID o hostname da digitare) aggiunge azioni con bottoni inline tramite un Atlas Relay opt-in. Setup, diagnostica e prerequisiti di deploy del relay Telegram sono in `docs/atlas-interactions-quickstart.md`.
+Il pannello Notifiche sulla destra della dashboard trasforma nodi HITL, run bloccati, retry esauriti e END in card azionabili, risolte con `atlas serve` attivo, senza polling: una risposta valida risveglia Autopilot subito al commit. Gli avvisi browser e di sistema funzionano senza configurazione; un profilo Himalaya già configurato sulla macchina aggiunge alert ed escalation via email; un bottone di pairing Telegram one-tap (nessun token, chat ID o hostname da digitare) aggiunge azioni con bottoni inline tramite un Atlas Relay opt-in. Setup, diagnostica e prerequisiti di deploy del relay Telegram sono in `docs/atlas-interactions-quickstart.md`.
 
 ## Installare il CLI
 
@@ -95,6 +97,7 @@ Finisce in `~/.local/bin/atlas` (`%USERPROFILE%\.local\bin\atlas` su Windows, ov
 atlas install .                      # oppure atlas install /path/al/progetto
 atlas install . --graph mio-epic     # crea subito il primo grafo
 atlas install . --lang en            # contenuti e skill in inglese invece che italiano
+atlas uninstall .                    # toglie Atlas dal progetto e lascia i dati in .atlas/
 ```
 
 In `.atlas/` finiscono solo i dati del progetto: `config.json`, i grafi, gli script di mutazione, le skill, il contratto e un `README.md` che spiega a chi trova quella cartella come procurarsi `atlas`. Il motore non ci finisce: vive nell'eseguibile, uno per macchina. Fuori da `.atlas/` resta un symlink per skill in `.claude/skills/`, l'hook di fine sessione in `.claude/settings.json` e il contratto in `CLAUDE.md`. Il progetto viene anche registrato in `~/.config/atlas.json` con uno slug (default: nome della cartella; `--slug` per un nome diverso).
@@ -124,12 +127,22 @@ atlas status                         # frontiera, lucchetti, avanzamento
 atlas next                           # frontiera ordinata per impatto, come suggerimento
 atlas take F01                       # rivendica e stampa il contesto in un solo passo
 # lavori, poi scrivi la sezione Risposta in .atlas/graphs/<slug>/tickets/F01.md
+atlas progress F01 verifying           # dichiara il passo raggiunto, mentre lavori
 atlas close F01 -s "sintesi in una riga"
+atlas give-up F01 --motivo missing-resource -d "serve il token del bot"
+atlas ask-human F01 -q "procedo con lo schema A, confermi?"
 atlas amend F01 --artefatti src/a.py # corregge la contabilità di un nodo già chiuso
+atlas fog "quel che è emerso e non ha ancora un nodo"
+atlas fog --list                     # la nebbia raccolta finora
+atlas ask "la domanda" --assumption "come procedo intanto"
+atlas asks                           # le domande aperte, di tutti
+atlas answer Q001 -r "la risposta"
+atlas validate                       # forma del grafo: id, archi, cicli
+atlas doctor                         # diagnosi che regge anche su un grafo rotto
 atlas render --open                  # dashboard
 atlas serve --no-open                # dashboard su un server locale, viva (Ctrl-C per fermare)
 atlas serve --port 8080              # la stessa, sulla porta che scegli tu
-atlas run --parallelism 1            # run Automata: 1 significa seriale
+atlas run --parallelism 1            # run Autopilot: 1 significa seriale
 atlas doctor                         # controllo di salute: nodi dimenticati, lucchetti fermi, dashboard stantia
 atlas conflicts                      # i conflitti di merge irrisolti del grafo attivo
 atlas conflicts --resolve            # li dichiara risolti, dopo aver corretto graph.json a mano

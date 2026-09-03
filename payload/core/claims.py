@@ -14,15 +14,18 @@ attraverso l'holder di remotelock.py: se non e' attivo, il percorso e' identico 
 from __future__ import annotations
 
 import os
+import re
 import socket
 from datetime import datetime, timedelta
 
-from . import docs, gitscan, remotelock
+from . import docs, gitscan, interactions, remotelock
 from .config import ENV_HOST, Graph
+from .editor import editing
 from .identity import alive, e_mio, holder, identity, mio_come, nota, session
 from .model import by_id, fingerprint, is_done, istante, node_of, claimed
 from .remotelock import (ACQUISITO, GARA, NON_SCADUTO, NON_TUO, RETE, TENUTO,
                          fresco, nome_lock, scadenza_epoch)
+from .run_state import RunState
 from .store import CLAIMED, CLOSED, OPEN, StateError, load, transaction
 from .strings import t
 
@@ -82,6 +85,16 @@ def heartbeat_since(node: dict) -> timedelta | None:
     return datetime.now().astimezone() - datetime.fromisoformat(stamp) if stamp else None
 
 
+def silent_for(node: dict) -> timedelta | None:
+    """Da quanto un nodo che ha gia' dichiarato almeno un passo (H01/4, progress())
+    non ne dichiara uno nuovo. None se non ne ha mai dichiarato uno: senza un primo
+    passo il silenzio non si distingue da un lavoro lecito che non parla, e chi
+    chiama (H03) deve restare col solo tetto assoluto a difesa in quel caso."""
+    if not holder(node).get("progress"):
+        return None
+    return heartbeat_since(node)
+
+
 def claim_state(node: dict, agent: dict) -> str:
     """live, dead o idle: come si presenta un nodo rivendicato.
 
@@ -91,7 +104,7 @@ def claim_state(node: dict, agent: dict) -> str:
     verifica sul PID con l'idle su idle_hours. Un claim remoto senza lease_until
     vale come fresco, mai come morto: nel dubbio si lascia lavorare.
 
-    Un claim preso con on_behalf_of (Automata, per conto del provider che lancia)
+    Un claim preso con on_behalf_of (Autopilot, per conto del provider che lancia)
     non porta il PID di chi lavora davvero (claim() lo scrive a None apposta): la
     verifica sul processo direbbe sempre morto un lucchetto vivo. Il flag
     'delegated' distingue questo caso da un claim normale senza PID noto (per
@@ -254,7 +267,7 @@ def claim(ref: Graph, node_id: str, assignee: str | None = None, force: bool = F
     """Prende il lucchetto, o lo rinnova se e' gia' nostro.
 
     on_behalf_of scrive nel claim l'identita' dell'agente che lavorera' il nodo,
-    non quella del processo che lo prende. Serve ad Automata, che rivendica prima
+    non quella del processo che lo prende. Serve ad Autopilot, che rivendica prima
     di lanciare il provider: senza, il figlio troverebbe il proprio nodo tenuto da
     uno sconosciuto e dovrebbe scegliere fra rubare il lucchetto e fermarsi, e in
     AFK fermarsi vuol dire un run morto su un nodo che nessuno sta guardando.
@@ -289,6 +302,13 @@ def claim(ref: Graph, node_id: str, assignee: str | None = None, force: bool = F
         if bloccanti := [d for d in node["blockedBy"] if not is_done(index[d])]:
             if not force:
                 raise StateError(t("claim.bloccato", id=node_id, bloccanti=", ".join(bloccanti)))
+        if interactions.has_open(data, node_id, "human-needed") and not force:
+            # H05: la stessa mutua esclusione con cui claim() gia' rispetta un
+            # bloccante non chiuso, applicata alla domanda aperta invece che a un
+            # arco. Senza questo, un altro agente (o la stessa persona da un'altra
+            # sessione) potrebbe riprendere il nodo mentre la card aspetta ancora
+            # un tap, e la risposta arriverebbe su un lavoro gia' ripartito.
+            raise StateError(t("claim.in_attesa_di_persona", id=node_id))
         tenuti = [n["id"] for n in mine(data)]
         if len(tenuti) >= agent["max_claims_per_session"] and not force:
             raise StateError(t("claim.tetto", tenuti=", ".join(tenuti),
@@ -322,6 +342,37 @@ def _assicura_rilascio(ref: Graph, node_id: str) -> None:
     raise StateError(t("release.remoto_gara", id=node_id))
 
 
+PASSI = ("investigating", "implementing", "verifying", "writing-answer", "blocked")
+
+
+def _nota_progress(testo: str | None) -> str | None:
+    """Il testo libero di 'progress': una riga sola, entro 200 caratteri, mai
+    interpretata da un programma. Normalizza invece di rifiutare (a capo e spazi
+    ripetuti collassati, coda tagliata): il segnale non deve mai fallire per un
+    testo scomodo, coerente con lo scopo di poterlo chiamare spesso e a poco costo."""
+    if not testo:
+        return None
+    return " ".join(testo.split())[:200] or None
+
+
+def progress(ref: Graph, node_id: str, step: str, note: str | None = None) -> dict:
+    """Il segnale di avanzamento (H01/4): scrive il passo dichiarato e rinfresca il
+    battito dentro il claim gia' esistente, in una transazione leggera come quella
+    del rinnovo-su-lettura. Non tocca lease_until (quello segue la sua cadenza in
+    rinnova_se_necessario, non ogni chiamata di progress) ne' rigenera ticket,
+    mappa o dashboard: e' pensato per costare poco anche chiamato spesso."""
+    if step not in PASSI:
+        raise StateError(t("progress.passo_invalido", passo=step, elenco=", ".join(PASSI)))
+    with transaction(ref.json_path) as data:
+        node = node_of(data, node_id)
+        if node["status"] != CLAIMED:
+            raise StateError(t("progress.non_rivendicato", id=node_id, stato=node["status"]))
+        ora = _adesso().isoformat(timespec="seconds")
+        node["claim"]["heartbeat"] = ora
+        node["claim"]["progress"] = {"step": step, "note": _nota_progress(note), "at": ora}
+        return dict(node)
+
+
 def release(ref: Graph, node_id: str, reason: str | None = None) -> dict:
     with transaction(ref.json_path) as data:
         node = node_of(data, node_id)
@@ -336,6 +387,94 @@ def release(ref: Graph, node_id: str, reason: str | None = None) -> dict:
             })
         node.update(status=OPEN, assignee=None, claim=None)
         return dict(node)
+
+
+# H01/2: l'elenco chiuso dei motivi di resa. Un programma li confronta uno per uno,
+# quindi restano esattamente questi valori finche' un altro nodo del grafo non li cambia.
+MOTIVI_RESA = ("infeasible", "missing-resource", "blocked-environment", "needs-redesign")
+
+
+def _prossimo_id_resa(data: dict) -> str:
+    numeri = [int(s["id"][1:]) for s in data.get("surrenders", [])
+              if isinstance(s.get("id"), str) and re.fullmatch(r"Y\d+", s["id"])]
+    return f"Y{max(numeri, default=0) + 1:03d}"
+
+
+def give_up(ref: Graph, node_id: str, reason: str, detail: str) -> dict:
+    """La resa (H01/2): un esito terminale che l'agente dichiara, mai un guasto.
+
+    Stessa transazione di release() sul lucchetto (CLAUDE -> OPEN), piu' un record
+    append-only in data["surrenders"]: e' il canale che autopilot.py intercetta prima
+    di classificare il nodo non chiuso come terminazione ambigua (H04). Senza questo
+    record la resa rientrava fra i guasti ritentabili e bruciava tentativi identici
+    su un esito che l'agente aveva gia' dichiarato definitivo.
+    """
+    if reason not in MOTIVI_RESA:
+        raise StateError(t("give_up.motivo_invalido", motivo=reason,
+                           elenco=", ".join(MOTIVI_RESA)))
+    if not isinstance(detail, str) or not detail.strip():
+        raise StateError(t("give_up.dettaglio_vuoto"))
+    with transaction(ref.json_path) as data:
+        node = node_of(data, node_id)
+        if node["status"] != CLAIMED:
+            raise StateError(t("give_up.non_rivendicato", id=node_id, stato=node["status"]))
+        if remotelock.attivo():
+            _assicura_rilascio(ref, node_id)
+        data.setdefault("surrenders", []).append({
+            "id": _prossimo_id_resa(data), "node": node_id, "reason": reason,
+            "detail": detail.strip(), "by": identity(),
+            "at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        })
+        node.update(status=OPEN, assignee=None, claim=None)
+        return dict(node)
+
+
+def _run_id_corrente(ref: Graph) -> str:
+    """Il campo runId della card (H05): il run-state di Autopilot se un run e'
+    vivo su questo grafo, l'identita' di chi chiama per una sessione manuale
+    fuori da un run. Solo un'etichetta d'audit: a differenza delle card che il
+    runner apre su se stesso (decision-required, run-stopped), qui nessuno resta
+    in attesa sul canale in-process che 'runId' aiuta ad appaiare."""
+    esistente = RunState.read(ref.run_state_path)
+    return esistente["run_id"] if esistente else identity()
+
+
+def ask_human(ref: Graph, node_id: str, question: str) -> dict:
+    """L'esito 'serve una persona' (H01/3, H05): sospende il nodo sopra
+    un'Interazione dell'unico ledger che gia' esiste (interactions.py), non un
+    canale nuovo. A differenza di give_up non e' terminale: il claim si rilascia
+    perche' un lease non deve restare acceso per le ore in cui una persona non ha
+    ancora guardato il telefono, ma claim() rifiuta di riprendere il nodo finche'
+    la card resta aperta (has_open) e resolve_interaction() la chiude alla
+    risposta, riaprendo il nodo alla frontiera.
+
+    Passa da editing() e non dalla transazione leggera di give_up/release: la
+    card che open_interaction scrive va validata come ogni altra (validate_
+    interactions), e quella validazione gira solo dentro editing().
+    """
+    if not isinstance(question, str) or not question.strip():
+        raise StateError(t("ask_human.domanda_vuota"))
+    with editing(ref) as g:
+        node = g.node(node_id)
+        if node["status"] != CLAIMED:
+            raise StateError(t("ask_human.non_rivendicato", id=node_id, stato=node["status"]))
+        if remotelock.attivo():
+            _assicura_rilascio(ref, node_id)
+        run_id = _run_id_corrente(ref)
+        record = interactions.open_interaction(
+            g, run_id=run_id, node_id=node_id, event="human-needed",
+            summary=question.strip(),
+            allowed_actions=[
+                {"id": "confirm", "label": t("autopilot.action_confirm"), "effect": "confirmed"},
+                {"id": "decline", "label": t("autopilot.action_decline"), "effect": "declined"},
+            ],
+            expires_at=(_adesso() + interactions.SCADENZA_DECISIONE).isoformat(timespec="seconds"),
+            # Univoca per presa: un nuovo tentativo dello stesso nodo non puo'
+            # chiamare ask_human senza riclaimarlo (claim scrive un 'at' fresco),
+            # e claim() rifiuta comunque la presa finche' questa card resta aperta.
+            idempotency_key=f"{run_id}:{node_id}:human-needed:{node['claim']['at']}")
+        node.update(status=OPEN, assignee=None, claim=None)
+        return record
 
 
 # Il segnale che la rete non ha saputo dire se altre macchine tengono qualcosa:

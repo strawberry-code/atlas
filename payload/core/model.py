@@ -11,6 +11,7 @@ from datetime import datetime
 
 # La lettura degli assegnatari sta in owners.py: col campo a vettore qui non ci stava piu'.
 # Si ri-esporta da model perche' e' li' che la cercano i chiamanti, dentro e fuori dal motore.
+from . import interactions
 from .owners import chiave_nome, insiemi, owners, owners_of, unowned  # noqa: F401
 from .store import CLAIMED, CLOSED, DROPPED, OPEN, StateError
 from .strings import t
@@ -89,16 +90,30 @@ def fingerprint(node: dict) -> str:
 
 
 def frontier(graph: dict) -> list[dict]:
-    """Aperti con ogni blocker chiuso: il lavoro prendibile adesso."""
+    """Aperti con ogni blocker chiuso e nessuna domanda ancora aperta per una
+    persona: il lavoro prendibile adesso. Un nodo con una card 'human-needed'
+    ancora aperta (H01/3, H05) esce di qui e finisce in waiting_human, non in
+    blocked: i suoi blocker sono soddisfatti, quel che manca e' una risposta."""
     index = by_id(graph)
     return [n for n in graph["nodes"]
-            if n["status"] == OPEN and all(is_done(blocker_of(index, n, d)) for d in n["blockedBy"])]
+            if n["status"] == OPEN and all(is_done(blocker_of(index, n, d)) for d in n["blockedBy"])
+            and not interactions.has_open(graph, n["id"], "human-needed")]
 
 
 def blocked(graph: dict) -> list[dict]:
     index = by_id(graph)
     return [n for n in graph["nodes"]
             if n["status"] == OPEN and not all(is_done(blocker_of(index, n, d)) for d in n["blockedBy"])]
+
+
+def waiting_human(graph: dict) -> list[dict]:
+    """Aperti, con ogni blocker chiuso, sospesi su una card 'human-needed' ancora
+    aperta (H05): la condizione che frontier() esclude, isolata perche' chi legge
+    lo stato del grafo la deve distinguere da 'finito' e da 'bloccato da un arco'."""
+    index = by_id(graph)
+    return [n for n in graph["nodes"]
+            if n["status"] == OPEN and all(is_done(blocker_of(index, n, d)) for d in n["blockedBy"])
+            and interactions.has_open(graph, n["id"], "human-needed")]
 
 
 def claimed(graph: dict) -> list[dict]:

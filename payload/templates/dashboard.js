@@ -88,13 +88,17 @@
       });
   });
 
-  /* ---------- pannello Notifiche: pairing Telegram one-tap (D05) ----------
+  /* ---------- pannello Notifiche: pairing Telegram one-tap (D05/A04) ----------
      Un solo bottone: POST /pairing/telegram genera un codice monouso e il link
      t.me da aprire, senza che l'utente inserisca token bot, chat ID, hostname o
      file di configurazione. Dopo l'apertura del link si interroga lo stato a
-     intervalli finche' l'utente non conferma su Telegram (o il codice scade):
-     e' un poll verso 'atlas serve' locale, mai verso il relay, e si ferma da
-     solo (successo, scadenza o errore), mai un giro infinito. */
+     intervalli finche' non arriva un esito terminale: e' un poll verso 'atlas
+     serve' locale, mai verso il relay, e si ferma da solo (connesso, rifiutato
+     dal gestore, nessun gestore ancora configurato, scaduto/sconosciuto), mai un
+     giro infinito. 'in_attesa' e 'in_attesa_gestore' (A03: prima che l'utente
+     apra Telegram, poi mentre il gestore decide) restano indistinti in UI, un
+     solo messaggio d'attesa per entrambi: dal lato di chi preme il bottone e'
+     comunque 'aspetto il via libera'. */
   (function pairingTelegram() {
     var bottone = document.querySelector(".pairing-telegram");
     if (!bottone) return;
@@ -128,6 +132,16 @@
             bottone.disabled = false;
             return;
           }
+          if (esito.status === "rifiutato") {
+            messaggio(notificheData.pairingRifiutato, "pairing-errore");
+            bottone.disabled = false;
+            return;
+          }
+          if (esito.status === "senza_gestore") {
+            messaggio(notificheData.pairingSenzaGestore, "pairing-errore");
+            bottone.disabled = false;
+            return;
+          }
           setTimeout(function () { interroga(codice, scadenzaMs); }, PASSO_POLL_MS);
         })
         .catch(function () {
@@ -149,6 +163,38 @@
           messaggio(notificheData.azioneErrore, "pairing-errore");
           bottone.disabled = false;
         });
+    });
+  })();
+
+  /* ---------- pannello Notifiche: levetta muto Telegram per progetto (SS7-ter/1) ----------
+     Un solo bottone che capovolge lo stato a ogni clic: POST /notify/telegram/toggle
+     tocca solo config.json (nessun cambio a graph.json), quindi non arriva nessun
+     reload SSE a farlo vedere. Il DOM si aggiorna qui con la risposta del server, che
+     e' l'unica fonte di verita' sullo stato nuovo. Il markup manca del tutto quando
+     Telegram non e' configurato su questa installazione (render_notif_telegram.py):
+     qui non c'e' niente da disabilitare in quel caso, solo da saltare offline. */
+  (function mutoTelegram() {
+    var bottone = document.querySelector(".notif-muto");
+    if (!bottone) return;
+    if (!servito) {
+      bottone.disabled = true;
+      bottone.title = notificheData.azioneOffline || "";
+      return;
+    }
+    var statoEl = bottone.querySelector(".notif-muto-stato");
+    var azioneEl = bottone.querySelector(".notif-muto-azione");
+    function applica(acceso) {
+      bottone.dataset.muto = acceso ? "on" : "off";
+      bottone.setAttribute("aria-pressed", String(acceso));
+      statoEl.textContent = acceso ? bottone.dataset.statoOn : bottone.dataset.statoOff;
+      azioneEl.textContent = acceso ? bottone.dataset.azioneOn : bottone.dataset.azioneOff;
+    }
+    bottone.addEventListener("click", function () {
+      bottone.disabled = true;
+      fetch("/notify/telegram/toggle", { method: "POST" })
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+        .then(function (esito) { applica(esito.enabled); bottone.disabled = false; })
+        .catch(function () { bottone.disabled = false; });
     });
   })();
 

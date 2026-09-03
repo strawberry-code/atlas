@@ -1,6 +1,13 @@
-"""Adapter Telegram lato relay (D04): riceve il webhook HTTPS di Telegram,
-verifica che sia davvero Telegram a chiamare, scarta gli utenti non ancora
-associati a un progetto e rende idempotente ogni callback inline.
+"""Adapter Telegram lato relay (D04): traduce un update Telegram in evento
+minimo, scarta gli utenti non ancora associati a un progetto e rende
+idempotente ogni callback inline. 'GestoreWebhook.processa_update' e' il
+punto unico d'ingresso, alimentato dal long polling verso getUpdates
+(G02, relay/telegram_polling.py): riceve un update gia' decodificato da
+Telegram stesso, senza nessun segreto da verificare, perche' e' questo
+processo a chiamare Telegram e non il contrario. Il webhook HTTPS che
+questo modulo esponeva (D04) e' stato smontato da G02 insieme al segreto
+del suo header: nessuna porta di questo servizio deve restare raggiungibile
+da Internet.
 
 Non parla mai col ledger Atlas: quello resta un'esclusiva del client (D01).
 Non decide nemmeno quale progetto risponde a un tap: si ferma al confine del
@@ -25,16 +32,12 @@ contenuto della capability, solo il suo trasporto opaco.
 """
 from __future__ import annotations
 
-import hmac
 import json
 import urllib.error
 import urllib.request
+import uuid
 from collections.abc import Callable, Iterable, Mapping
 from typing import Protocol
-
-
-class WebhookRejected(ValueError):
-    """La richiesta non e' un webhook Telegram autentico o valido."""
 
 
 class UnpairedUser(ValueError):
@@ -106,27 +109,28 @@ class CodaTap:
 
 AnswerCallback = Callable[[object], None]
 Sink = Callable[[dict], None]
-PairingStart = Callable[[str, int], None]
+PairingStart = Callable[[str, int, "str | None"], None]
 CapabilityResolver = Callable[[str], str | None]
+AdminDecision = Callable[[str, int, int], bool]
+DispositiviComando = Callable[[int], None]
+ComandoStato = Callable[[str, int], bool]
+ComandoView = Callable[[str, int], bool]
+
+COMANDO_DISPOSITIVI = "/computer"
 
 
-def verifica_segreto(header_segreto: str | None, atteso: str) -> None:
-    """Confronta l'header X-Telegram-Bot-Api-Secret-Token (il meccanismo
-    documentato da Telegram per provare che la chiamata viene davvero da loro,
-    non un endpoint indovinato) con quanto configurato per questo bot.
-    hmac.compare_digest per non aprire un confronto a tempo sul segreto."""
-    if not header_segreto or not hmac.compare_digest(header_segreto, atteso):
-        raise WebhookRejected("secret token Telegram assente o non valido")
-
-
-def _decodifica(corpo: bytes) -> Mapping[str, object]:
-    try:
-        update = json.loads(corpo.decode("utf-8"))
-    except (json.JSONDecodeError, UnicodeDecodeError) as errore:
-        raise WebhookRejected("corpo non e' JSON valido") from errore
-    if not isinstance(update, Mapping):
-        raise WebhookRejected("corpo non e' un update Telegram")
-    return update
+def _nome_da(messaggio: Mapping[str, object]) -> str | None:
+    """Il nome Telegram di chi ha mandato il messaggio (S11/3: al gestore
+    arriva il nome di chi chiede di entrare): username se c'e', altrimenti il
+    nome proprio. None se il campo 'from' manca o non porta nessuno dei due."""
+    mittente = messaggio.get("from")
+    if not isinstance(mittente, Mapping):
+        return None
+    username = mittente.get("username")
+    if isinstance(username, str) and username:
+        return f"@{username}"
+    nome = mittente.get("first_name")
+    return nome if isinstance(nome, str) and nome else None
 
 
 def _estrai_evento(update: Mapping[str, object]) -> dict | None:
@@ -156,6 +160,10 @@ def _estrai_evento(update: Mapping[str, object]) -> dict | None:
             # solo per riconoscere '/start <codice>' (D05): un messaggio senza
             # comando di pairing non porta mai il testo oltre questo modulo.
             evento["text"] = testo
+            if testo.startswith("/start"):
+                # il nome serve solo qui (A03, cancello d'ingresso): ogni
+                # altro messaggio resta ridotto a chat/message id come prima.
+                evento["from_nome"] = _nome_da(messaggio)
         return evento
     return None
 
@@ -172,10 +180,10 @@ def _codice_pairing(evento: Mapping[str, object]) -> str | None:
 
 
 class GestoreWebhook:
-    """Punto unico d'ingresso del webhook: verifica, deduplica, filtra per
-    associazione, poi passa l'evento minimo al sink. Solleva WebhookRejected o
-    UnpairedUser; chi chiama (l'handler HTTP) decide lo status code, questa
-    classe non conosce HTTP.
+    """Punto unico d'ingresso degli update Telegram: deduplica, filtra per
+    associazione, poi passa l'evento minimo al sink. Solleva UnpairedUser;
+    chi chiama (il long polling di relay/telegram_polling.py) decide cosa
+    farne, questa classe non conosce il trasporto.
 
     'capability_resolver' (D08) e' l'unico punto in cui il callback_data che
     Telegram consegna, l'identificativo corto emesso da 'capability_store.
@@ -184,24 +192,56 @@ class GestoreWebhook:
     hanno bisogno) il campo attraversa questa classe cosi' com'e', come
     prima di D08. Un identificativo che il resolver non sa risolvere non
     raggiunge il sink: stesso 'nessuna traccia' di un token invalido scartato
-    oggi da 'payload/core/capability.py', un passo prima."""
+    oggi da 'payload/core/capability.py', un passo prima.
 
-    def __init__(self, segreto_atteso: str, pairing: PairingStore, sink: Sink,
+    'admin_decision' (A03) e' lo stesso genere di confine per il tap del
+    gestore su 'Approva'/'Rifiuta' di un ingresso: torna True se il
+    callback_data era per lui (gestito, a prescindere dall'esito), False se
+    non lo riconosce. Non tocca mai il sink ne' 'is_paired': il gestore
+    decide un ingresso, non manda un tap di grafo.
+
+    'dispositivi_comando' (C02) e' lo stesso genere di confine di
+    'pairing_start' per '/computer': una chat elenca le proprie
+    installazioni a prescindere dall'essere gia' associata (zero
+    installazioni e' una risposta legittima, non un errore), quindi va
+    riconosciuto prima del cancello 'is_paired' esattamente come '/start'.
+    Il tap 'Stacca' che ne segue e' invece un callback qualunque e passa dal
+    solito 'admin_decision', come gia' fa 'utente:appello:' (C01).
+
+    'comando_stato' (D01) e' invece dopo il cancello 'is_paired': i tre
+    comandi di stato rispondono con cio' che gira su un'installazione, quindi
+    hanno senso solo per una chat gia' associata a qualcuna. Vero se il testo
+    era uno dei tre comandi (D01 lo consegna gia' risolto, o dice subito che
+    il computer non e' in linea): ferma lo smistamento qui, come
+    'admin_decision' per un callback riconosciuto. Un messaggio che non e' uno
+    dei tre comandi prosegue verso il sink come ogni altro messaggio, invariato."""
+
+    def __init__(self, pairing: PairingStore, sink: Sink,
                  answer_callback: AnswerCallback | None = None,
                  dedup: DedupCallback | None = None,
                  pairing_start: PairingStart | None = None,
-                 capability_resolver: CapabilityResolver | None = None) -> None:
-        self._segreto_atteso = segreto_atteso
+                 capability_resolver: CapabilityResolver | None = None,
+                 admin_decision: AdminDecision | None = None,
+                 dispositivi_comando: DispositiviComando | None = None,
+                 comando_stato: ComandoStato | None = None,
+                 comando_view: ComandoView | None = None) -> None:
         self._pairing = pairing
         self._sink = sink
         self._answer_callback = answer_callback
         self._dedup = dedup or DedupCallback()
         self._pairing_start = pairing_start
         self._capability_resolver = capability_resolver
+        self._admin_decision = admin_decision
+        self._dispositivi_comando = dispositivi_comando
+        self._comando_stato = comando_stato
+        self._comando_view = comando_view
 
-    def gestisci(self, corpo: bytes, header_segreto: str | None) -> None:
-        verifica_segreto(header_segreto, self._segreto_atteso)
-        update = _decodifica(corpo)
+    def processa_update(self, update: Mapping[str, object]) -> None:
+        """Il traduttore vero e proprio: il long polling di
+        relay/telegram_polling.py ci arriva con un update gia' decodificato
+        da Telegram stesso, senza nessun segreto da verificare perche' e'
+        questo processo a chiamare Telegram, non il contrario (il webhook
+        HTTPS che verificava un header di segreto e' stato smontato da G02)."""
         evento = _estrai_evento(update)
         if evento is None:
             return  # tipo di update che il relay non instrada (join, edit, ...)
@@ -225,11 +265,44 @@ class GestoreWebhook:
                 # non deve mai finire nel controllo 'is_paired' sotto, ne'
                 # attraversare il confine verso il sink come fosse un tap.
                 if self._pairing_start is not None and isinstance(chat_id, int):
-                    self._pairing_start(codice, chat_id)
+                    self._pairing_start(codice, chat_id, evento.get("from_nome"))
+                return
+            if (evento.get("text") == COMANDO_DISPOSITIVI and self._dispositivi_comando is not None
+                    and isinstance(chat_id, int)):
+                # C02: zero installazioni e' una risposta legittima quanto
+                # una lista piena, quindi anche questo comando precede
+                # 'is_paired' invece di dipendere da un'associazione gia'
+                # esistente.
+                self._dispositivi_comando(chat_id)
+                return
+
+        if evento["kind"] == "callback" and self._admin_decision is not None:
+            # A03: il tap del gestore su 'Approva'/'Rifiuta' non e' un tap di
+            # grafo, e il gestore non e' un'installazione associata: va
+            # riconosciuto e assorbito qui, prima del cancello 'is_paired'.
+            dato = evento.get("callback_data")
+            message_id = evento.get("message_id")
+            if (isinstance(dato, str) and isinstance(chat_id, int) and isinstance(message_id, int)
+                    and self._admin_decision(dato, chat_id, message_id)):
                 return
 
         if not isinstance(chat_id, int) or not self._pairing.is_paired(chat_id):
             raise UnpairedUser("chat non associata a nessun progetto")
+
+        if evento["kind"] == "message" and self._comando_stato is not None:
+            # D01: i tre comandi di stato si fermano qui, gestiti o no (il
+            # 'non in linea' e' gia' risposto dentro 'comando_stato' stesso).
+            # Un testo che non e' uno dei tre torna False e prosegue sotto.
+            testo = evento.get("text")
+            if isinstance(testo, str) and self._comando_stato(testo, chat_id):
+                return
+
+        if evento["kind"] == "message" and self._comando_view is not None:
+            # D02: stesso principio di comando_stato sopra, un comando a se'
+            # perche' la sua risposta e' un file, non un messaggio.
+            testo = evento.get("text")
+            if isinstance(testo, str) and self._comando_view(testo, chat_id):
+                return
 
         if evento["kind"] == "callback" and self._capability_resolver is not None:
             # D08: il callback_data che Telegram ha appena consegnato e'
@@ -319,30 +392,79 @@ def costruisci_modifica_messaggio(bot_token: str,
     return _modifica
 
 
-PREREQUISITI = ["TELEGRAM_BOT_TOKEN_REF", "TELEGRAM_WEBHOOK_SECRET_REF"]
+def _multipart(campi: Mapping[str, str], campo_file: str, filename: str,
+               content: bytes, mime: str) -> tuple[bytes, str]:
+    """Corpo multipart/form-data a mano: e' l'unica chiamata di questo modulo
+    che porta bytes, non JSON, perche' l'API Telegram non accetta un upload
+    per valore dentro un campo JSON. Nessuna libreria: la stdlib non ha un
+    encoder multipart pronto, e per un solo campo file non vale la pena
+    importarne uno di terze parti."""
+    boundary = f"atlas-view-{uuid.uuid4().hex}"
+    parti = [
+        f'--{boundary}\r\nContent-Disposition: form-data; name="{chiave}"\r\n\r\n{valore}\r\n'
+        .encode("utf-8")
+        for chiave, valore in campi.items()
+    ]
+    parti.append(
+        f'--{boundary}\r\nContent-Disposition: form-data; name="{campo_file}"; '
+        f'filename="{filename}"\r\nContent-Type: {mime}\r\n\r\n'.encode("utf-8")
+        + content + b"\r\n"
+    )
+    parti.append(f"--{boundary}--\r\n".encode("utf-8"))
+    return b"".join(parti), boundary
+
+
+def costruisci_invia_file(bot_token: str, opener=urllib.request.urlopen
+                          ) -> Callable[[int, str, bytes, str, str], None]:
+    """'sendPhoto'/'sendDocument' (D02): la risposta di '/view'. A differenza
+    delle altre chiamate Telegram di questo modulo non assorbe il guasto,
+    stesso principio di costruisci_invia_bottoni: la consegna del file e' il
+    primo tentativo, non l'effetto collaterale di una transazione gia'
+    commessa sul ledger."""
+    def _invia(chat_id: int, filename: str, content: bytes, mime: str, kind: str) -> None:
+        metodo, campo = ("sendPhoto", "photo") if kind == "photo" else ("sendDocument", "document")
+        corpo, boundary = _multipart({"chat_id": str(chat_id)}, campo, filename, content, mime)
+        richiesta = urllib.request.Request(
+            f"https://api.telegram.org/bot{bot_token}/{metodo}",
+            data=corpo, method="POST",
+            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+        )
+        with opener(richiesta, timeout=20):
+            pass
+    return _invia
+
+
+PREREQUISITI = ["TELEGRAM_BOT_TOKEN_REF"]
 
 
 def costruisci_gestore_da_ambiente(env: Mapping[str, str], pairing: PairingStore | None = None,
                                     sink: Sink | None = None,
                                     pairing_start: PairingStart | None = None,
-                                    capability_resolver: CapabilityResolver | None = None
+                                    capability_resolver: CapabilityResolver | None = None,
+                                    admin_decision: AdminDecision | None = None,
+                                    dispositivi_comando: DispositiviComando | None = None,
+                                    comando_stato: ComandoStato | None = None,
+                                    comando_view: ComandoView | None = None
                                     ) -> GestoreWebhook | None:
-    """None se mancano i prerequisiti Telegram (stesso gate di A01/D02: bot e
-    segreti non ancora approvati in questo ambiente): il resto del relay
-    (/healthz) continua a funzionare, l'avvio del servizio non si blocca per
-    una feature non ancora sbloccata. 'pairing_start' arriva da chi assembla
-    il servizio (atlas_relay.main): questo modulo fissa solo il confine
-    (D04), non costruisce l'implementazione del pairing (D05, relay/pairing.py).
+    """None se manca il prerequisito Telegram (stesso gate di A01/D02: bot non
+    ancora approvato in questo ambiente): il resto del relay (/healthz)
+    continua a funzionare, l'avvio del servizio non si blocca per una feature
+    non ancora sbloccata. 'pairing_start' arriva da chi assembla il servizio
+    (atlas_relay.main): questo modulo fissa solo il confine (D04), non
+    costruisce l'implementazione del pairing (D05, relay/pairing.py).
     'capability_resolver' e' lo stesso principio per D08: qui si fissa solo
     il confine, 'capability_store.StoreCapability.preleva' e' l'implementazione
     che atlas_relay.main() costruisce e condivide con l'endpoint di deliver."""
     if any(not env.get(nome) for nome in PREREQUISITI):
         return None
     return GestoreWebhook(
-        segreto_atteso=env["TELEGRAM_WEBHOOK_SECRET_REF"],
         pairing=pairing if pairing is not None else MemoriaPairing(),
         sink=sink if sink is not None else CodaTap(),
         answer_callback=costruisci_answer_callback(env["TELEGRAM_BOT_TOKEN_REF"]),
         pairing_start=pairing_start,
         capability_resolver=capability_resolver,
+        admin_decision=admin_decision,
+        dispositivi_comando=dispositivi_comando,
+        comando_stato=comando_stato,
+        comando_view=comando_view,
     )

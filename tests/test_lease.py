@@ -139,7 +139,7 @@ class LeaseCampi(Base):
         self.assertEqual("live", self.claims.claim_state(nodo, self.ws.config["agent"]))
 
     def test_claim_state_delegato_live_col_lease_anche_senza_pid(self):
-        """Un claim on_behalf_of (Automata per conto del provider) non porta il PID
+        """Un claim on_behalf_of (Autopilot per conto del provider) non porta il PID
         di chi lavora davvero: senza la lente del lease sarebbe sempre 'dead', un
         lucchetto vivo scambiato per orfano mentre l'agente delegato lo sta lavorando."""
         self.popola()

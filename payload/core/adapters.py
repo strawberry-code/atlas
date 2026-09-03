@@ -1,4 +1,4 @@
-"""Confine provider-agnostic fra Automata e un processo agente.
+"""Confine provider-agnostic fra Autopilot e un processo agente.
 
 Il registry contiene gli adapter gia' configurati e risolve l'identita' richiesta.
 La politica del contesto rende esplicito il contratto AFK del provider; il
@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from typing import Literal, Protocol, TYPE_CHECKING, runtime_checkable
 
 if TYPE_CHECKING:
-    from .automata import Run
+    from .autopilot import Run
 
 
 CODEX_LUNA = "codex-luna"
@@ -84,7 +84,7 @@ class AgentOutcome:
 
 @dataclass(frozen=True)
 class LaunchPolicy:
-    """Vincoli comuni a ogni processo lanciato da Automata."""
+    """Vincoli comuni a ogni processo lanciato da Autopilot."""
 
     afk: bool = True
     sandbox: bool = False
@@ -94,7 +94,7 @@ class LaunchPolicy:
         if (type(self.afk) is not bool or type(self.sandbox) is not bool
                 or type(self.bypass_permissions) is not bool
                 or not self.afk or self.sandbox or not self.bypass_permissions):
-            raise ValueError("Automata adapters must run AFK outside the sandbox with bypass permissions")
+            raise ValueError("Autopilot adapters must run AFK outside the sandbox with bypass permissions")
 
 
 @dataclass(frozen=True)
@@ -197,7 +197,7 @@ class AdapterRegistry:
         return tuple(sorted(self._adapters))
 
     def launcher(self, identity: str) -> Callable[["Run", Mapping[str, object]], AgentHandle]:
-        """Crea il launcher generico che Automata puo' usare per un'identita' scelta."""
+        """Crea il launcher generico che Autopilot puo' usare per un'identita' scelta."""
         adapter = self.get(identity)
 
         def launch(run: "Run", node: Mapping[str, object]) -> AgentHandle:

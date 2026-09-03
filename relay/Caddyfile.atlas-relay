@@ -1,4 +1,4 @@
-# Blocco isolato per Atlas Relay (D02).
+# Blocco isolato per Atlas Relay.
 #
 # Da includere nel Caddyfile principale con:
 #   import /etc/caddy/Caddyfile.atlas-relay
@@ -6,6 +6,26 @@
 # Non contiene e non modifica i blocchi del bot WhenAGI o di Claude Proxy, che
 # restano nei loro file: questo file dichiara solo il proprio hostname e la
 # propria porta locale.
+#
+# Perche' esiste ancora, dopo il passaggio al polling. Il polling ha tolto la
+# sola direzione Telegram -> relay: nessun webhook, nessun secret token da
+# condividere con Telegram, nessun certificato che Telegram debba validare e
+# nessun vincolo sulle porte che Telegram accetta. Resta pero' la direzione
+# client -> relay: il tunnel e il pairing sono chiamate che partono dalla
+# macchina di chi usa Atlas verso RELAY_PUBLIC_URL, e il servizio e' un
+# http.server senza TLS in ascolto su 127.0.0.1. Senza questo blocco davanti,
+# nessun client remoto raggiunge il relay, per quanto gli update Telegram
+# arrivino in uscita.
+#
+# I path sono elencati uno per uno invece di girare tutto al servizio: la
+# superficie esposta e' solo quella che un client deve poter chiamare, e un
+# endpoint nuovo non finisce su Internet per distrazione. Chi aggiunge un path
+# al servizio lo aggiunge anche qui, deliberatamente.
 {$RELAY_HTTPS_HOSTNAME} {
-    reverse_proxy 127.0.0.1:8765
+    @relay path /healthz /tunnel /tunnel/tap-result /tunnel/deliver /tunnel/deliver-file /pairing /peers/notify
+    reverse_proxy @relay 127.0.0.1:8765
+
+    # Tutto il resto non esiste: risposta secca, nessun dettaglio su cosa gira
+    # dietro. Un probe che cerca pannelli di amministrazione non impara niente.
+    respond 404
 }

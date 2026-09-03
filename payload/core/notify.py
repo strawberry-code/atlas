@@ -59,7 +59,7 @@ def _key(interaction_id: str, channel: str) -> str:
 class NotifyState:
     """Ledger JSON atomico degli esiti di consegna, per interazione e canale.
 
-    A differenza del retry-state di Automata, qui il successo va ricordato per
+    A differenza del retry-state di Autopilot, qui il successo va ricordato per
     sempre: e' la sola memoria che impedisce, dopo un riavvio, di consegnare di
     nuovo una card gia' arrivata sullo stesso canale.
     """
@@ -117,6 +117,17 @@ class NotifyState:
             "at": now, "next_at": next_at,
         }
         self._save()
+
+    def failed_channels(self, interaction_id: str) -> list[str]:
+        """I canali su cui la consegna di questa Interaction si e' esaurita
+        senza riuscire ('failed'): la sola lettura che serve alla dashboard
+        per dire che il silenzio ha una causa (SS7-ter/3), senza aprire un
+        nuovo giro di retry oltre a quello che dispatch() ha gia' concluso."""
+        prefisso = f"{interaction_id}::"
+        return sorted(
+            chiave[len(prefisso):] for chiave, record in self._data["deliveries"].items()
+            if chiave.startswith(prefisso) and record.get("status") == "failed"
+        )
 
 
 def plan(data: dict, state: NotifyState, channels: Iterable[str], now: float) -> list[Delivery]:
