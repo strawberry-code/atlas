@@ -100,21 +100,36 @@ def riavvia_servizio(env: dict, runner=subprocess.run) -> None:
     _run(["ssh", host, "sudo", "systemctl", "restart", "atlas-relay"], runner)
 
 
+def url_di_salute(env: dict) -> str:
+    """L'indirizzo a cui bussare per sapere se il servizio e' vivo.
+
+    Non e' sempre 127.0.0.1: il bind e' una scelta dell'installazione
+    (ATLAS_RELAY_HOST nella unit), e un relay che ascolta solo sull'indirizzo
+    di una VPN non risponde sul loopback. Cercarlo dove non e' faceva fallire
+    ogni health check e scattare un rollback su un rilascio sano, senza che
+    niente nominasse la causa.
+    """
+    host = env.get("ATLAS_RELAY_HOST") or "127.0.0.1"
+    porta = env.get("ATLAS_RELAY_PORT") or "8765"
+    return f"http://{host}:{porta}/healthz"
+
+
 def controlla_salute(env: dict, tentativi: int = TENTATIVI_HEALTH,
                       attesa: float = ATTESA_HEALTH, runner=subprocess.run,
                       sleep=time.sleep) -> bool:
-    """Nessuna porta pubblica a cui bussare da qui (G02 ha smontato l'unica
-    che il relay aveva): il controllo passa dalla stessa sessione ssh che ha
-    gia' riavviato la unit, verso la porta locale che atlas-relay.service
-    dichiara (127.0.0.1:8765, mai raggiungibile da fuori quell'host)."""
+    """Nessuna porta pubblica a cui bussare da qui (G02 ha smontato l'unica che
+    il relay aveva): il controllo passa dalla stessa sessione ssh che ha gia'
+    riavviato la unit, verso l'indirizzo su cui il servizio ascolta davvero."""
     host = env["ATLAS_RELAY_DEPLOY_HOST"]
+    url = url_di_salute(env)
     for tentativo in range(tentativi):
-        esito = runner(["ssh", host, "curl", "-sf", "-o", "/dev/null",
-                         "http://127.0.0.1:8765/healthz"], capture_output=True, text=True)
+        esito = runner(["ssh", host, "curl", "-sf", "-o", "/dev/null", url],
+                       capture_output=True, text=True)
         if esito.returncode == 0:
             return True
         if tentativo < tentativi - 1:
             sleep(attesa)
+    print(f"  il servizio non ha risposto su {url} dopo {tentativi} tentativi")
     return False
 
 

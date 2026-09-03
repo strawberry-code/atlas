@@ -58,11 +58,59 @@ class TunnelConfig:
         return f"{self.base_url.rstrip('/')}/tunnel?{query}"
 
 
+def _dal_profilo(env: Mapping[str, str]) -> tuple[str | None, str | None]:
+    """L'indirizzo del relay e il suo bearer dal profilo di questa macchina.
+
+    Sta accanto all'identita' di installazione, per la stessa ragione: un relay
+    e' di chi sta davanti al computer, non di un progetto, e la sua chiave non
+    deve finire in nessun repository. Chiederlo all'ambiente e basta obbligava a
+    esportare due variabili a mano prima di ogni 'atlas serve', cioe' proprio il
+    gesto che il disegno vieta al primo punto. Un profilo assente o illeggibile
+    non e' un guasto: vuol dire che questa macchina non ha un relay, e il
+    chiamante lo tratta come tale."""
+    percorso = relay_identity.percorso_predefinito(env).with_name("relay.json")
+    try:
+        dati = json.loads(percorso.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None, None
+    if not isinstance(dati, dict):
+        return None, None
+    url, token = dati.get("url"), dati.get("token")
+    return (url if isinstance(url, str) else None,
+            token if isinstance(token, str) else None)
+
+
 def da_ambiente(env: Mapping[str, str]) -> TunnelConfig | None:
-    """None se il relay non e' configurato per questo progetto: stesso gate di
-    A01/D01, senza inventare un URL o un token di comodo."""
+    """None se il relay non e' configurato in questo ambiente: stesso gate di
+    A01/D01, senza inventare un URL o un token di comodo.
+
+    Pura sull'ambiente che riceve, e non tocca il disco: chi passa un dizionario
+    sta dicendo 'questo e' tutto', e deve poterci contare. Per la configurazione
+    completa di una macchina vera c'e' 'configurazione' qui sotto."""
     base = env.get(ENV_URL) or (f"https://{env[ENV_HOSTNAME]}" if env.get(ENV_HOSTNAME) else None)
     token = env.get(ENV_TOKEN)
+    if not base or not token:
+        return None
+    return TunnelConfig(base_url=base, token=token)
+
+
+def configurazione(env: Mapping[str, str]) -> TunnelConfig | None:
+    """Il relay di questa macchina: prima l'ambiente, poi il profilo su disco.
+
+    E' quel che usa chi gira davvero (il pannello, le notifiche, il tunnel),
+    mentre 'da_ambiente' resta pura per chi passa un ambiente finto. Tenerle
+    separate evita il difetto che ha prodotto questa funzione: leggere il disco
+    dentro la funzione pura faceva passare o fallire i test a seconda di come
+    era messo il computer di chi li lanciava.
+
+    L'ambiente vince sul profilo, cosi' una prova una tantum non deve toccare
+    il file di nessuno."""
+    base = env.get(ENV_URL) or (f"https://{env[ENV_HOSTNAME]}" if env.get(ENV_HOSTNAME) else None)
+    token = env.get(ENV_TOKEN)
+    if not base or not token:
+        url_profilo, token_profilo = _dal_profilo(env)
+        base = base or url_profilo
+        token = token or token_profilo
     if not base or not token:
         return None
     return TunnelConfig(base_url=base, token=token)

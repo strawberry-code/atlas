@@ -610,15 +610,23 @@
       ],
       "expiresAt": "2026-09-04T15:36:20+02:00",
       "idempotencyKey": "f1bf86405ad9:END:run-ended",
-      "status": "open",
+      "status": "resolved",
       "createdAt": "2026-09-03T15:36:20+02:00",
-      "updatedAt": "2026-09-03T15:36:20+02:00",
-      "resolution": null,
+      "updatedAt": "2026-09-03T22:55:50+02:00",
+      "resolution": {
+        "action": "acknowledge",
+        "effect": "acknowledged"
+      },
       "events": [
         {
           "at": "2026-09-03T15:36:20+02:00",
           "type": "opened",
           "by": "33493"
+        },
+        {
+          "at": "2026-09-03T22:55:50+02:00",
+          "type": "resolved",
+          "by": "?"
         }
       ]
     },
@@ -638,15 +646,23 @@
       ],
       "expiresAt": "2026-09-04T18:34:44+02:00",
       "idempotencyKey": "109d67d3d9b8:END:run-ended",
-      "status": "open",
+      "status": "resolved",
       "createdAt": "2026-09-03T18:34:44+02:00",
-      "updatedAt": "2026-09-03T18:34:44+02:00",
-      "resolution": null,
+      "updatedAt": "2026-09-03T22:55:56+02:00",
+      "resolution": {
+        "action": "acknowledge",
+        "effect": "acknowledged"
+      },
       "events": [
         {
           "at": "2026-09-03T18:34:44+02:00",
           "type": "opened",
           "by": "33493"
+        },
+        {
+          "at": "2026-09-03T22:55:56+02:00",
+          "type": "resolved",
+          "by": "?"
         }
       ]
     }

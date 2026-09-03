@@ -98,7 +98,7 @@ class TelegramChannel:
         self._graph = graph if graph is not None else {}
 
     def deliver(self, interaction: Mapping[str, object]) -> None:
-        config = relay_client.da_ambiente(self._env)
+        config = relay_client.configurazione(self._env)
         chiave = capability.da_ambiente(self._env)
         if config is None or chiave is None:
             raise PermanentError(

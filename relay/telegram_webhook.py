@@ -110,6 +110,8 @@ class CodaTap:
 AnswerCallback = Callable[[object], None]
 Sink = Callable[[dict], None]
 PairingStart = Callable[[str, int, "str | None"], None]
+# Un '/start' senza codice: il relay risponde invece di tacere.
+StartNudo = Callable[[int], None]
 CapabilityResolver = Callable[[str], str | None]
 AdminDecision = Callable[[str, int, int], bool]
 DispositiviComando = Callable[[int], None]
@@ -224,7 +226,8 @@ class GestoreWebhook:
                  admin_decision: AdminDecision | None = None,
                  dispositivi_comando: DispositiviComando | None = None,
                  comando_stato: ComandoStato | None = None,
-                 comando_view: ComandoView | None = None) -> None:
+                 comando_view: ComandoView | None = None,
+                 start_nudo: StartNudo | None = None) -> None:
         self._pairing = pairing
         self._sink = sink
         self._answer_callback = answer_callback
@@ -235,6 +238,7 @@ class GestoreWebhook:
         self._dispositivi_comando = dispositivi_comando
         self._comando_stato = comando_stato
         self._comando_view = comando_view
+        self._start_nudo = start_nudo
 
     def processa_update(self, update: Mapping[str, object]) -> None:
         """Il traduttore vero e proprio: il long polling di
@@ -266,6 +270,17 @@ class GestoreWebhook:
                 # attraversare il confine verso il sink come fosse un tap.
                 if self._pairing_start is not None and isinstance(chat_id, int):
                     self._pairing_start(codice, chat_id, evento.get("from_nome"))
+                return
+            if (isinstance(evento.get("text"), str) and evento["text"].strip() == "/start"
+                    and self._start_nudo is not None and isinstance(chat_id, int)):
+                # Un '/start' senza codice arriva piu' spesso di quanto il
+                # disegno prevedesse: Telegram porta il parametro del deep link
+                # solo alla prima conversazione col bot, e nel passaggio fra due
+                # suoi client (web che apre l'app) lo perde comunque. Prima
+                # questo caso cadeva nel cancello 'is_paired' e finiva in
+                # UnpairedUser, cioe' in silenzio: chi lo mandava restava
+                # davanti a una chat muta senza sapere cosa aveva sbagliato.
+                self._start_nudo(chat_id)
                 return
             if (evento.get("text") == COMANDO_DISPOSITIVI and self._dispositivi_comando is not None
                     and isinstance(chat_id, int)):
@@ -444,7 +459,8 @@ def costruisci_gestore_da_ambiente(env: Mapping[str, str], pairing: PairingStore
                                     admin_decision: AdminDecision | None = None,
                                     dispositivi_comando: DispositiviComando | None = None,
                                     comando_stato: ComandoStato | None = None,
-                                    comando_view: ComandoView | None = None
+                                    comando_view: ComandoView | None = None,
+                                    start_nudo: StartNudo | None = None
                                     ) -> GestoreWebhook | None:
     """None se manca il prerequisito Telegram (stesso gate di A01/D02: bot non
     ancora approvato in questo ambiente): il resto del relay (/healthz)
@@ -467,4 +483,5 @@ def costruisci_gestore_da_ambiente(env: Mapping[str, str], pairing: PairingStore
         dispositivi_comando=dispositivi_comando,
         comando_stato=comando_stato,
         comando_view=comando_view,
+        start_nudo=start_nudo,
     )

@@ -29,6 +29,36 @@ import tunnel
 import view_command
 
 
+class IndirizzoDelControlloSalute(unittest.TestCase):
+    """L'health check bussa dove il servizio ascolta, non dove ascoltava prima.
+
+    Regressione del 2026-09-03: il controllo era inchiodato su 127.0.0.1, ma il
+    bind e' una scelta dell'installazione. Con un relay in ascolto sull'indirizzo
+    di una VPN ogni deploy finiva in rollback su un rilascio sano, e nessun
+    messaggio nominava la causa.
+    """
+
+    def test_il_default_resta_il_loopback(self):
+        self.assertEqual("http://127.0.0.1:8765/healthz", deploy.url_di_salute({}))
+
+    def test_host_e_porta_dichiarati_vincono(self):
+        env = {"ATLAS_RELAY_HOST": "10.66.66.1", "ATLAS_RELAY_PORT": "9000"}
+        self.assertEqual("http://10.66.66.1:9000/healthz", deploy.url_di_salute(env))
+
+    def test_il_controllo_interroga_quell_indirizzo(self):
+        comandi = []
+
+        def runner(argv, **kwargs):
+            comandi.append(argv)
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        deploy.controlla_salute(
+            {"ATLAS_RELAY_DEPLOY_HOST": "utente@host", "ATLAS_RELAY_HOST": "10.66.66.1"},
+            runner=runner, sleep=lambda _s: None)
+
+        self.assertIn("http://10.66.66.1:8765/healthz", comandi[0])
+
+
 class SuperficiePubblica(unittest.TestCase):
     """Cio' che il servizio serve e cio' che il proxy espone devono coincidere.
 

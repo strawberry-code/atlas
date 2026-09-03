@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 from html import escape
 
-from . import capability, relay_client
+from . import capability, relay_client, serve_pairing
 from .config import Graph
 from .strings import t
 
@@ -20,7 +20,7 @@ def _levetta(ref: Graph) -> str:
     (stesso gate di serve_notify._canali_attivi): senza, sarebbe una levetta
     su un canale che chi guarda non ha mai collegato, e chi lavora offline
     non deve vederla ne' sentirne parlare."""
-    if relay_client.da_ambiente(os.environ) is None or capability.da_ambiente(os.environ) is None:
+    if relay_client.configurazione(os.environ) is None or capability.da_ambiente(os.environ) is None:
         return ""
     acceso = bool(ref.workspace.config.get("notify", {}).get("telegram_enabled", True))
     on, off = t("render.notif_muto_attivo"), t("render.notif_muto_silenziato")
@@ -36,6 +36,20 @@ def _levetta(ref: Graph) -> str:
     )
 
 
+def _riga_pairing() -> str:
+    """Il bottone, oppure la conferma per chi si e' gia' collegato.
+
+    La domanda si fa al relay a ogni apertura del pannello. Quando non si puo'
+    fare, perche' il relay non e' configurato o non risponde, si mostra il
+    bottone: e' l'unica risposta che non toglie niente a chi ne ha bisogno.
+    Prima il bottone c'era sempre, anche per chi era gia' collegato, e l'unico
+    modo di sapere com'era finita era leggere lo stato sul server."""
+    if serve_pairing.collegato():
+        return f'<span class="pairing-fatto">{escape(t("render.notif_pairing_connesso"))}</span>'
+    return ('<button type="button" class="pairing-telegram" data-pairing="telegram">'
+            f'{escape(t("render.notif_pairing_bottone"))}</button>')
+
+
 def blocco(ref: Graph) -> str:
     """Il bottone di pairing e' sempre presente (grilling 27), discreto,
     senza campi da compilare: dashboard.js fa il resto (POST/GET
@@ -47,8 +61,7 @@ def blocco(ref: Graph) -> str:
     return (
         '<div class="notif-canali">'
         '<div class="pairing-riga">'
-        '<button type="button" class="pairing-telegram" data-pairing="telegram">'
-        f'{escape(t("render.notif_pairing_bottone"))}</button>'
+        f'{_riga_pairing()}'
         '<span class="pairing-stato" aria-live="polite"></span>'
         '</div>'
         f'{_levetta(ref)}'

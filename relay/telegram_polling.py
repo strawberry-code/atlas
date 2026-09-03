@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import threading
 import urllib.error
 import urllib.parse
@@ -98,7 +99,22 @@ def ciclo_polling(bot_token: str, processa_update: ProcessaUpdate, offset_store:
             fermo.wait(attesa_errore)
             continue
         for update in updates:
-            processa_update(update)
+            # Un update non deve poter uccidere il servizio. Il traduttore
+            # solleva UnpairedUser per ogni messaggio da una chat che il relay
+            # non conosce, ed e' un caso ordinario, non un guasto: chiunque
+            # trovi il bot puo' scrivergli. Senza questa cattura il thread
+            # moriva al primo estraneo e il bot restava muto per tutti, con il
+            # servizio che continuava a dirsi 'active'. Vale per qualunque
+            # eccezione del traduttore, per la stessa ragione: si perde
+            # l'update, non il servizio.
+            try:
+                processa_update(update)
+            except Exception as errore:   # noqa: BLE001 - vedi sopra
+                print(f"update {update.get('update_id')} scartato: "
+                      f"{type(errore).__name__}: {errore}", file=sys.stderr, flush=True)
+            # L'offset avanza comunque: un update che ha fatto sollevare
+            # un'eccezione una volta la fara' sollevare identica per sempre, e
+            # riconsegnarlo in eterno terrebbe fermo tutto quel che viene dopo.
             update_id = update.get("update_id")
             if isinstance(update_id, int):
                 offset_store.avanza(update_id + 1)

@@ -273,7 +273,7 @@ def _avvia_tunnel_telegram(run: Run) -> tuple[threading.Event | None, threading.
     sotto l'identita' di questa installazione (A05, SS4-bis), non sotto il
     grafo: 'carica_o_crea' la genera al primo utilizzo su questa macchina.
     Gira in un thread demone: non deve mai impedire al processo di uscire."""
-    config = relay_client.da_ambiente(os.environ)
+    config = relay_client.configurazione(os.environ)
     chiave = capability.da_ambiente(os.environ)
     if config is None or chiave is None:
         return None, None

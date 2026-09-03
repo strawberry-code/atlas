@@ -54,6 +54,44 @@ class FakeOpener:
         return urllib.parse.parse_qs(query)["offset"][0]
 
 
+class UnUpdateNonUccideIlServizio(unittest.TestCase):
+    """Un messaggio da una chat sconosciuta non deve fermare il bot per tutti.
+
+    Regressione del 2026-09-03: il traduttore solleva UnpairedUser per ogni
+    messaggio da una chat non associata, che e' un caso ordinario visto che
+    chiunque trovi il bot puo' scrivergli. Il thread moriva al primo estraneo e
+    il bot restava muto per tutti, mentre systemd continuava a dire 'active'.
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+
+    def test_un_update_che_solleva_non_ferma_i_successivi(self):
+        visti = []
+
+        def processa(update):
+            if update["update_id"] == 1:
+                raise ValueError("chat non associata a nessun progetto")
+            visti.append(update["update_id"])
+
+        fermo = threading.Event()
+        offset = tp.OffsetStore(Path(self._tmp.name) / "offset.json")
+        lotti = [{"ok": True, "result": [{"update_id": 1}, {"update_id": 2}]}]
+
+        def opener(richiesta, timeout=None):
+            if not lotti:
+                fermo.set()
+                return _FakeRisposta({"ok": True, "result": []})
+            return _FakeRisposta(lotti.pop(0))
+
+        tp.ciclo_polling("token", processa, offset, fermo,
+                         opener=opener, timeout=0, attesa_errore=0)
+
+        self.assertEqual([2], visti, "il secondo update deve essere stato processato")
+        self.assertEqual(3, offset.leggi(), "l'offset avanza anche sull'update scartato")
+
+
 class OffsetStoreTest(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()

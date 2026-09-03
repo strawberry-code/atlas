@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import sys
 import types
+import shutil
+import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -36,7 +38,14 @@ class AvviaTunnelTelegram(unittest.TestCase):
         self.assertIsNone(thread)
 
     def test_nessun_thread_solo_chiave_capability_senza_relay(self):
-        with mock.patch.dict("os.environ", {"ATLAS_CAPABILITY_KEY_REF": "k"}, clear=True):
+        # 'clear=True' svuota l'ambiente ma non il disco: da quando la
+        # configurazione del relay vive anche in un profilo di macchina, un
+        # test che vuole 'nessun relay' deve puntare a un'installazione vuota,
+        # altrimenti legge quella di chi lo lancia.
+        casa = tempfile.mkdtemp(prefix="atlas-test-senza-relay-")
+        self.addCleanup(shutil.rmtree, casa, True)
+        with mock.patch.dict("os.environ", {"ATLAS_CAPABILITY_KEY_REF": "k",
+                                            "ATLAS_INSTALL_HOME": casa}, clear=True):
             fermo, thread = autopilot._avvia_tunnel_telegram(_run())
         self.assertIsNone(fermo)
         self.assertIsNone(thread)

@@ -284,6 +284,24 @@ class GestorePairing:
             return True
 
 
+def costruisci_start_nudo(invia_messaggio: InviaMessaggio):
+    """La risposta a un '/start' senza codice, da una chat che il relay non
+    conosce ancora.
+
+    Il codice viaggia nel deep link, e Telegram lo consegna solo alla prima
+    conversazione col bot: chi ha gia' parlato con lui, o apre il link dal web
+    e viene rimbalzato sull'app, manda un '/start' nudo. Prima quel messaggio
+    cadeva nel cancello delle chat non associate e il bot restava muto, che e'
+    il modo peggiore di rispondere a qualcuno che sta provando a collegarsi."""
+    def _on_start(chat_id: int) -> None:
+        invia_messaggio(chat_id, "Per collegare un computer, apri il pannello "
+                                  "Notifiche di Atlas e premi 'collega Telegram'. "
+                                  "Se questa chat si apre senza che succeda niente, "
+                                  "incolla qui il comando che il pannello ti mostra: "
+                                  "e' un '/start' seguito da un codice.")
+    return _on_start
+
+
 def costruisci_pairing_start(store: GestorePairing, invia_messaggio: InviaMessaggio,
                              invia_bottoni: InviaBottoni) -> PairingStart:
     """La chiusura che GestoreWebhook (D04) chiama su un '/start <codice>':

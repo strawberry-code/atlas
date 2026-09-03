@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import os
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections.abc import Mapping
 from urllib.parse import quote
@@ -42,9 +43,13 @@ def avvia(env: Mapping[str, str] | None = None,
     (stesso gate del tunnel D03), 502 se il relay non risponde o rifiuta la
     richiesta (non ancora deployato, pairing disattivato, bearer scaduto...)."""
     ambiente = _ambiente(env)
-    config = relay_client.da_ambiente(ambiente)
+    config = relay_client.configurazione(ambiente)
     if config is None:
-        return 503, {"ok": False}
+        # 'motivo' e' un valore codificato, non prosa: il pannello ci sceglie il
+        # testo da mostrare. Senza, il browser vedeva un errore solo e diceva
+        # 'riprova' anche a chi non ha un relay configurato, cioe' a chi
+        # riprovando fallira' per sempre.
+        return 503, {"ok": False, "motivo": "relay-non-configurato"}
     installazione = relay_identity.carica_o_crea(env=ambiente)
     richiesta = urllib.request.Request(
         f"{config.base_url.rstrip('/')}/pairing",
@@ -55,12 +60,39 @@ def avvia(env: Mapping[str, str] | None = None,
     try:
         with opener(richiesta, timeout=10) as risposta:
             if risposta.status != 200:
-                return 502, {"ok": False}
+                return 502, {"ok": False, "motivo": "relay-non-risponde"}
             corpo = json.loads(risposta.read().decode("utf-8"))
     except (OSError, urllib.error.URLError, json.JSONDecodeError):
-        return 502, {"ok": False}
+        return 502, {"ok": False, "motivo": "relay-non-risponde"}
     return 200, {"ok": True, "url": corpo.get("url"), "code": corpo.get("code"),
                  "expiresAt": corpo.get("expiresAt")}
+
+
+def collegato(env: Mapping[str, str] | None = None,
+              opener=urllib.request.urlopen) -> bool:
+    """Questa installazione risulta gia' collegata a una chat Telegram?
+
+    Il pannello lo chiede a ogni apertura: senza, mostrava il bottone 'collega
+    Telegram' anche a chi si era gia' collegato, e l'unico modo di sapere com'era
+    andata era leggere lo stato sul server. Un relay non configurato o che non
+    risponde vale come 'non collegato': e' l'unica risposta onesta quando non si
+    puo' chiedere, e non fa sparire il bottone a chi ne ha bisogno."""
+    ambiente = _ambiente(env)
+    config = relay_client.configurazione(ambiente)
+    if config is None:
+        return False
+    installazione = relay_identity.carica_o_crea(env=ambiente)
+    url = (f"{config.base_url.rstrip('/')}/pairing"
+           f"?installation={urllib.parse.quote(installazione.installation_id)}")
+    richiesta = urllib.request.Request(
+        url, headers={"Authorization": f"Bearer {config.token}"}, method="GET")
+    try:
+        with opener(richiesta, timeout=5) as risposta:
+            if risposta.status != 200:
+                return False
+            return bool(json.loads(risposta.read().decode("utf-8")).get("paired"))
+    except (OSError, urllib.error.URLError, json.JSONDecodeError):
+        return False
 
 
 def stato(codice: str, env: Mapping[str, str] | None = None,
@@ -68,7 +100,7 @@ def stato(codice: str, env: Mapping[str, str] | None = None,
     """GET /pairing/telegram/status?code=...: il pannello lo interroga a
     intervalli finche' l'utente non conferma su Telegram o il codice non
     scade. Il bearer resta lato server: il browser non lo vede mai."""
-    config = relay_client.da_ambiente(_ambiente(env))
+    config = relay_client.configurazione(_ambiente(env))
     if config is None:
         return 503, {"ok": False}
     if not codice:
@@ -80,8 +112,8 @@ def stato(codice: str, env: Mapping[str, str] | None = None,
     try:
         with opener(richiesta, timeout=10) as risposta:
             if risposta.status != 200:
-                return 502, {"ok": False}
+                return 502, {"ok": False, "motivo": "relay-non-risponde"}
             corpo = json.loads(risposta.read().decode("utf-8"))
     except (OSError, urllib.error.URLError, json.JSONDecodeError):
-        return 502, {"ok": False}
+        return 502, {"ok": False, "motivo": "relay-non-risponde"}
     return 200, {"ok": True, "status": corpo.get("status")}

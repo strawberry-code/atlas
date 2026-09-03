@@ -151,13 +151,35 @@
     bottone.addEventListener("click", function () {
       bottone.disabled = true;
       messaggio("", "");
+      /* Il server manda un 'motivo' codificato quando non ce la fa, e i due casi
+         vogliono due risposte diverse: senza un relay configurato riprovare non
+         funzionera' mai, quindi dirlo sarebbe una bugia. Un errore che non
+         riconosciamo resta 'riprova', che e' l'unica cosa onesta da dire. */
       fetch("/pairing/telegram", { method: "POST" })
-        .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+        .then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (corpo) {
+            return { ok: r.ok, corpo: corpo };
+          });
+        })
         .then(function (esito) {
-          if (!esito.ok || !esito.url) return Promise.reject();
-          window.open(esito.url, "_blank", "noopener");
-          messaggio(notificheData.pairingAttesa, "pairing-attesa");
-          interroga(esito.code, esito.expiresAt * 1000);
+          if (esito.ok && esito.corpo.ok && esito.corpo.url) {
+            window.open(esito.corpo.url, "_blank", "noopener");
+            /* Il codice viaggia nel deep link, e Telegram lo consegna solo alla
+               prima conversazione col bot: chi ci ha gia' parlato, o apre il link
+               dal web e viene rimbalzato sull'app, si ritrova una chat che non
+               fa niente. Il comando da incollare e' il ripiego che funziona
+               sempre, e sta accanto all'attesa invece che al posto suo. */
+            messaggio(notificheData.pairingAttesa + " · "
+                      + notificheData.pairingRipiego + "/start " + esito.corpo.code,
+                      "pairing-attesa");
+            interroga(esito.corpo.code, esito.corpo.expiresAt * 1000);
+            return;
+          }
+          var testo = notificheData.azioneErrore;
+          if (esito.corpo.motivo === "relay-non-configurato") testo = notificheData.pairingSenzaRelay;
+          else if (esito.corpo.motivo === "relay-non-risponde") testo = notificheData.pairingRelayMuto;
+          messaggio(testo, "pairing-errore");
+          bottone.disabled = false;
         })
         .catch(function () {
           messaggio(notificheData.azioneErrore, "pairing-errore");

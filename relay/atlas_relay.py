@@ -109,7 +109,15 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(401)
             self.end_headers()
             return
-        codice = (parse_qs(urlsplit(self.path).query).get("code") or [""])[0]
+        query = parse_qs(urlsplit(self.path).query)
+        if installazione := (query.get("installation") or [""])[0]:
+            # 'sono gia' collegato?', la domanda che il pannello deve poter fare
+            # a ogni apertura: senza, la dashboard mostrava per sempre il bottone
+            # 'collega Telegram' anche a chi era gia' associato, e l'unico modo
+            # di sapere com'era andata era guardare il file di stato sul server.
+            self._json(200, {"paired": gestore.chat_id_di(installazione) is not None})
+            return
+        codice = (query.get("code") or [""])[0]
         if not codice:
             self.send_response(400)
             self.end_headers()
@@ -499,6 +507,7 @@ def main() -> None:
     avvisa_protocollo = None
     avviso_peer = None
     comando_dispositivi = None
+    start_nudo = None
     if gestore_pairing is not None:
         # A03: 'pairing_start' e 'admin_decision' condividono lo stesso store
         # e le stesse chiamate Telegram, ma sono due confini distinti verso
@@ -508,6 +517,7 @@ def main() -> None:
         invia_bottoni_admin = costruisci_invia_bottoni(bot_token)
         pairing_start = pairing.costruisci_pairing_start(
             gestore_pairing, invia_messaggio, invia_bottoni_admin)
+        start_nudo = pairing.costruisci_start_nudo(invia_messaggio)
         admin_decision_pairing = pairing.costruisci_admin_decision(
             gestore_pairing, invia_messaggio, costruisci_modifica_messaggio(bot_token))
         # C01: il freno automatico ha il suo prefisso di callback_data
@@ -581,7 +591,7 @@ def main() -> None:
             os.environ, pairing=gestore_pairing, sink=sink, pairing_start=pairing_start,
             capability_resolver=memoria_capability.preleva, admin_decision=admin_decision,
             dispositivi_comando=comando_dispositivi, comando_stato=comando_stato,
-            comando_view=comando_view),
+            comando_view=comando_view, start_nudo=start_nudo),
         tunnel_token=token,
         registro_tunnel=registro_tunnel,
         gestore_pairing=gestore_pairing,

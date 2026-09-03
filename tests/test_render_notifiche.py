@@ -7,6 +7,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -58,6 +59,24 @@ class NotificheTest(unittest.TestCase):
         }
         base.update(over)
         return base
+
+    def test_il_pannello_porta_i_testi_dei_due_guasti_di_pairing(self):
+        """dashboard.js li legge dal markup, non da un catalogo suo.
+
+        Se mancano qui, il browser mostra 'undefined' proprio nel momento in cui
+        una persona ha bisogno di sapere perche' il collegamento non e' partito.
+        """
+        from core import render_notifiche
+
+        momento = datetime(2026, 1, 1, 12, 0)
+        html = render_notifiche.panel(self.ref, {"interactions": []}, now=momento)
+
+        for attributo in ("data-pairing-senza-relay", "data-pairing-relay-muto"):
+            with self.subTest(attributo=attributo):
+                self.assertIn(attributo, html)
+                # e non vuoto: un attributo senza testo e' peggio di uno assente
+                valore = html.split(attributo + '="')[1].split('"')[0]
+                self.assertTrue(valore.strip(), f"{attributo} e' vuoto")
 
     def test_una_interaction_aperta_finisce_in_attenzione_richiesta_col_badge(self):
         from core import render_notifiche
@@ -223,12 +242,27 @@ class NotificheTest(unittest.TestCase):
 
         self.assertNotIn("notif-log", html)
 
+    @property
+    def tmp_isolata(self) -> str:
+        """Una casa di installazione vuota: nessun profilo di relay, quindi il
+        pannello non puo' sapere di essere collegato e mostra il bottone."""
+        if not hasattr(self, "_tmp_isolata"):
+            self._tmp_isolata = tempfile.mkdtemp(prefix="atlas-test-pannello-")
+            self.addCleanup(shutil.rmtree, self._tmp_isolata, True)
+        return self._tmp_isolata
+
     def test_il_pairing_telegram_e_un_bottone_unico_senza_campi(self):
         """D05: nessun input per token bot, chat ID, hostname o config - solo
-        il bottone e uno span di stato che dashboard.js riempie da solo."""
+        il bottone e uno span di stato che dashboard.js riempie da solo.
+
+        L'installazione va isolata: da quando il pannello chiede al relay se e'
+        gia' collegato, il bottone lascia il posto alla conferma, e senza
+        isolamento questo test passerebbe o fallirebbe a seconda di come e'
+        messo il computer di chi lo lancia."""
         from core import render_notifiche
 
-        html = render_notifiche.panel(self.ref, {"interactions": []}, now=datetime.now().astimezone())
+        with mock.patch.dict(os.environ, {"ATLAS_INSTALL_HOME": self.tmp_isolata}):
+            html = render_notifiche.panel(self.ref, {"interactions": []}, now=datetime.now().astimezone())
 
         self.assertIn('class="pairing-telegram" data-pairing="telegram"', html)
         self.assertIn('class="pairing-stato"', html)

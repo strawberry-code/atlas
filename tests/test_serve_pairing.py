@@ -26,6 +26,12 @@ ENV = {
 }
 
 
+# Un ambiente vuoto non basta a dire 'questa macchina non ha un relay': la
+# configurazione vive anche in un profilo su disco, e un test che non lo isola
+# leggerebbe quello di chi lo lancia, passando o fallendo a seconda del computer.
+SENZA_RELAY = {"ATLAS_INSTALL_HOME": tempfile.mkdtemp(prefix="atlas-test-senza-relay-")}
+
+
 class FakeRisposta:
     def __init__(self, status: int, corpo: bytes) -> None:
         self.status = status
@@ -41,6 +47,31 @@ class FakeRisposta:
         return False
 
 
+class MotivoDelFallimento(unittest.TestCase):
+    """Due guasti diversi devono dire due cose diverse a chi guarda.
+
+    Senza un relay configurato, riprovare non funzionera' mai: il pannello che
+    dice 'riprova' manda una persona a premere un bottone per sempre. Il motivo
+    e' un valore codificato, non prosa, perche' a sceglierne il testo e' il
+    browser e non un modello.
+    """
+
+    def test_senza_relay_configurato_lo_dichiara(self):
+        stato, corpo = serve_pairing.avvia(env=SENZA_RELAY)
+        self.assertEqual(503, stato)
+        self.assertEqual("relay-non-configurato", corpo["motivo"])
+
+    def test_relay_che_non_risponde_e_un_altro_motivo(self):
+        def opener(richiesta, timeout=None):
+            raise OSError("connessione rifiutata")
+
+        stato, corpo = serve_pairing.avvia(
+            env={"RELAY_PUBLIC_URL": "https://relay.example", "ATLAS_RELAY_TOKEN_REF": "x"},
+            opener=opener)
+        self.assertEqual(502, stato)
+        self.assertEqual("relay-non-risponde", corpo["motivo"])
+
+
 class Avvia(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
@@ -48,7 +79,7 @@ class Avvia(unittest.TestCase):
         self.env = dict(ENV, ATLAS_INSTALL_HOME=self._tmp.name)
 
     def test_503_senza_relay_configurato(self):
-        stato, payload = serve_pairing.avvia(env={})
+        stato, payload = serve_pairing.avvia(env=SENZA_RELAY)
         self.assertEqual(stato, 503)
         self.assertFalse(payload["ok"])
 
@@ -89,7 +120,7 @@ class Avvia(unittest.TestCase):
 
 class Stato(unittest.TestCase):
     def test_503_senza_relay_configurato(self):
-        stato, payload = serve_pairing.stato("abc123", env={})
+        stato, payload = serve_pairing.stato("abc123", env=SENZA_RELAY)
         self.assertEqual(stato, 503)
 
     def test_400_senza_codice(self):

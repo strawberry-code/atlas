@@ -60,7 +60,7 @@ def _canali_attivi(ref: Graph) -> tuple[str, ...]:
     canali = [notify_local.IDENTITY]
     if os.environ.get(notify_himalaya.ENV_TO):
         canali.append(notify_himalaya.IDENTITY)
-    if (relay_client.da_ambiente(os.environ) is not None
+    if (relay_client.configurazione(os.environ) is not None
             and capability.da_ambiente(os.environ) is not None and telegram_abilitato(ref)):
         canali.append(notify_telegram.IDENTITY)
     return tuple(canali)

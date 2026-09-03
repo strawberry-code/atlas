@@ -30,7 +30,7 @@ def avvisa(ws: Workspace, env: Mapping[str, str] | None = None,
     Telegram (relay non deployato, progetto non ancora appaiato), non del
     grafo."""
     ambiente = env if env is not None else os.environ
-    config = relay_client.da_ambiente(ambiente)
+    config = relay_client.configurazione(ambiente)
     if config is None:
         return
     codice = project_code.carica_o_crea(ws)

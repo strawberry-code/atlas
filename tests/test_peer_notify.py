@@ -57,9 +57,18 @@ class PeerNotifyTest(unittest.TestCase):
         env.update(over)
         return env
 
+    def _casa_vuota(self) -> str:
+        """Un'installazione senza profilo di relay. Un ambiente vuoto non basta
+        piu' a dire 'nessun relay': la configurazione vive anche su disco, e su
+        una macchina che il relay ce l'ha davvero il test leggerebbe quello."""
+        casa = tempfile.mkdtemp(prefix="atlas-test-senza-relay-")
+        self.addCleanup(shutil.rmtree, casa, True)
+        return casa
+
     def test_senza_relay_configurato_non_chiama_l_opener(self):
         chiamate = []
-        peer_notify.avvisa(self.ws, env={}, opener=lambda *a, **k: chiamate.append(a))
+        peer_notify.avvisa(self.ws, env={"ATLAS_INSTALL_HOME": self._casa_vuota()},
+                           opener=lambda *a, **k: chiamate.append(a))
         self.assertEqual(chiamate, [])
 
     def test_posta_bearer_codice_e_installazione(self):

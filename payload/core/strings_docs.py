@@ -184,6 +184,14 @@ STRINGS: dict[str, dict[str, str]] = {
     "render.notif_pairing_attesa": {"it": "in attesa del via libera su Telegram",
                                     "en": "waiting for the go-ahead on Telegram"},
     "render.notif_pairing_connesso": {"it": "Telegram collegato", "en": "Telegram connected"},
+    "render.notif_pairing_ripiego": {
+        "it": "se Telegram si apre e non succede niente, incolla nella chat: ",
+        "en": "if Telegram opens and nothing happens, paste this in the chat: "},
+    "render.notif_pairing_senza_relay": {
+        "it": "questo computer non ha un relay a cui collegarsi: chi lo gestisce deve dirti il suo indirizzo",
+        "en": "this computer has no relay to connect to: whoever runs it has to give you its address"},
+    "render.notif_pairing_relay_muto": {"it": "il relay non risponde: riprova fra poco",
+                                        "en": "the relay is not answering: try again shortly"},
     "render.notif_pairing_scaduto": {"it": "codice scaduto, riprova", "en": "code expired, try again"},
     "render.notif_pairing_rifiutato": {"it": "richiesta rifiutata", "en": "request rejected"},
     "render.notif_pairing_senza_gestore": {"it": "il servizio non è ancora pronto, riprova più tardi",

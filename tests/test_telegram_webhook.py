@@ -34,6 +34,80 @@ def _update_messaggio(update_id=1, chat_id=42, text=None):
     return {"update_id": update_id, "message": messaggio}
 
 
+class LaFabbricaAccettaCioCheIlServizioLePassa(unittest.TestCase):
+    """I nomi che atlas_relay.main() passa devono esistere nella fabbrica.
+
+    Regressione del 2026-09-03: 'start_nudo' era stato aggiunto a GestoreWebhook
+    e passato da main(), ma non alla fabbrica in mezzo. I test costruivano il
+    gestore direttamente, quindi il difetto e' comparso solo sul server, come
+    TypeError all'avvio, dopo un rollback su un rilascio sano.
+
+    Si legge il sorgente invece di eseguire main(), che aprirebbe socket e
+    thread: qui serve sapere se i nomi combaciano, non far partire un servizio.
+    """
+
+    def test_i_nomi_passati_da_main_esistono_nella_fabbrica(self):
+        import ast
+        import inspect
+
+        sorgente = (Path(__file__).resolve().parent.parent / "relay" / "atlas_relay.py").read_text(encoding="utf-8")
+        chiamate = [nodo for nodo in ast.walk(ast.parse(sorgente))
+                    if isinstance(nodo, ast.Call)
+                    and getattr(nodo.func, "id", None) == "costruisci_gestore_da_ambiente"]
+        self.assertTrue(chiamate, "il servizio non costruisce piu' il gestore da qui")
+
+        accettati = set(inspect.signature(tw.costruisci_gestore_da_ambiente).parameters)
+        for chiamata in chiamate:
+            passati = {kw.arg for kw in chiamata.keywords if kw.arg}
+            sconosciuti = sorted(passati - accettati)
+            self.assertEqual([], sconosciuti,
+                             f"main() passa nomi che la fabbrica non accetta: {sconosciuti}")
+
+
+class StartSenzaCodice(unittest.TestCase):
+    """Un '/start' nudo da una chat sconosciuta riceve una risposta, non silenzio.
+
+    Il codice del collegamento viaggia nel deep link, e Telegram lo consegna solo
+    alla prima conversazione col bot: chi ci ha gia' parlato, o apre il link dal
+    web e viene rimbalzato sull'app, manda un '/start' nudo. Prima quel messaggio
+    finiva nel cancello delle chat non associate, cioe' in silenzio, davanti a
+    una persona che stava proprio provando a collegarsi.
+    """
+
+    def _update(self, testo, chat_id=42):
+        return {"update_id": 1, "message": {"chat": {"id": chat_id}, "text": testo,
+                                            "from": {"username": "tizio"}}}
+
+    def test_lo_start_nudo_riceve_una_risposta(self):
+        visti = []
+        gestore = tw.GestoreWebhook(
+            pairing=tw.MemoriaPairing(), sink=lambda evento: None,
+            start_nudo=lambda chat_id: visti.append(chat_id))
+
+        gestore.processa_update(self._update("/start"))
+
+        self.assertEqual([42], visti)
+
+    def test_lo_start_col_codice_resta_un_pairing(self):
+        nudi, codici = [], []
+        gestore = tw.GestoreWebhook(
+            pairing=tw.MemoriaPairing(), sink=lambda evento: None,
+            pairing_start=lambda codice, chat_id, nome: codici.append(codice),
+            start_nudo=lambda chat_id: nudi.append(chat_id))
+
+        gestore.processa_update(self._update("/start ABC123"))
+
+        self.assertEqual(["ABC123"], codici)
+        self.assertEqual([], nudi, "un pairing vero non deve passare per lo start nudo")
+
+    def test_senza_gestore_dello_start_nudo_resta_il_comportamento_di_prima(self):
+        gestore = tw.GestoreWebhook(
+            pairing=tw.MemoriaPairing(), sink=lambda evento: None)
+
+        with self.assertRaises(tw.UnpairedUser):
+            gestore.processa_update(self._update("/start"))
+
+
 class EstraiEvento(unittest.TestCase):
     def test_callback(self):
         evento = tw._estrai_evento(_update_callback())

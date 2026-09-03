@@ -10,6 +10,8 @@ import sys
 import tempfile
 import threading
 import time
+import json
+import shutil
 import unittest
 import urllib.error
 import urllib.request
@@ -25,6 +27,48 @@ import tunnel as relay_tunnel
 
 TOKEN = "il-bearer-del-tunnel"
 
+
+class ConfigurazioneDalProfilo(unittest.TestCase):
+    """Il relay si configura una volta per macchina, non a ogni sessione.
+
+    Prima la configurazione veniva solo dall'ambiente, quindi per usare il relay
+    bisognava esportare due variabili prima di ogni 'atlas serve', cioe' proprio
+    il gesto che il disegno vieta al primo punto.
+    """
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.env = {"ATLAS_INSTALL_HOME": str(self.tmp)}
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp)
+
+    def _scrivi_profilo(self, dati):
+        (self.tmp / "relay.json").write_text(json.dumps(dati), encoding="utf-8")
+
+    def test_senza_profilo_e_senza_ambiente_non_c_e_relay(self):
+        self.assertIsNone(relay_client.configurazione(self.env))
+
+    def test_il_profilo_basta_da_solo(self):
+        self._scrivi_profilo({"url": "http://10.66.66.1:8765", "token": "segreto"})
+        config = relay_client.configurazione(self.env)
+        self.assertEqual("http://10.66.66.1:8765", config.base_url)
+        self.assertEqual("segreto", config.token)
+
+    def test_l_ambiente_scavalca_il_profilo(self):
+        self._scrivi_profilo({"url": "http://vecchio", "token": "vecchio"})
+        env = dict(self.env, RELAY_PUBLIC_URL="http://nuovo", ATLAS_RELAY_TOKEN_REF="nuovo")
+        config = relay_client.configurazione(env)
+        self.assertEqual("http://nuovo", config.base_url)
+        self.assertEqual("nuovo", config.token)
+
+    def test_un_profilo_rotto_non_e_un_guasto(self):
+        (self.tmp / "relay.json").write_text("{ questo non e' json", encoding="utf-8")
+        self.assertIsNone(relay_client.configurazione(self.env))
+
+    def test_un_profilo_a_meta_non_vale(self):
+        self._scrivi_profilo({"url": "http://10.66.66.1:8765"})
+        self.assertIsNone(relay_client.configurazione(self.env))
 
 class ConfigDaAmbiente(unittest.TestCase):
     def test_none_senza_url_ne_hostname(self):
