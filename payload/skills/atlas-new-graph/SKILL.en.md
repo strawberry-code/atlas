@@ -23,7 +23,8 @@ Also ask for the graph's **technical name** (kebab-case, e.g. `epic-auth`) and i
 3. Identify the **branches**: 3-6 strands of work, each with a letter and a color. Branches exist to read the graph, not to organize execution.
 4. Derive the **nodes**. Each is sized for a single work session. A node that holds three independent decisions should be split; three nodes that all close with the same sentence should be merged.
 5. Wire the **dependencies**: a `blockedBy` edge exists when the second node isn't even formulable until the first has answered. A plain "comes later in time" is not a dependency. Make the **graph converge into a single final node**, usually a gate that verifies the destination: a terminal that doesn't flow into it is a strand whose outcome no one will collect, and `atlas doctor` flags it.
-6. **Show the structure to the user before writing anything** — id, title, type, mode, blocker — and ask for confirmation. This is where things get corrected, not after.
+6. **Check coverage before showing the structure**: list, one line each, every decision or requirement the source text names explicitly (a choice between options, a "we will do X", a stated constraint), and match each one against the id of the node that covers it. Rereading the document as a whole doesn't catch a gap: a decision made halfway through a long text, maybe in a later grilling iteration, gets lost in the overall read the same way it got lost in the first draft of the graph. The explicit, entry-by-entry list is the mechanical safeguard; a decision with no covering node gets added before moving on, not after the graph is already running.
+7. **Show the structure to the user before writing anything** — id, title, type, mode, blocker — and ask for confirmation. This is where things get corrected, not after.
 
 ## Branch B — there's just an idea
 

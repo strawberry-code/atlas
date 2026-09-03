@@ -23,7 +23,8 @@ Chiedi anche il **nome tecnico** del grafo (kebab-case, es. `epic-auth`) e il **
 3. Individua i **rami**: 3-6 filoni di lavoro, ognuno con una lettera e un colore. I rami servono a leggere il grafo, non a organizzare l'esecuzione.
 4. Ricava i **nodi**. Ognuno è dimensionato su una sessione di lavoro sola. Un nodo che contiene tre decisioni indipendenti va spezzato; tre nodi che si chiudono con la stessa frase vanno fusi.
 5. Cabla le **dipendenze**: un arco `blockedBy` esiste quando il secondo nodo non è nemmeno formulabile finché il primo non ha risposto. Un semplice "viene prima nel tempo" non è una dipendenza. Fai **convergere il grafo in un nodo finale unico**, di solito un cancello che verifica la destinazione: un terminale che non vi confluisce è un ramo il cui esito nessuno raccoglierà, e `atlas doctor` lo segnala.
-6. **Mostra la struttura all'utente prima di scrivere** — id, titolo, tipo, modo, blocker — e chiedi conferma. È qui che si correggono le cose, non dopo.
+6. **Verifica la copertura prima di mostrare la struttura**: elenca, una riga per una, ogni decisione o requisito che il testo sorgente nomina esplicitamente (una scelta fra opzioni, un "si farà X", un vincolo dichiarato), e affianca a ciascuna l'id del nodo che la copre. Una rilettura in blocco del documento non basta a trovare un buco: una decisione presa a metà di un testo lungo, magari in un'iterazione successiva del grilling, si perde nella lettura d'insieme nello stesso punto in cui si è persa nella prima stesura del grafo. L'elenco esplicito, voce per voce, è il presidio meccanico; una decisione senza nodo che la copra si aggiunge prima di procedere, non dopo che il grafo è già in esecuzione.
+7. **Mostra la struttura all'utente prima di scrivere** — id, titolo, tipo, modo, blocker — e chiedi conferma. È qui che si correggono le cose, non dopo.
 
 ## Ramo B — c'è solo un'idea
 
