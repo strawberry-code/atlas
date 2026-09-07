@@ -1,0 +1,3 @@
+atlas render su un grafo con un ciclo si ferma con questa diagnosi (render_panels.panels -> topology.convergence -> topology.levels), mai un traceback:
+
+ciclo di dipendenze su X

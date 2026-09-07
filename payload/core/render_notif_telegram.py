@@ -46,7 +46,8 @@ def _riga_pairing() -> str:
     modo di sapere com'era finita era leggere lo stato sul server."""
     if serve_pairing.collegato():
         return f'<span class="pairing-fatto">{escape(t("render.notif_pairing_connesso"))}</span>'
-    return ('<button type="button" class="pairing-telegram" data-pairing="telegram">'
+    return ('<button type="button" class="btn-primary btn-ghost pairing-telegram" '
+            'data-pairing="telegram">'
             f'{escape(t("render.notif_pairing_bottone"))}</button>')
 
 

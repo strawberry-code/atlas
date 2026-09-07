@@ -264,7 +264,7 @@ class NotificheTest(unittest.TestCase):
         with mock.patch.dict(os.environ, {"ATLAS_INSTALL_HOME": self.tmp_isolata}):
             html = render_notifiche.panel(self.ref, {"interactions": []}, now=datetime.now().astimezone())
 
-        self.assertIn('class="pairing-telegram" data-pairing="telegram"', html)
+        self.assertIn('class="btn-primary btn-ghost pairing-telegram" data-pairing="telegram"', html)
         self.assertIn('class="pairing-stato"', html)
         self.assertNotIn("<input", html)
         self.assertIn("data-pairing-attesa=", html)

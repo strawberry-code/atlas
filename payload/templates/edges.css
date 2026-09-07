@@ -1,0 +1,75 @@
+/* archi: ognuno prende il colore dello stato del nodo da cui parte. Le frecce
+   che entrano in un blocco dicono cosi' in che stato sono le sue dipendenze
+   senza doverle cercare sulla mappa: tutte verdi vuol dire pronto, e dove non
+   lo e' si vede subito chi lo trattiene e a che punto sta.
+   Il bloccato tiene il grigio dell'arco neutro invece della propria tinta: e'
+   lo stato piu' frequente su un grafo appena aperto, e cinque colori pieni tutti
+   insieme farebbero della mappa un cavo aggrovigliato. */
+path.edge{stroke:var(--edge);fill:none;stroke-width:1.7;
+  transition:opacity .15s ease,stroke .15s ease,stroke-width .15s ease}
+path.edge.da-frontier{stroke:var(--edge-frontier)}
+path.edge.da-claimed{stroke:var(--edge-claimed)}
+path.edge.da-closed{stroke:var(--edge-closed)}
+path.edge.da-out-of-scope{stroke:var(--edge-out-of-scope)}
+circle.port{fill:var(--edge);transition:fill .15s ease,opacity .15s ease}
+circle.port.da-frontier{fill:var(--edge-frontier)}
+circle.port.da-claimed{fill:var(--edge-claimed)}
+circle.port.da-closed{fill:var(--edge-closed)}
+circle.port.da-out-of-scope{fill:var(--edge-out-of-scope)}
+.tip-frontier{fill:var(--edge-frontier)}
+.tip-claimed{fill:var(--edge-claimed)}
+.tip-closed{fill:var(--edge-closed)}
+.tip-blocked{fill:var(--edge)}
+.tip-out-of-scope{fill:var(--edge-out-of-scope)}
+.tip{fill:var(--edge)}
+svg:has(.n:hover) .n{opacity:.3}
+svg:has(.n:hover) .n:hover{opacity:1}
+svg:has(.n:hover) path.edge{opacity:.12}
+svg:has(.n:hover) circle.port{opacity:.12}
+
+/* palline sugli archi del nodo selezionato (A05, edges.js, porta di
+   pulse.tsx): il moto e' tutto in SMIL sul path dell'arco, qui restano solo
+   colore e misura. Deliberatamente fuori da ':is(path.edge,circle.port)' e
+   da ogni regola di spegnimento allo hover qui sopra: selezione e hover sono
+   due segnali distinti, e le palline restano il segnale della selezione
+   anche mentre il mouse mette a fuoco un altro nodo. */
+.edge-dots circle{fill:var(--ink)}
+.edge-dots-still{fill:none;stroke:var(--ink);stroke-width:4.5;stroke-linecap:round;
+  stroke-dasharray:0 30;pointer-events:none}
+
+/* filtro per stato dal chip di legenda */
+body[data-filter="frontier"] .n:not(.st-frontier),
+body[data-filter="claimed"] .n:not(.st-claimed),
+body[data-filter="closed"] .n:not(.st-closed),
+body[data-filter="blocked"] .n:not(.st-blocked),
+body[data-filter="out-of-scope"] .n:not(.st-out-of-scope){opacity:.13}
+body[data-filter] path.edge{opacity:.25}
+
+/* dal pannello alla mappa: il quadratino del titolo prende il colore dello
+   stato, e passare il mouse sul blocco (o sul suo chip di legenda) accende
+   sulla mappa i soli nodi di quello stato */
+.blocco[data-hl="frontier"] h2::before{background:var(--st-frontier)}
+.blocco[data-hl="claimed"] h2::before{background:var(--st-claimed)}
+.blocco[data-hl="closed"] h2::before{background:var(--st-closed)}
+.blocco[data-hl]:hover{border-color:var(--border-strong)}
+/* il titolo del blocco e' una presa come il chip: ci si passa sopra per vedere,
+   ci si clicca per fissare */
+.blocco[data-hl] > h2{cursor:pointer}
+.blocco[data-hl] > h2:hover{color:var(--ink)}
+.side:has([data-hl="frontier"]:hover) ~ .map .n:not(.st-frontier),
+.map:has(.chip.st-frontier:hover) .n:not(.st-frontier){opacity:.13}
+.side:has([data-hl="claimed"]:hover) ~ .map .n:not(.st-claimed),
+.map:has(.chip.st-claimed:hover) .n:not(.st-claimed){opacity:.13}
+.side:has([data-hl="closed"]:hover) ~ .map .n:not(.st-closed),
+.map:has(.chip.st-closed:hover) .n:not(.st-closed){opacity:.13}
+.map:has(.chip.st-blocked:hover) .n:not(.st-blocked){opacity:.13}
+.map:has(.chip.st-out-of-scope:hover) .n:not(.st-out-of-scope){opacity:.13}
+.side:has([data-hl]:hover) ~ .map :is(path.edge,circle.port),
+.map:has(.legend .chip:hover) :is(path.edge,circle.port){opacity:.25}
+
+/* dalla riga alla mappa: il mouse su una voce dei pannelli (o su un id citato
+   nell'avviso) mette a fuoco quel nodo e i suoi archi; le regole per-nodo
+   stanno nello stile generato */
+body:has(.side [data-node]:hover) .map .n,body:has(.notifiche [data-node]:hover) .map .n{opacity:.25}
+body:has(.side [data-node]:hover) .map :is(path.edge,circle.port),
+body:has(.notifiche [data-node]:hover) .map :is(path.edge,circle.port){opacity:.12}

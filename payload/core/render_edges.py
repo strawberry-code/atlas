@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 
+from .edge_geometry import LOOP_DASH, loop_path, smooth_step_path
 from .theme import STATE, state_of
 
 # le chiavi di ramo sono dati liberi ma finiscono in un selettore: una chiave
@@ -31,8 +32,15 @@ def _slots(ids: list[str], pos: dict, box_x: float, larghezza: float) -> dict[st
 
 
 def edges(data: dict, pos: dict, front_ids: set[str]) -> str:
-    """Bezier verticale dal bordo basso del blocker al bordo alto del bloccato,
-    con una porta di aggancio (cerchietto) a ogni estremo.
+    """Arco ortogonale dal bordo basso del blocker al bordo alto del bloccato
+    (edge_geometry.smooth_step_path, porta di Nodavia: A01), con una porta di
+    aggancio (cerchietto) sull'uscita.
+
+    Un arco che risale, cioe' il bloccato non sta sotto il blocker nel layout a
+    rank (C08: 'un arco che risale e' sempre un ritorno'), non passa da questa
+    geometria: prende loop_path, la corsia laterale con tratteggio (LOOP_DASH)
+    che lo distingue a colpo d'occhio da un arco sano, altrimenti un giro corto
+    in colonna si confonderebbe con uno in avanti.
 
     data-from/data-to reggono l'evidenziazione al passaggio del mouse (vedi
     hover_css). Ogni arco porta invece la classe da-<stato> del nodo da cui parte,
@@ -62,14 +70,23 @@ def edges(data: dict, pos: dict, front_ids: set[str]) -> str:
         for dep in deps:
             sy = pos[dep][1] + H
             sx, ex = punti_uscita[dep][nid], punti_entrata[nid][dep]
-            gap = ey - sy
-            mid = sy + gap / 2
-            piede = min(14, gap / 3)  # tratto retto finale: orientamento del marker inequivocabile
             da = f"da-{stato_di[dep]}"
+            if ey > pos[dep][1]:
+                d, classi, tratto = smooth_step_path(sx, sy, ex, ey), f"edge {da}", ""
+            else:
+                d = loop_path(sx, sy, ex, ey)["d"]
+                classi, tratto = f"edge loop {da}", f' stroke-dasharray="{LOOP_DASH}"'
             out.append(
-                f'<path class="edge {da}" data-from="{dep}" data-to="{nid}" '
-                f'd="M{sx},{sy} C{sx},{mid} {ex},{mid} {ex},{ey - piede} L{ex},{ey}" '
-                f'marker-end="url(#tip-{stato_di[dep]})"/>'  # spessore e colore: dashboard.css
+                # data-sx/sy/ex/ey: i due punti di aggancio della geometria non
+                # gappata, che il JS non deve riparsare dalla 'd'. Restano gli
+                # unici quattro numeri che C10 non tocca mai: quando drag.js
+                # sposta un nodo ricalcola 'd' e le cx/cy delle porte, ma questi
+                # quattro restano il riferimento "a riposo" per ogni ricalcolo
+                # successivo, e per il ripristino del layout automatico.
+                f'<path class="{classi}" data-from="{dep}" data-to="{nid}" '
+                f'data-sx="{sx}" data-sy="{sy}" data-ex="{ex}" data-ey="{ey}"{tratto} '
+                f'd="{d}" '
+                f'marker-end="url(#tip-{stato_di[dep]})"/>'  # spessore e colore: edges.css
                 f'<circle class="port {da}" data-from="{dep}" data-to="{nid}" cx="{sx}" cy="{sy}" r="2.6"/>'
             )
     return "".join(out)
@@ -79,7 +96,7 @@ def hover_css(ids: list[str]) -> str:
     """Le regole per nodo: attivano archi e porte entranti/uscenti al passaggio
     del mouse sul nodo stesso o sulla sua riga nei pannelli laterali, e in quel
     secondo caso mettono in evidenza anche il nodo. Generate qui perche'
-    dipendono dagli id del grafo, a differenza del tema statico (dashboard.css).
+    dipendono dagli id del grafo, a differenza del tema statico (edges.css).
 
     L'evidenziazione ingrossa la linea e non la ricolora. Prima dipingeva di verde
     gli entranti e di rosso gli uscenti, e su un arco che porta gia' il colore del
@@ -108,7 +125,7 @@ def hover_css(ids: list[str]) -> str:
 def branch_css(keys: list[str]) -> str:
     """Una regola per ramo: il mouse sulla riga del pannello rami accende sulla
     mappa i soli nodi di quel ramo. Generata qui perche' i rami, come gli id,
-    sono dati del grafo; il resto del tema e' statico (dashboard.css)."""
+    sono dati del grafo; il resto del tema e' statico (edges.css)."""
     out = []
     for k in keys:
         if not _CHIAVE_SICURA.match(k):

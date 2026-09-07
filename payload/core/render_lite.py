@@ -14,6 +14,14 @@ S11/4). Riusa render_svg.py e render_table.py in quanto disegnano solo
 struttura, titoli e stati; esclude render_panels.py e render_notifiche.py,
 che mostrano prosa (destinazione del grafo, domande aperte, riassunti delle
 Interazioni) fuori da quell'elenco chiuso.
+
+CSS: leggi_css_lite() (S09), non leggi_css_dashboard() che usa render.py.
+Le due condividono la stessa concatenazione (risorse.py) ma non lo stesso
+elenco di fogli: qui fuori sheet.css e notifiche.css (nessuna scheda ne'
+pannello Notifiche in questa pagina) e fuori grafite.fonts.inline.css, 208KB
+di font incorporati in base64 che su una foto per Telegram pesano piu' di
+quel che rendono - i fallback di sistema di grafite.offline.css bastano.
+Misurato: 280KB -> 60KB di CSS concatenato (tests/test_render_lite.py).
 """
 from __future__ import annotations
 
@@ -22,10 +30,9 @@ from html import escape
 from . import render_svg, render_table, theme
 from .config import Graph
 from .model import claimed, frontier, progress
-from .risorse import leggi_template
+from .risorse import leggi_css_lite
 from .strings import current, t
 from .theme import ORDER, STATE, css_class
-from .topology import levels
 
 
 def _topbar(data: dict, front: list[dict], presi: list[dict]) -> str:
@@ -53,9 +60,8 @@ def _legenda() -> str:
 
 def build(ref: Graph, data: dict) -> str:
     """La pagina intera, gia' pronta da scrivere su disco o da dare a un
-    browser: stesso foglio di stile della dashboard vera (dashboard.css),
-    cosi' la foto e la pagina vera si somigliano."""
-    depth = levels(data)
+    browser: stesso foglio di stile della dashboard vera, cosi' la foto e la
+    pagina vera si somigliano."""
     front = frontier(data)
     presi = claimed(data)
     front_ids = {n["id"] for n in front}
@@ -63,10 +69,10 @@ def build(ref: Graph, data: dict) -> str:
         f'<!doctype html><html lang="{current()}"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         f'<title>{escape(data["meta"]["title"])} · atlas</title>'
-        f'<style>{leggi_template("dashboard.css")}</style></head><body>'
+        f'<style>{leggi_css_lite()}</style></head><body>'
         f'{_topbar(data, front, presi)}'
         f'<main class="map"><div class="viewport">'
-        f'{render_svg.canvas(data, depth, front_ids, {}, lite=True)}</div>'
+        f'{render_svg.canvas(data, front_ids, {}, lite=True)}</div>'
         f'<div class="legend">{_legenda()}</div></main>'
         f'{render_table.table(data, front_ids)}'
         '</body></html>'

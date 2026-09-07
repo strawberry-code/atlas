@@ -8,6 +8,11 @@ stessa scheda-ticket, senza JavaScript dedicato a questa vista. L'ordinamento
 e' tutto lato client (dashboard.js): ogni cella porta gia' un data-v pronto
 al confronto, cosi' il JS non deve interpretare testo di dominio (uno stato
 si ordina per gravita', non per alfabeto).
+
+Le intestazioni portano '.label-xs' (Grafite, G03): l'eyebrow che gia' vestiva
+i pannelli, qui su un'unica riga di colonna invece che sopra un titolo. La
+cella del costo porta '.num' (table.css): l'unica colonna che deve incolonnare
+cifre vere, quindi mono tabellare e allineata a destra; le altre restano testo.
 """
 from __future__ import annotations
 
@@ -26,14 +31,16 @@ _COLONNE = (
 
 def _head() -> str:
     voci = "".join(
-        f'<th scope="col" data-col="{i}" title="{escape(t("render.tbl_ordina"))}">{escape(t(chiave))}</th>'
+        f'<th scope="col" class="label-xs" data-col="{i}" title="{escape(t("render.tbl_ordina"))}">'
+        f'{escape(t(chiave))}</th>'
         for i, chiave in enumerate(_COLONNE)
     )
     return f'<thead><tr>{voci}</tr></thead>'
 
 
-def _td(html: str, sort: str) -> str:
-    return f'<td data-v="{escape(sort)}">{html}</td>'
+def _td(html: str, sort: str, classe: str = "") -> str:
+    attr = f' class="{classe}"' if classe else ""
+    return f'<td data-v="{escape(sort)}"{attr}>{html}</td>'
 
 
 def _riga(node: dict, ramo: dict, i_ramo: int, stato: str) -> str:
@@ -56,7 +63,7 @@ def _riga(node: dict, ramo: dict, i_ramo: int, stato: str) -> str:
         _td(escape(tipo_modo), tipo_modo),
         _td(escape(nomi) if nomi else f'<i class="tmuted">{escape(t("render.tbl_non_assegnato"))}</i>', nomi),
         _td(escape(costo) if costo else f'<i class="tmuted">{escape(t("render.costo_ignoto"))}</i>',
-            "" if numero_costo is None else f"{numero_costo:g}"),
+            "" if numero_costo is None else f"{numero_costo:g}", classe="num"),
         _td(f'<span class="tclip" title="{deps}">{deps}</span>', str(len(node["blockedBy"]))),
     )
     return f'<tr data-node="{escape(node["id"])}">{"".join(celle)}</tr>'

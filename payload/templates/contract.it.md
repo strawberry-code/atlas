@@ -15,6 +15,8 @@ atlas fog "una riga" --for <ID>  # appunta ciò che è emerso, indirizzato a un 
 
 `atlas serve` tiene la dashboard viva su `http://127.0.0.1`, la rigenera quando `graph.json` cambia e spinge il reload al browser già aperto; con `lock.remote` attivo mostra anche i lucchetti delle altre macchine.
 
+La dashboard non è un'immagine statica: il grafo si pana, si zooma, si rinquadra con un bottone, si segue sulla minimap e si naviga da tastiera. Ogni card si trascina dove serve, con la posizione ricordata per macchina. Il pannello di destra si apre e si chiude solo col suo bottone o con Escape, mai per un clic altrove; mostra due viste, Notifiche e il Dettaglio del nodo selezionato, e cliccare un nodo cambia quale delle due si vede senza chiudere il resto. Il tema è quello di Grafite, senza variante scura.
+
 Autopilot conserva l'ultima esecuzione in `run-state.json` accanto a `graph.json`. `atlas run-status` mostra se il run è attivo, in attesa, fallito, bloccato o completato, insieme a nodo, provider, tentativo, retry, frontiera e blocker residui. `atlas run-log` stampa la cronologia persistente di claim, provider, fallback, attese, backoff, chiusure e aggiornamenti della frontiera; `--tail N` limita l'uscita. Il ledger descrive ciò che è accaduto, ma non conserva processi e non autorizza il resume di un agente dopo un'interruzione.
 
 ### Run Autopilot

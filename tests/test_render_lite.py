@@ -74,5 +74,34 @@ class RenderLite(unittest.TestCase):
         self.assertIn(DOMANDA_SEGRETA, html)
 
 
+class CssAlleggerito(unittest.TestCase):
+    """S09: la pagina alleggerita non eredita per inerzia i fogli della
+    dashboard vera. leggi_css_dashboard() resta usato da render.py."""
+
+    def test_niente_font_incorporati_ne_fogli_di_chrome_non_usati(self):
+        from core.risorse import leggi_css_lite, leggi_template
+
+        css = leggi_css_lite()
+        # i font base64 (208KB) non ci sono: un frammento del preambolo del
+        # foglio font basta a escluderlo senza decodificare 200KB di dati
+        self.assertNotIn("Variante incorporabile di grafite.css", css)
+        # sheet.css (scheda ticket) e notifiche.css (pannello Notifiche):
+        # nessuno dei due componenti vive su questa pagina
+        self.assertNotIn(leggi_template("sheet.css"), css)
+        self.assertNotIn(leggi_template("notifiche.css"), css)
+        # la struttura che il grafo e la tabella disegnano davvero resta
+        self.assertIn(leggi_template("canvas.css"), css)
+        self.assertIn(leggi_template("table.css"), css)
+
+    def test_pesa_una_frazione_della_dashboard_vera(self):
+        """Non un numero magico: solo la prova che il taglio e' reale, non
+        un fogli-in-piu'-fogli-in-meno che si annulla nel totale."""
+        from core.risorse import leggi_css_dashboard, leggi_css_lite
+
+        pesante = len(leggi_css_dashboard())
+        leggero = len(leggi_css_lite())
+        self.assertLess(leggero, pesante // 2)
+
+
 if __name__ == "__main__":
     unittest.main()

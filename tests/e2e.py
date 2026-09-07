@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -194,7 +195,12 @@ def main() -> int:
                                 .read_text(encoding="utf-8"))["nodes"]) == 0, "i due grafi restano isolati")
 
         html = (radice / "graphs" / datato("epic-test") / "dashboard.html").read_text(encoding="utf-8")
-        verifica(" src=" not in html and "<link" not in html and "cdn" not in html,
+        # "cdn" come sottostringa non basta piu': i font di Grafite sono base64 inline
+        # e su un blob di centinaia di KB una tripletta di caratteri ricorre per caso.
+        # Il controllo vero e' che non compaia nessun URL http(s) reale, a parte
+        # l'xmlns SVG (che lo contiene per specifica, non per un caricamento remoto).
+        riferimenti_remoti = [m for m in re.findall(r'https?://[^\s"\')]+', html) if "w3.org" not in m]
+        verifica(" src=" not in html and "<link" not in html and not riferimenti_remoti,
                  "dashboard senza risorse remote: stile, script e ticket viaggiano inline")
         verifica("è" in html and "Ã" not in html, "accenti resi bene nella dashboard")
 

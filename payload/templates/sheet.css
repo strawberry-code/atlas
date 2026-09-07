@@ -1,0 +1,100 @@
+a{text-decoration:none;color:inherit}
+/* ---------- vista Nodo: il ticket dentro il pannello destro (S11) ----------
+   Non e' piu' una scheda modale: niente '.scrim', niente posizionamento
+   assoluto ne' animazione d'ingresso, il '.sheet' e' un figlio in flusso come
+   '.panel-vista-notifiche', stessa colonna. 'display:flex;flex-direction:
+   column' e' quanto basta qui: 'flex:1;min-height:0' (chi decide se questa
+   vista e' quella visibile) vive nella regola comune '.panel-vista' di
+   notifiche.css, non duplicata qui. */
+.sheet{display:flex;flex-direction:column}
+.sheet-head{position:relative;padding:18px 22px 13px;border-bottom:1px solid var(--border)}
+.sheet-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 36px 10px 0;min-height:20px}
+/* stessa veste di '.chip-state' (Grafite): pillola mono senza bordo, su
+   --bg-soft. Qui il pallino diventa il glifo di stato (o l'anello fermo),
+   perche' un pallino nudo non si legge in scala di grigi. */
+.schip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;
+  letter-spacing:.02em;padding:4px 10px;border-radius:8px;color:var(--muted);
+  background:var(--bg-soft);font-family:var(--mono)}
+.schip.state{color:var(--sc)}
+/* l'anello dei nodi in lavorazione: gira finche' il nodo resta rivendicato */
+@keyframes atlas-spin{to{transform:rotate(360deg)}}
+.spin{transform-box:fill-box;transform-origin:center;animation:atlas-spin 1.15s linear infinite}
+.spin-arc{stroke:var(--st-claimed)}
+/* Lo stesso anello fermo, dove lo stato e' un'etichetta e non un nodo al lavoro.
+   Il nome non e' .ring, che e' gia' l'anello dell'avanzamento largo 92px: chiamarli
+   uguale faceva ereditare quella misura e il marcatore usciva grande come la card. */
+.st-ring{flex:none;vertical-align:-1px}
+@media (prefers-reduced-motion: reduce){.spin{animation:none}}
+
+/* la figura del ramo (.bshape) e il suo segno sulla card (.bmark) vivono in
+   tokens.css/canvas.css: la pagina alleggerita non carica questo foglio, e
+   card e pannelli disegnano comunque quella figura (vedi tokens.css). Qui
+   resta solo cio' che e' davvero della scheda: lo scarto dal testo del chip. */
+.schip .bshape{margin-right:1px}
+.sheet-close{position:absolute;top:14px;right:14px;width:30px;height:30px;border:none;
+  border-radius:9px;background:var(--bg-soft);color:var(--muted);cursor:pointer;
+  font-size:13px;line-height:1;display:grid;place-items:center;
+  transition:color var(--t-fast) var(--e-soft),background var(--t-fast) var(--e-soft),
+    transform var(--t-fast) var(--e-soft)}
+.sheet-close:hover{color:var(--ink);background:var(--bg-hover);transform:translateY(-1px)}
+.sheet-close:active{transform:translateY(0) scale(.98)}
+.sheet-title{margin:0;font-size:14.5px;font-weight:700;letter-spacing:.01em;
+  text-transform:none;color:var(--ink);display:block;font-family:var(--display)}
+.sheet-title .sid{color:var(--ink);font-size:13px;margin-right:8px;font-family:var(--mono)}
+
+/* click-to-copy: si annuncia con un sottolineato appena accennato e conferma con
+   una parola, perche' negli appunti non si vede se e' arrivato qualcosa. La
+   conferma sta in ::after e non sostituisce il testo, cosi' la riga non si
+   accorcia sotto il puntatore mentre la si legge. */
+[data-copy]{cursor:copy;text-decoration:underline;text-decoration-style:dotted;
+  text-underline-offset:3px;text-decoration-color:var(--border-strong)}
+[data-copy]:hover{text-decoration-color:var(--ink);color:var(--ink)}
+[data-copy].copiato::after{content:" " attr(data-copiato);color:var(--ok);
+  font-size:9.5px;letter-spacing:.06em;text-decoration:none}
+.sheet-title .stt{text-decoration-color:transparent}
+.sheet-title .stt:hover{text-decoration-color:var(--ink)}
+.sheet-question{margin:6px 0 0;color:var(--muted);font-size:11px;line-height:1.5;font-style:italic}
+.sheet-body{flex:1;overflow-y:auto;padding:16px 22px 22px;scrollbar-width:thin;
+  scrollbar-color:var(--border-strong) transparent}
+.sheet-foot{padding:11px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end}
+/* prima solo colore ad annunciare il link: rimosso il teal, l'affordance
+   diventa il sottolineato permanente (come '.md a'), non solo l'hover. */
+.sheet-foot a{color:var(--ink);font-size:11px;letter-spacing:.04em;
+  text-decoration:underline;text-underline-offset:2px}
+.sheet-empty{color:var(--faint);font-style:italic}
+.sheet-artifacts{margin:0;padding:0 22px 14px;list-style:none;flex:none;display:flex;flex-direction:column;gap:4px}
+.sheet-artifacts:empty{display:none;padding:0}
+.sheet-artifacts-label{font-size:9.5px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;
+  font-family:var(--display)}
+.sheet-artifacts code{font-size:10.5px;color:var(--ink);word-break:break-all}
+
+/* markdown renderizzato nella scheda: qui si legge, quindi sans, titoli inclusi
+   (qui i titoli sono prosa che scorre col corpo, non le label della chrome) */
+.md{font:13.5px/1.65 var(--sans);color:var(--ink)}
+.md h1,.md h2,.md h3,.md h4{margin:20px 0 8px;line-height:1.3;
+  color:var(--ink);text-transform:none;font-weight:650;letter-spacing:0;display:block;
+  font-family:var(--sans)}
+.md h2::before{display:none}
+.md h1{font-size:16px}.md h2{font-size:14.5px}.md h3{font-size:13.5px}.md h4{font-size:12.5px}
+.md h1:first-child,.md h2:first-child{margin-top:0}
+.md p{margin:8px 0}
+.md ul,.md ol{margin:8px 0;padding-left:22px}
+.md ul{list-style:disc}
+.md ol{list-style:decimal}
+.md li{display:list-item;padding:2px 0;margin:0;color:var(--ink);font-size:13.5px}
+.md blockquote{margin:10px 0;padding:2px 14px;border-left:2px solid var(--border-strong);
+  color:var(--muted)}
+.md code{background:var(--code-bg);padding:1px 5px;font-size:12px}
+.md pre{background:var(--code-bg);border:1px solid var(--border);
+  padding:12px 14px;overflow-x:auto;scrollbar-width:thin}
+.md pre code{background:none;padding:0;font-size:12px;line-height:1.55}
+.md a{color:var(--ink);text-decoration:underline;text-underline-offset:2px}
+.md hr{border:none;border-top:1px solid var(--border);margin:16px 0}
+/* La regola 'input,select,textarea' di Grafite pensa a un campo di modulo
+   (width:100%, padding largo, sfondo, bordo arrotondato): su una checkbox in
+   una lista quella larghezza al 100% la spinge fuori riga e il testo cade a
+   capo sotto, non accanto. Qui la casella torna piccola e inline, e il resto
+   della veste (colore, angoli, sfondo del campo) non le serve. */
+.md input[type="checkbox"]{accent-color:var(--ink);margin-right:6px;
+  width:13px;height:13px;padding:0;border:none;border-radius:3px;background:none;
+  vertical-align:-2px}

@@ -308,6 +308,10 @@ STRINGS: dict[str, dict[str, str]] = {
     "render.remoto_scaduto": {"it": "scaduto", "en": "expired"},
     "render.remoto_scade": {"it": "scade alle {ora}", "en": "expires at {ora}"},
     "render.remoto_ignoto": {"it": "scadenza ignota", "en": "unknown expiry"},
+    # claims.claim_state(): come si presenta un claim nella lista 'in lavorazione'
+    "render.claim_live": {"it": "attivo", "en": "live"},
+    "render.claim_idle": {"it": "in pausa", "en": "idle"},
+    "render.claim_dead": {"it": "interrotto", "en": "dead"},
 
     # --- doctor.py ---
     "doctor.remoto_rete": {"it": "il lucchetto remoto non risponde: le macchine non si "

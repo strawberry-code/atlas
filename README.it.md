@@ -73,9 +73,13 @@ Usa `atlas run-status` per leggere gli stati `active`, `waiting`, `failed`, `blo
 
 Un modo di orchestrare più nodi insieme, se il progetto ne ha molti prendibili: una sessione "principale" che guarda la frontiera e coordina, i nodi AFK delegati a sotto-agenti che lavorano in parallelo e scrivono i risultati nei rispettivi ticket, i nodi HITL riservati a una sessione dedicata. Non è una funzione del motore, è un modo di usarlo: Atlas resta la fonte di verità su cosa è fatto, chi coordina sopra è libero di organizzarsi come preferisce.
 
+## La dashboard
+
+`atlas render` e `atlas serve` producono una sola pagina HTML autosufficiente, vestita col design system Grafite, senza variante scura. Il grafo è un canvas vero, non un disegno statico: lo si pana e zooma, lo si rinquadra con un bottone, lo si segue sulla minimap, si trascina una card dove serve (le posizioni restano ricordate per macchina), oppure ci si muove da tastiera. Un bottone solo apre un pannello a destra con due viste, Notifiche e il Dettaglio di un nodo: cliccare un nodo porta il pannello su quel nodo senza chiudere nient'altro. Il pannello si apre o si chiude solo dal suo bottone o con Escape, mai per un clic altrove.
+
 ## Atlas Interactions
 
-Il pannello Notifiche sulla destra della dashboard trasforma nodi HITL, run bloccati, retry esauriti e END in card azionabili, risolte con `atlas serve` attivo, senza polling: una risposta valida risveglia Autopilot subito al commit. Gli avvisi browser e di sistema funzionano senza configurazione; un profilo Himalaya già configurato sulla macchina aggiunge alert ed escalation via email; un bottone di pairing Telegram one-tap (nessun token, chat ID o hostname da digitare) aggiunge azioni con bottoni inline tramite un Atlas Relay opt-in. Setup, diagnostica e prerequisiti di deploy del relay Telegram sono in `docs/atlas-interactions-quickstart.md`.
+Una delle due viste di quel pannello a destra trasforma nodi HITL, run bloccati, retry esauriti e END in card azionabili, risolte con `atlas serve` attivo, senza polling: una risposta valida risveglia Autopilot subito al commit. Gli avvisi browser e di sistema funzionano senza configurazione; un profilo Himalaya già configurato sulla macchina aggiunge alert ed escalation via email; un bottone di pairing Telegram one-tap (nessun token, chat ID o hostname da digitare) aggiunge azioni con bottoni inline tramite un Atlas Relay opt-in. Setup, diagnostica e prerequisiti di deploy del relay Telegram sono in `docs/atlas-interactions-quickstart.md`.
 
 ## Installare il CLI
 

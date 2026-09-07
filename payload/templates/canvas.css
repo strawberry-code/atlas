@@ -1,0 +1,144 @@
+/* ---------- mappa del grafo ---------- */
+.map{grid-area:map;position:relative;min-width:0;min-height:0;overflow:hidden;background:var(--bg)}
+.viewport{
+  position:absolute;inset:0;overflow:hidden;cursor:grab;
+  /* Il contenitore che ritaglia: la griglia vive qui, non sul pannello, cosi'
+     copre tutta la superficie visibile anche oltre il bordo del grafo. Un
+     punto per cella invece di due linee incrociate, perche' un punto scala
+     col raggio (canvas.js lo ricalcola da stato.k a ogni frame) mentre una
+     linea a spessore fisso non lo farebbe: senza quel ricalcolo, a zoom molto
+     basso il passo si stringe ma lo spessore resta lo stesso, e la griglia
+     collassa in una nebbia grigia invece di restare puntini leggibili. */
+  background-image:radial-gradient(circle,var(--gridline) 1px,transparent 1.55px);
+  background-size:22px 22px;
+  background-position:0 0;
+}
+.viewport.trascina{cursor:grabbing;user-select:none}
+/* setPointerCapture (canvas.js/minimap.js/drag.js) tiene il gesto vivo anche
+   quando il puntatore esce dal riquadro che lo ha catturato e passa sopra il
+   resto della pagina (legenda, colonna dei pannelli): li' la regola locale
+   sopra non ha effetto, quegli elementi non sono discendenti del viewport
+   (C13). body.trascina sopprime la selezione ovunque per la durata del gesto;
+   ogni modulo che la aggiunge la toglie sempre, anche su pointercancel o
+   rilascio fuori dal riquadro, mai solo sul percorso lineare. */
+body.trascina{user-select:none}
+/* Fallback statico (S09/render_lite.py, senza canvas.js: niente '.pannello',
+   l'svg e' figlio diretto del viewport): lo stesso respiro che aveva la mappa
+   prima del transform. */
+.viewport>svg{display:block;margin:64px 26px 46px}
+.pannello{position:absolute;top:0;left:0;transform-origin:0 0}
+/* overflow:visible scavalca il default UA (hidden) dell'svg: il suo viewBox
+   e' calcolato una volta sola sul layout d'origine (render_svg.canvas) e non
+   si allarga quando drag.js sposta una card fuori da quel riquadro (C10).
+   Senza, l'svg ritaglierebbe da solo card e archi trascinati oltre il bordo
+   calcolato; il ritaglio vero (a schermo) resta a '.viewport{overflow:hidden}'. */
+.pannello svg{display:block;overflow:visible}
+
+/* Controls Grafite: zoom avanti/indietro, rinquadra, lucchetto (C05).
+   '.gf-controls'/'.gf-controls-button' sono le ricette di Grafite (raggio,
+   ombra, sfondo per bottone, hover, fill delle icone per eredita'): qui solo
+   posizione, dimensione dei bottoni, e gli stati che Grafite non conosce
+   perche' sono semantica del grafo (disabilitato a un limite di zoom,
+   lucchetto attivo), non del design system. */
+.controls{position:absolute;left:14px;bottom:14px;z-index:2;display:flex;flex-direction:column}
+.gf-controls-button{width:32px;height:32px;display:grid;place-items:center;border:none}
+.gf-controls-button svg{width:16px;height:16px}
+.gf-controls-button:disabled{opacity:.35;cursor:default;pointer-events:none}
+.gf-controls-button[data-lock][aria-pressed="true"]{background:var(--line)}
+
+/* Minimap Grafite: sagoma di tutti i nodi colorata per STATO, non per tipo
+   come in Nodavia (contratto S5) - su un grafo grande e' l'unico posto da cui
+   si vede a colpo d'occhio dove sono i nodi prendibili. Contenuto (svg, nodi,
+   rettangolo della vista, maschera) costruito interamente da minimap.js che
+   legge le posizioni gia' disegnate da render_svg.canvas: qui solo posizione,
+   dimensione, e le tinte che il modulo non porta con se'. */
+.minimap{position:absolute;right:14px;bottom:14px;z-index:2;width:200px;height:150px;
+  cursor:grab;background:var(--bg)}
+.minimap.trascina{cursor:grabbing}
+.minimap svg{display:block;width:100%;height:100%}
+.minimap .mn{opacity:.92}
+.minimap .mn.st-frontier{fill:var(--st-frontier)}
+.minimap .mn.st-claimed{fill:var(--st-claimed)}
+.minimap .mn.st-closed{fill:var(--st-closed)}
+.minimap .mn.st-blocked{fill:var(--st-blocked)}
+.minimap .mn.st-out-of-scope{fill:var(--st-out-of-scope)}
+.minimap .mm-mask{fill:rgba(250,250,250,.78)}
+.minimap .mm-frame{fill:none;stroke:var(--border-strong);stroke-width:1.5}
+
+/* Una riga sola, mai a capo: senza vincolo cresce verso l'alto (e' ancorato
+   al basso) e su una mappa stretta (poca larghezza fra i controlli e la
+   minimap, o l'intero .map quando la finestra e' sotto 880px) finiva sopra
+   una card del grafo invece che sotto di essa (V06, visto in foto a 600px).
+   Il ritaglio e' lo stesso di '.sub' in shell.css: e' un suggerimento, non un
+   contenuto che deve arrivare intero. */
+.hint{
+  position:absolute;left:64px;bottom:12px;right:222px;z-index:2;color:var(--faint);
+  font-size:9.5px;pointer-events:none;letter-spacing:.03em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+/* ---------- i nodi: carta bianca flottante, come customNodes.tsx ----------
+   Struttura SVG (non foreignObject: 'rect.card' resta l'aggancio a cui
+   render_edges.hover_css() lega le sue regole, A03): .neyebrow+.ndot sono la
+   riga rf-head (tipo a sinistra, stato a destra), .nid l'id sotto, .ntt il
+   corpo, .nfoot il footer (modo, assegnatario, costo). */
+.neyebrow{font:500 9px var(--display);letter-spacing:.13em;text-transform:uppercase;fill:var(--faint)}
+.ndot{font:11px var(--mono)}
+.nid{font:500 14px var(--display);letter-spacing:-.01em}
+.ntt{font:11.5px var(--display);fill:var(--ink)}
+.nfoot{font:9.5px var(--mono);fill:var(--muted)}
+
+/* --dragx/--dragy (C10, positions.js/drag.js): lo scarto in spazio-grafo di
+   una card spostata a mano, sempre 0px finche' nessuno la tocca. E' una
+   proprieta' CSS apposta perche' un transform CSS sull'hover sovrascriverebbe
+   per intero (non compone con) un transform-attributo SVG: comporle qui
+   invece le somma. */
+.n{cursor:pointer;--dragx:0px;--dragy:0px;
+  transform:translate(var(--dragx),var(--dragy));
+  transition:opacity .15s ease,transform .15s ease}
+.n rect.card{transition:stroke-width .15s ease,filter .15s ease;
+  filter:drop-shadow(0 6px 14px rgba(10,10,10,.14))}
+/* Sollevamento all'hover: la carta si stacca, come .kpi:hover in Grafite
+   (stessa traslazione verticale, ombra un filo piu' profonda), sommata allo
+   scarto del trascinamento invece di rimpiazzarlo. */
+.n:hover{transform:translate(var(--dragx),var(--dragy)) translateY(-3px)}
+/* Mentre drag.js muove la card ad ogni pointermove, la transizione da .15s
+   la farebbe inseguire il puntatore in ritardo: si spegne solo per la durata
+   del gesto (drag.js toglie la classe al rilascio). */
+.n.trascina{transition:none}
+.n:hover rect.card{stroke-width:2.2;filter:drop-shadow(0 10px 20px rgba(10,10,10,.2))}
+/* Il segno della figura di ramo nell'angolo della card (render_svg.py):
+   spento un filo a riposo, pieno quando il nodo e' sotto il puntatore. Vive
+   qui e non in sheet.css (da cui l'ha spostato Q03) perche' e' la card a
+   volerlo, e la pagina alleggerita disegna la card senza caricare sheet.css. */
+.bmark{opacity:.9}
+.n:hover .bmark{opacity:1}
+/* Selezione: anello interno come '.gf-node.sel' di Grafite (inset 1.5px,
+   colore ink), qui un secondo rect perche' il primo porta gia' il colore di
+   stato e non puo' portarne un secondo. Nasce col clic (sheet.js): un nodo
+   solo alla volta, la classe sta qui e chi la legge (A05, C12) non deve
+   sapere come ci e' arrivata. */
+.selring{pointer-events:none;stroke:var(--ink);stroke-width:1.5;opacity:0;transition:opacity .1s ease}
+.n.sel .selring{opacity:1}
+/* Il focus da tastiera (C12, keyboard.js) nasce sullo stesso '.sel': niente
+   contorno nativo del link sopra, che sarebbe un secondo anello scoordinato. */
+a[data-node]:focus{outline:none}
+/* Tutti i bordi hanno lo stesso spessore a riposo: la gerarchia la porta il
+   colore, che e' pieno, e un bordo piu' spesso in piu' sarebbe la stessa cosa
+   detta due volte. Resta il solo ispessimento dell'hover, che non distingue
+   uno stato ma risponde al puntatore.
+   Il chiuso arretra col colore e non con la trasparenza: a .72 il velo mangiava
+   proprio il verde che distingue un nodo finito da uno fermo. */
+.st-closed{opacity:.9}
+.st-closed .ntt{fill:var(--muted)}
+
+.st-frontier rect.card{fill:var(--st-frontier-bg);stroke:var(--st-frontier)}
+.st-claimed rect.card{fill:var(--st-claimed-bg);stroke:var(--st-claimed)}
+.st-closed rect.card{fill:var(--st-closed-bg);stroke:var(--st-closed)}
+.st-blocked rect.card{fill:var(--st-blocked-bg);stroke:var(--st-blocked)}
+.st-out-of-scope rect.card{fill:var(--st-out-of-scope-bg);stroke:var(--st-out-of-scope)}
+.st-frontier .nid,.st-frontier .ndot{fill:var(--st-frontier-tx)}
+.st-claimed .nid,.st-claimed .ndot{fill:var(--st-claimed-tx)}
+.st-closed .nid,.st-closed .ndot{fill:var(--st-closed-tx)}
+.st-blocked .nid,.st-blocked .ndot{fill:var(--st-blocked-tx)}
+.st-out-of-scope .nid,.st-out-of-scope .ndot{fill:var(--st-out-of-scope-tx)}
+.st-out-of-scope .ntt{fill:var(--faint)}

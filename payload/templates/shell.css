@@ -1,0 +1,128 @@
+html{scrollbar-color:var(--border-strong) transparent;height:100%}
+body{
+  margin:0;height:100vh;overflow:hidden;color:var(--ink);background:var(--bg);
+  display:grid;grid-template-rows:54px 1fr;grid-template-columns:332px 1fr minmax(260px,380px);
+  grid-template-areas:"top top top" "side map notif";
+  font:12.5px/1.5 var(--sans);
+}
+/* Il tetto sale da 296 a 380 (S11): la terza colonna non ospita piu' solo le
+   notifiche, ospita anche il ticket (markdown, titoli, blocchi di codice), il
+   contenuto che ha piu' bisogno di respiro dei due. Non i vecchi 480px della
+   scheda modale: a 1024px lascerebbero alla mappa solo 1024-332-480=212px,
+   una fetta che si nota; 380px la lasciano a 312px, un taglio che si sente
+   meno della mappa di oggi (attuale: 1024-332-296=396px) senza soffocarla. Il
+   floor sale insieme, da 230 a 260, per la stessa ragione sul lato stretto. */
+:root[data-notifiche="chiuso"] body{grid-template-columns:332px 1fr 46px}
+/* La riga della mappa (terza) non puo' scendere sotto 270px: e' lo spazio che
+   la legenda (top:12px, alta al piu' 76px, legend.css) e la pulsantiera di
+   zoom (bottom:14px, cinque bottoni da 32px, canvas.css) si contendono nello
+   stesso angolo. 12+76=88 dall'alto, 14+160=174 dal basso: sotto 262px i due
+   si toccano. Un fr semplice lasciava alla mappa solo cio' che avanzava dopo
+   aver saziato side/notif fino al loro tetto in vh, e su una finestra bassa
+   (~800px) restavano 234px: legenda e controlli finivano a sovrapporsi
+   (V06). Il floor forza side/notif a cedere spazio prima, non dopo. */
+@media (max-width: 880px){
+  body{grid-template-rows:54px minmax(0,38vh) minmax(270px,1fr) minmax(0,26vh);grid-template-columns:minmax(0,1fr);
+    grid-template-areas:"top" "side" "map" "notif"}
+  :root[data-notifiche="chiuso"] body{grid-template-columns:minmax(0,1fr);grid-template-rows:54px minmax(0,38vh) minmax(270px,1fr) 44px}
+}
+.topbar{
+  grid-area:top;display:flex;align-items:center;gap:14px;min-width:0;
+  padding:0 14px;border-bottom:1px solid var(--border);background:var(--pane-2);z-index:3;
+}
+/* --pane (chiaro) e non --bg-soft: la topbar e' gia' --pane-2, cioe' lo
+   stesso valore di --bg-soft, e il segno sarebbe sparito (Q03, in foto). */
+.mark{
+  flex:none;width:30px;height:30px;border-radius:9px;background:var(--pane);
+  display:grid;place-items:center;color:var(--ink);font-size:14px;font-family:var(--display);
+}
+.ident{min-width:0}
+/* '.section-title' (G03) impila l'eyebrow sopra il titolo con un gap piccolo:
+   qui non e' fine-sezione ma una riga della topbar, quindi il margin-bottom
+   della ricetta si azzera invece di lasciare un vuoto sotto l'ultimo readout. */
+.ident.section-title{margin-bottom:0;gap:2px}
+.wordmark{display:flex;align-items:center;gap:8px;min-width:0}
+.wordmark h1{min-width:0}
+h1{
+  margin:0;font-size:14px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--display);
+}
+/* '.eyebrow' (Grafite) da' font, tracking e colore; qui restano solo margin e
+   il ritaglio del testo lungo, che l'eyebrow non tratta. */
+.sub{margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sub code{color:var(--ink);background:none;padding:0}
+.spacer{flex:1}
+.readouts{display:flex;gap:10px;flex:none}
+@media (max-width: 720px){.readouts{display:none}}
+.ro{
+  display:flex;gap:8px;align-items:baseline;border-radius:10px;
+  background:var(--pane);padding:5px 12px;
+}
+.ro label{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);font-family:var(--display)}
+.ro b{font-size:18px;color:var(--ink);font-variant-numeric:tabular-nums;font-family:var(--mono)}
+
+.side{
+  grid-area:side;min-height:0;min-width:0;overflow-y:auto;background:var(--bg);
+  border-right:1px solid var(--border);padding:14px;
+  scrollbar-width:thin;scrollbar-color:var(--border-strong) transparent;
+  display:flex;flex-direction:column;gap:12px;z-index:2;
+}
+@media (max-width: 880px){.side{border-right:none;border-bottom:1px solid var(--border)}}
+h2{
+  margin:0 0 9px;font-size:9.5px;font-weight:700;letter-spacing:.16em;
+  color:var(--muted);text-transform:uppercase;display:flex;align-items:center;gap:7px;
+  font-family:var(--display);
+}
+h2::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--ink);flex:none}
+ul{margin:0;padding:0;list-style:none}
+/* '.row-dense' (G03) da' il resto: padding, hover che scivola a destra,
+   cursor. Divisorio hairline fra le righe, non gradienti ne' bordi a scatola. */
+.panel-dense li+li{border-top:1px solid var(--line)}
+li{padding:4px 6px;margin:0 -6px;color:var(--muted);font-size:11.5px;
+  display:flex;gap:8px;align-items:baseline;transition:background-color var(--t-fast) var(--e-soft)}
+li[data-node],li[data-owner]{cursor:pointer}
+li[data-owner]:hover{background:var(--code-bg)}
+li[data-owner].on{background:var(--code-bg);box-shadow:inset 2px 0 0 var(--ink)}
+li b{color:var(--ink);font-weight:700;font-size:11px;transition:color var(--t-fast) var(--e-soft);font-family:var(--mono)}
+.tag{margin-left:auto;font-size:9.5px;color:var(--faint);white-space:nowrap;
+  max-width:45%;overflow:hidden;text-overflow:ellipsis;flex:none;font-family:var(--mono)}
+/* Le righe dense (G03) portano gia' padding/hover/reveal: qui solo il ritaglio
+   del testo lungo, che la ricetta non tratta perche' e' layout-agnostica. */
+.row-dense-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row-dense-meta{max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* avviso: il grafo non converge nel nodo finale */
+.blocco.caution{border-color:var(--st-frontier)}
+.blocco.caution h2{color:var(--st-frontier-tx)}
+.blocco.caution h2::before{background:var(--st-frontier)}
+.blocco.caution p{margin:0;font-size:11px;line-height:1.6;color:var(--muted)}
+.blocco.caution [data-node]{color:var(--ink);font-weight:700;cursor:pointer}
+
+/* avanzamento: anello con corona di tacche e frazione. Il riempimento si
+   disegna una volta all'apertura, in coppia col count-up del numero (vedi
+   dashboard.js), poi si ferma. */
+.ring-wrap{display:flex;align-items:center;gap:14px}
+.ring{width:92px;height:92px;flex:none;transform:rotate(-90deg)}
+.ring-ticks{fill:none;stroke:var(--border-strong);stroke-width:3;stroke-dasharray:.5 2.5}
+.ring-bg{fill:none;stroke:var(--code-bg);stroke-width:9}
+.ring-fg{fill:none;stroke:url(#ringgrad);stroke-width:9;
+  stroke-dasharray:var(--p) 100;
+  animation:ringfill 1.1s cubic-bezier(.22,1,.36,1) backwards}
+@keyframes ringfill{from{stroke-dasharray:0 100}}
+.rg-a{stop-color:var(--ink)}
+.rg-b{stop-color:var(--ink)}
+.pct{font-size:26px;font-weight:700;letter-spacing:-.02em;display:block;
+  font-variant-numeric:tabular-nums;color:var(--ink);font-family:var(--mono)}
+.frac{font-size:10.5px;color:var(--faint);display:block;margin-top:1px;font-family:var(--mono)}
+.dest{margin:10px 0 0;color:var(--muted);font-size:11px;line-height:1.55}
+
+/* costo: numero-eroe */
+.pct-line{margin:0;font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink);font-family:var(--mono)}
+.pct-line span{font-size:10.5px;font-weight:400;color:var(--faint);margin-left:7px}
+.nota{margin:4px 0 0;color:var(--faint);font-size:10px}
+
+.blocco-chiusi ul{max-height:170px;overflow-y:auto;scrollbar-width:thin;
+  scrollbar-color:var(--border-strong) transparent}
+
+.firma{margin-top:auto;padding:8px 2px 0;color:var(--faint);font-size:9.5px;line-height:1.5}
+

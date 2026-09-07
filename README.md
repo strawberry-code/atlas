@@ -72,9 +72,13 @@ Use `atlas run-status` to read `active`, `waiting`, `failed`, `blocked` or `comp
 
 One way to orchestrate several nodes at once, if the project has many available: a "main" session that watches the frontier and coordinates, AFK nodes delegated to sub-agents that work in parallel and write their results into their own tickets, HITL nodes reserved for a dedicated session. This isn't a feature of the engine, it's just one way of using it: Atlas stays the source of truth on what's done, whoever's coordinating on top is free to organize however they like.
 
+## The dashboard
+
+`atlas render` and `atlas serve` produce one self-contained HTML page, styled by the Grafite design system, with no dark variant. The graph is a real canvas, not a static picture: pan and zoom it, fit it to the window with a button, follow it on the minimap, drag a card to a spot of its own (positions are remembered per machine), or move through it from the keyboard. A single button opens a panel on the right with two views, Notifications and a node's Detail: clicking a node switches the panel to that node without closing whatever else was open, and the panel only opens or closes from its own button or Escape, never from a click elsewhere.
+
 ## Atlas Interactions
 
-The dashboard's right-side Notifications panel turns HITL nodes, blocked runs, exhausted retries and END into actionable cards, resolved with `atlas serve` running, no polling: a valid response resumes Autopilot straight from the commit. Browser and system notifications work with no setup; a Himalaya profile already configured on the machine adds email alerts and escalation; a one-tap Telegram pairing button (no token, chat ID or hostname to type in) adds inline-button actions through an opt-in Atlas Relay. Setup, diagnostics and the deploy prerequisites for the Telegram relay are in `docs/atlas-interactions-quickstart.md`.
+One of that right-side panel's two views turns HITL nodes, blocked runs, exhausted retries and END into actionable cards, resolved with `atlas serve` running, no polling: a valid response resumes Autopilot straight from the commit. Browser and system notifications work with no setup; a Himalaya profile already configured on the machine adds email alerts and escalation; a one-tap Telegram pairing button (no token, chat ID or hostname to type in) adds inline-button actions through an opt-in Atlas Relay. Setup, diagnostics and the deploy prerequisites for the Telegram relay are in `docs/atlas-interactions-quickstart.md`.
 
 ## Installing the CLI
 

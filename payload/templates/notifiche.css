@@ -1,0 +1,138 @@
+.notifiche{
+  grid-area:notif;min-height:0;min-width:0;overflow-y:auto;background:var(--bg);
+  border-left:1px solid var(--border);display:flex;flex-direction:column;z-index:2;
+  scrollbar-width:thin;scrollbar-color:var(--border-strong) transparent;
+}
+@media (max-width: 880px){.notifiche{border-left:none;border-top:1px solid var(--border)}}
+.notifiche-toggle{
+  all:unset;box-sizing:border-box;display:flex;align-items:center;gap:8px;cursor:pointer;
+  padding:13px 14px;border-bottom:1px solid var(--border);flex:none;
+}
+.notifiche-toggle:hover{background:var(--code-bg)}
+.notifiche-toggle .bell{width:14px;height:14px;flex:none;color:var(--muted)}
+.notifiche-toggle h2{margin:0;flex:1}
+.notifiche-toggle .chev{width:12px;height:12px;color:var(--faint);flex:none;transition:transform var(--t-fast) var(--e-soft)}
+:root[data-notifiche="chiuso"] .notifiche-toggle .chev{transform:rotate(180deg)}
+:root[data-notifiche="chiuso"] .notifiche-toggle{flex-direction:column;padding:14px 6px;gap:8px}
+:root[data-notifiche="chiuso"] .notifiche-toggle h2{display:none}
+:root[data-notifiche="chiuso"] .notifiche-corpo{display:none}
+/* Stessa veste di '.badge-count' (G03): pillola mono, cifre tabulari. Il
+   colore e' --warn perche' conta le card che aspettano una persona, non un
+   conteggio neutro: sale con l'attesa, come il chip-state.warn a cui somiglia. */
+.badge{
+  background:var(--bg-soft);color:var(--warn);border-radius:6px;
+  font-size:10px;font-weight:500;padding:2px 8px;line-height:1.4;flex:none;font-family:var(--mono);
+  font-variant-numeric:tabular-nums;
+}
+/* Il corpo ospita ora il selettore e le due viste (S11), non piu' solo le
+   sezioni delle notifiche: 'flex:1;min-height:0' lo fa crescere fino al
+   bordo del pannello e permette a CIASCUNA vista di gestirsi lo scroll da
+   sola (le card qui sotto, il corpo del ticket in '.sheet-body'), invece di
+   scorrere lui stesso trascinandosi dietro anche il selettore. */
+.notifiche-corpo{padding:12px;display:flex;flex-direction:column;gap:10px;flex:1;min-height:0;overflow:hidden}
+/* Le due viste, un contenitore solo: quale sia visibile lo decide
+   '[data-vista]' sull'aside (statico qui, S12 lo cambiera' a runtime). Base
+   comune 'display:none' perche' e' l'eccezione (il match sotto) a dover
+   vincere, non il contrario. */
+.panel-vista{display:none;flex-direction:column;flex:1;min-height:0}
+.panel-vista-notifiche{gap:14px;overflow-y:auto}
+.notifiche:not([data-vista="nodo"]) .panel-vista-notifiche{display:flex}
+.notifiche[data-vista="nodo"] .panel-vista-nodo{display:flex}
+/* Il selettore: due bottoni pieni in una pista, stessa grammatica del resto
+   della chrome dopo i tre cancelli monocromo (niente bordo, il pieno segna
+   il tab attivo, non un sottolineato). 'aria-selected' e' statico finche'
+   S12 non lo aggiorna al clic: qui sceglie solo il colore di partenza. */
+.panel-selettore{display:flex;gap:3px;padding:3px;border-radius:11px;background:var(--pane);flex:none}
+.panel-tab{
+  all:unset;box-sizing:border-box;flex:1;text-align:center;cursor:pointer;font:inherit;
+  padding:6px 4px;border-radius:8px;font-size:10px;font-weight:600;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--muted);font-family:var(--display);
+  transition:color var(--t-fast) var(--e-soft),background var(--t-fast) var(--e-soft),
+    transform var(--t-fast) var(--e-soft);
+}
+.panel-tab:hover{color:var(--ink);transform:translateY(-1px)}
+.panel-tab:active{transform:translateY(0) scale(.98)}
+.panel-tab[aria-selected="true"]{background:var(--bg-soft);color:var(--ink)}
+.notif-canali{display:flex;flex-direction:column;gap:4px}
+.pairing-riga{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.pairing-nota{margin:0;font-size:9.5px;color:var(--faint);font-style:italic}
+/* '.btn-primary.btn-ghost' (Grafite, in markup): sfondo pieno, niente
+   bordo, si solleva all'hover e si comprime al clic, gia' disabilitato in
+   veste corretta. '.btn-small' non si applica: scala anche il colore a
+   bg-soft/ink, che cancellerebbe il nero di un eventuale '.btn-primary' non
+   ghost altrove; qui la taglia compatta la fa questa regola, senza toccare
+   colore/hover/disabled che restano di Grafite. */
+.pairing-telegram{padding:6px 10px;font-size:10.5px;border-radius:9px}
+.pairing-telegram:disabled{pointer-events:none}
+.pairing-stato{font-size:10px;color:var(--muted)}
+.pairing-stato.pairing-ok{color:var(--ok)}
+.pairing-stato.pairing-errore{color:var(--down)}
+.notif-muto{
+  all:unset;box-sizing:border-box;display:flex;align-items:center;gap:8px;cursor:pointer;font:inherit;
+  transition:transform var(--t-fast) var(--e-soft);
+}
+.notif-muto:hover{transform:translateY(-1px)}
+.notif-muto:active{transform:translateY(0) scale(.98)}
+.notif-muto-stato{font-size:9.5px;color:var(--muted)}
+.notif-muto[data-muto="off"] .notif-muto-stato{color:var(--warn)}
+/* pillola piena, come '.badge-count' (Grafite): niente bordo, sfondo che si
+   scurisce all'hover del bottone intero, non del solo testo. */
+.notif-muto-azione{
+  background:var(--bg-soft);color:var(--ink);border-radius:8px;
+  font-size:9.5px;font-weight:600;padding:3px 8px;font-family:var(--display);
+  transition:background var(--t-fast) var(--e-soft);
+}
+.notif-muto:hover .notif-muto-azione{background:var(--bg-hover)}
+.notif-muto:disabled{opacity:.5;cursor:default;pointer-events:none;transform:none}
+.notif-sezione h3{
+  margin:0 0 8px;font-size:9.5px;font-weight:700;letter-spacing:.14em;color:var(--muted);
+  text-transform:uppercase;font-family:var(--display);
+}
+.notif-vuoto{margin:0;color:var(--faint);font-size:10.5px;font-style:italic}
+.notif-sezione ul{display:flex;flex-direction:column;gap:8px}
+/* Niente gradienti di fondo (G03): un solo piano, --pane, come '.panel-dense'.
+   I tre stati (attenzione/contesto/chiusa) si distinguono dal bordo a sinistra
+   coi semantici Grafite, non da una tinta di sfondo diversa per ciascuno.
+   Niente riquadro attorno alla card (Q03/Q002): lo spazio fra le card viene
+   gia' dal gap di '.notif-sezione ul', e l'hover scivola come una riga
+   invece di scurire un bordo che non c'e' piu'. La dashed di 'contesto'
+   resta, e' lo stesso tratteggio ammesso da Grafite sulla dropzone: qui dice
+   'informativa, non azionabile' invece di 'trascina qui'. */
+.notif-card{
+  display:block;background:var(--pane);border-radius:10px;
+  padding:10px 11px;cursor:pointer;
+  transition:background var(--t-fast) var(--e-soft),padding-left var(--t) var(--e-soft);
+}
+.notif-card:hover{background:var(--bg-hover);padding-left:14px}
+.notif-card.notif-attenzione{border-left:3px solid var(--warn)}
+.notif-card.notif-contesto{cursor:default;border:1px dashed var(--border-strong)}
+.notif-card.notif-contesto:hover{background:var(--pane);padding-left:11px}
+.notif-card.notif-chiusa{opacity:.78;border-left:3px solid var(--ok)}
+.notif-card.notif-evidenzia{outline:2px solid var(--ink);outline-offset:2px}
+.notif-testo{margin:0;color:var(--ink);font-size:11.5px;line-height:1.5}
+.notif-meta{margin:6px 0 0;display:flex;gap:6px;align-items:center}
+.notif-meta .tag{margin-left:0;max-width:none;overflow:visible;text-overflow:clip}
+.notif-meta .tag:last-child{margin-left:auto}
+.notif-meta .tag.urgente{color:var(--warn)}
+.notif-meta .tag.urgente.scaduta{color:var(--down)}
+.notif-azioni{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px}
+/* Colore, sollevamento e disabilitato vengono da '.btn-primary'/'.btn-ghost'
+   di Grafite (markup, render_notifiche.py): la prima azione e' sempre quella
+   che fa avanzare (riprova/conferma), nera piena; le altre sono '.btn-ghost',
+   perche' oggi erano identiche e non si vedeva quale fosse quella vera.
+   '.btn-small' non si applica (stesso motivo di '.pairing-telegram' sopra):
+   la taglia compatta la fa questa regola. */
+.notif-azioni button{flex:1;padding:6px 8px;font-size:10.5px;border-radius:9px}
+.notif-azioni button:disabled{pointer-events:none}
+.notif-errore-testo{flex:0 0 100%;margin:0;color:var(--down);font-size:10px}
+/* Il colore e il pallino vengono dal '.chip-state.error' dentro: qui solo lo
+   spazio sopra la riga precedente. */
+.notif-guasto{margin:6px 0 0}
+.notif-log{margin-top:8px}
+.notif-log summary{
+  font-size:9.5px;color:var(--muted);cursor:pointer;letter-spacing:.06em;
+  text-transform:uppercase;user-select:none;font-family:var(--display);
+}
+.notif-log summary:hover{color:var(--ink)}
+.notif-log ul{margin:6px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:3px}
+.notif-log li{font-size:10px;color:var(--muted)}

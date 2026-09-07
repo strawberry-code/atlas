@@ -537,8 +537,19 @@ class Artefatti(Base):
         self.assertIn('charset="utf-8"', html)
         self.assertIn('id="atlas-data"', html)
         self.assertEqual(3, html.count('class="card"'))
+        # I font Grafite incorporati (F01) sono base64 opaco: su 200KB di rumore
+        # una sotto-stringa di 3 lettere come 'cdn' ci finisce per caso, quindi il
+        # controllo guarda il markup vero e ignora il payload dentro data:...
+        senza_datauri = re.sub(r"data:[^)\"']*", "", html)
         for url in ("cdn", "googleapis", "unpkg"):
-            self.assertNotIn(url, html)
+            self.assertNotIn(url, senza_datauri)
+        # Un grafo minimo isola il costo fisso della pagina (CSS+JS+i tre font
+        # Grafite incorporati, ~208KB) dalla prosa variabile dei ticket, che sui
+        # grafi veri puo' pesare quanto i font stessi (vedi tests/test_autoconsistenza.py,
+        # che presidia quelli). Qui la soglia e' stretta apposta: raddoppiare per
+        # sbaglio il blocco font la sfonda subito (~587KB contro i ~379KB di oggi).
+        self.assertLess(len(html.encode("utf-8")), 450_000,
+                         "il grafo minimo pesa piu' del previsto: font raddoppiati?")
 
     def test_dashboard_mostra_il_modello_richiesto(self):
         self.popola()
@@ -601,13 +612,16 @@ class Artefatti(Base):
     def test_dashboard_avvisa_se_il_grafo_non_converge(self):
         self.popola()
         self.render_tutto()
-        self.assertNotIn('class="blocco caution"', self.ref.dashboard_path.read_text(encoding="utf-8"))
+        # S01: il pannello e' vestito Grafite (.panel-dense), ma resta riconoscibile
+        # come avviso dalla classe 'caution' e dal chip-state 'warn' che porta.
+        self.assertNotIn('class="blocco caution panel-dense"', self.ref.dashboard_path.read_text(encoding="utf-8"))
         with self.mutate.editing(self.ref) as g:
             self.mutate.unlink(g, "F03", blocked_by="F02")
         self.render_tutto()
         html = self.ref.dashboard_path.read_text(encoding="utf-8")
-        self.assertIn('class="blocco caution"', html)
+        self.assertIn('class="blocco caution panel-dense"', html)
         self.assertIn('<b data-node="F03">F03</b>', html)
+        self.assertIn('class="chip-state warn"', html)
 
     def test_dashboard_mostra_il_costo_dichiarato(self):
         self.popola()
@@ -1679,11 +1693,15 @@ class Assegnazioni(Base):
         pagina = self.render.build(self.ref, self.store.load(self.ref.json_path))
 
         pannello = pagina.split(">assegnazioni<")[1].split("</section>")[0]
-        self.assertIn('<li data-owner="1"><b>marco</b><span class="tag">1</span>', pannello,
+        self.assertIn('<li class="row-dense" data-owner="1">'
+                      '<span class="row-dense-label"><b>marco</b></span>'
+                      '<span class="badge-count muted">1</span>', pannello,
                       "marco conta il nodo suo soltanto, non quello condiviso")
         self.assertNotIn("anna<", pannello,
                          "anna non ha nodi suoi soltanto, quindi non ha una riga sua")
-        self.assertIn('<li data-owner="2">anna + marco<span class="tag">1</span>', pannello,
+        self.assertIn('<li class="row-dense" data-owner="2">'
+                      '<span class="row-dense-label">anna + marco</span>'
+                      '<span class="badge-count muted">1</span>', pannello,
                       "la squadra e' una riga sua, dopo le persone")
 
         # la card di un nodo, sulla mappa, porta l'indice del suo insieme e uno solo
@@ -1850,39 +1868,14 @@ class FrecceColorate(Base):
         """Un marker non eredita il colore del path: senza una punta per stato la
         freccia sarebbe colorata e la sua punta grigia."""
         from core import theme
+        from core.risorse import leggi_css_dashboard
         self.popola()
         pagina = self.pagina()
-        css = (SORGENTE / "templates" / "dashboard.css").read_text(encoding="utf-8")
+        css = leggi_css_dashboard()
         for stato in theme.STATE:
             with self.subTest(stato=stato):
                 self.assertIn(f'id="tip-{stato}"', pagina, "manca la punta di questo stato")
                 self.assertIn(f".tip-{stato}{{fill:", css, "la punta non ha colore")
-
-
-class TavolozzaScura(Base):
-    """Il tema scuro sta scritto due volte, e le due copie devono coincidere.
-
-    Una vale quando lo decide il sistema (media query), l'altra quando lo si sceglie
-    col toggle: il CSS non permette di dichiararle una volta sola, e mentre si
-    ritoccavano i colori una delle due e' rimasta indietro, dando alla stessa pagina
-    due aspetti a seconda di come ci si era arrivati."""
-
-    def tavole(self) -> tuple[dict, dict]:
-        css = (SORGENTE / "templates" / "dashboard.css").read_text(encoding="utf-8")
-        return self.token(css, ':root:not([data-theme="light"])'), self.token(css, ':root[data-theme="dark"]')
-
-    @staticmethod
-    def token(css: str, selettore: str) -> dict:
-        inizio = css.index(selettore) + len(selettore)
-        corpo = css[inizio: css.index("}", inizio)]
-        return dict(re.findall(r"(--[\w-]+)\s*:\s*([^;]+);", corpo))
-
-    def test_le_due_tavole_scure_dicono_la_stessa_cosa(self):
-        da_sistema, da_toggle = self.tavole()
-        self.assertTrue(da_sistema, "la tavola della media query non è stata trovata")
-        self.assertEqual(sorted(da_sistema), sorted(da_toggle), "le due tavole non hanno gli stessi token")
-        for nome, valore in da_sistema.items():
-            self.assertEqual(valore.strip(), da_toggle[nome].strip(), f"{nome} diverge fra le due tavole scure")
 
 
 class Nebbia(Base):

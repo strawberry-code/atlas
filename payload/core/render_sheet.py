@@ -1,10 +1,15 @@
-"""La scheda del ticket dentro la dashboard: scheletro della side sheet e dati.
+"""Il ticket dentro la dashboard: scheletro della vista Nodo e dati.
 
-Spezzato da render.py perche' sono due lavori: la' l'assemblaggio della pagina,
-qui tutto cio' che serve a leggere un ticket senza lasciare la pagina. I ticket
-sono incorporati come JSON al momento della generazione, perche' da file://
-nessuna fetch potrebbe leggerli dopo; il markdown lo trasforma il JavaScript
-della pagina (templates/dashboard.js), qui viaggia grezzo.
+Fino a S11 la vista era una scheda modale a se stante, con un velo sfocato
+sopra la pagina; ora e' una delle due viste del pannello destro, incollata
+dentro '.notifiche-corpo' da render_notifiche.panel() insieme alla vista
+Notifiche - stesso contenitore, stessa apertura/chiusura, un selettore per
+scegliere quale guardare (S12 decide quando). Qui restano lo scheletro vuoto
+che sheet.js riempie (invariato: la scheda cambia contenitore, non le classi
+che quel modulo legge) e i dati del grafo per popolarlo. I ticket sono
+incorporati come JSON al momento della generazione, perche' da file:// nessuna
+fetch potrebbe leggerli dopo; il markdown lo trasforma sheet.js, qui viaggia
+grezzo.
 """
 from __future__ import annotations
 
@@ -62,9 +67,13 @@ def data_island(ref: Graph, data: dict, front_ids: set[str]) -> str:
 
 
 def sheet() -> str:
+    """La vista Nodo: niente piu' '.scrim' ne' 'role=dialog'/'aria-modal', non
+    e' una modale. La classe 'sheet' resta (sheet.js la cerca con
+    'document.querySelector(".sheet")': cambiarla romperebbe l'intero modulo,
+    non solo questa vista), affiancata da 'panel-vista panel-vista-nodo' per
+    il selettore di render_notifiche.py."""
     return (
-        '<div class="scrim"></div>'
-        f'<aside class="sheet" role="dialog" aria-modal="true" data-empty="{escape(t("render.sheet_vuoto"))}"'
+        f'<div class="panel-vista panel-vista-nodo sheet" data-empty="{escape(t("render.sheet_vuoto"))}"'
         f' data-owner-label="{escape(t("render.sheet_assegnato"))}"'
         f' data-artefatti-label="{escape(t("render.sheet_artefatti"))}"'
         # le etichette del click-to-copy viaggiano nel markup, non nel JS, che resta
@@ -76,5 +85,5 @@ def sheet() -> str:
         '<div class="sheet-body md"></div>'
         '<ul class="sheet-artifacts"></ul>'
         f'<footer class="sheet-foot"><a class="sheet-raw" target="_blank">{t("render.sheet_apri_file")}</a></footer>'
-        '</aside>'
+        '</div>'
     )

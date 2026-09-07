@@ -119,6 +119,18 @@ class Http(Base):
         self.assertIn("EventSource", corpo)      # il canale di ricarica c'e'
         self.assertIn("/events", corpo)
 
+    def test_il_reload_si_inietta_una_sola_volta_al_posto_giusto(self):
+        """Con otto moduli JS concatenati nel corpo (leggi_js_dashboard, S09):
+        la sostituzione testuale di _RICARICA deve restare quella sola, e
+        proprio davanti al '</body>' vero, non in mezzo a un modulo che nel
+        frattempo e' cresciuto e porta la stessa sottostringa per caso."""
+        server = self._server()
+        with urllib.request.urlopen(self._url(server), timeout=5) as risposta:
+            corpo = risposta.read().decode("utf-8")
+        self.assertEqual(1, corpo.count("</body>"))
+        self.assertEqual(1, corpo.count(self.serve._RICARICA))
+        self.assertTrue(corpo.endswith(self.serve._RICARICA + "</body></html>"))
+
     def test_una_pagina_che_non_esiste_da_404(self):
         server = self._server()
         with self.assertRaises(urllib.error.HTTPError) as ctx:

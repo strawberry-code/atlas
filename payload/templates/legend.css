@@ -1,0 +1,62 @@
+/* Legenda flottante sulla mappa, che e' anche il filtro per stato e per
+   persona. Gli stati sono cinque e si conoscono da sempre, quindi le loro
+   regole stanno qui; le persone no, e le loro (indice numerico, mai il nome:
+   vedi render_owners.py) nascono a runtime insieme al markup.
+
+   Un grafo con molti assegnatari fa crescere le righe di chip oltre le due
+   che gli stati (fissi, cinque) occupano da soli: su una finestra stretta,
+   dove la mappa e' gia' bassa, quelle righe in piu' finivano per coprire le
+   card sottostanti (S07, misurato con owner veri: senza il tetto, 11 card
+   finivano sotto la legenda a 560px). '.legend' resta percio' alta al piu'
+   due righe, con scorrimento proprio per il resto: gli stati, che si
+   conoscono da sempre, restano sempre visibili; le persone, che crescono
+   col grafo, si scoprono scorrendo. Diventa un riquadro pieno (non piu' un
+   velo attraverso cui trascinare la mappa) solo per lo spazio che occupa
+   davvero, mai oltre. */
+.legend{
+  position:absolute;top:12px;left:14px;right:64px;z-index:2;display:flex;flex-wrap:wrap;
+  gap:7px;align-items:center;align-content:flex-start;pointer-events:auto;
+  max-height:76px;overflow-y:auto;overscroll-behavior:contain;
+  scrollbar-width:thin;scrollbar-color:var(--border-strong) transparent;
+}
+/* Pillola Grafite: raggio piccolo, tracking largo, come le altre ricette
+   dense (G03). Resta un chip interattivo (hover, stato .on), non '.chip-state':
+   quella ricetta e' riservata al segnale ok/warn/error, qui il colore e' lo
+   stato di un nodo del grafo, non un semantico Grafite. */
+/* Niente bordo (Q03/Q002): la separazione dal grafo sottostante la fa gia'
+   la sfocatura + il fondo traslucido, come un vetro invece che una scatola.
+   Selezionata diventa opaca invece che tradotta in nero pieno (come
+   '.seg-opt.on' di Grafite): il quadratino di stato porta un colore gia'
+   tarato sul fondo chiaro, e nero pieno lo avrebbe spento. */
+.legend .chip{
+  /* e' un <button>: senza questo azzeramento non e' che il bordo sparisce,
+     e' che torna quello nativo del browser (Q03, trovato solo in foto). */
+  pointer-events:auto;display:flex;gap:6px;align-items:center;font:inherit;
+  font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--muted);
+  background:color-mix(in srgb,var(--pane) 86%,transparent);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  border:none;border-radius:6px;padding:4px 10px;cursor:pointer;
+  transition:color var(--t-fast) var(--e-soft),background var(--t-fast) var(--e-soft),
+    transform var(--t-fast) var(--e-soft),opacity var(--t-fast) var(--e-soft);
+}
+.legend .chip:hover{color:var(--ink);transform:translateY(-1px)}
+.legend .chip:active{transform:translateY(0) scale(.98)}
+.legend .chip.on{background:var(--bg-soft);color:var(--ink)}
+/* Il filtro di stato attenua i chip di stato, quello per persona i suoi: sono due
+   assi indipendenti e possono essere accesi insieme. */
+body[data-filter] .legend .chip[data-state]:not(.on){opacity:.5}
+body[data-owner] .legend .chip[data-owner]:not(.on){opacity:.5}
+.legend .chip.who{letter-spacing:.02em;text-transform:none}
+.legend .chip.who b{color:var(--ink);font-weight:600}
+.legend .chip.who.none{font-style:italic}
+/* Il quadratino resta l'unico colore del chip, sia per stato che per persona:
+   il testo intorno e' sempre --muted/--ink, mai una terza tinta. */
+.legend .chip i{width:8px;height:8px;flex:none}
+.chip.st-frontier i{background:var(--st-frontier-bg);border:1.5px solid var(--st-frontier)}
+.chip.st-claimed i{background:var(--st-claimed-bg);border:1.5px solid var(--st-claimed)}
+.chip.st-closed i{background:var(--st-closed-bg);border:1.5px solid var(--st-closed)}
+.chip.st-blocked i{background:var(--st-blocked-bg);border:1.5px solid var(--st-blocked)}
+.chip.st-out-of-scope i{background:var(--st-out-of-scope-bg);border:1.5px dashed var(--st-out-of-scope)}
+.chip.st-frontier{color:var(--st-frontier-tx)}
+.chip.st-claimed{color:var(--st-claimed-tx)}
+.chip.st-closed{color:var(--st-closed-tx)}

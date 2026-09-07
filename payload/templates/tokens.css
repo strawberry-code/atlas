@@ -1,0 +1,88 @@
+/* Dashboard Atlas. Un solo schermo: intestazione con i tre numeri che contano,
+   colonna dei pannelli a sinistra, il grafo come mappa navigabile a destra.
+   Monotema chiaro, alto contrasto.
+   Regola di questo foglio: si disegna solo cio' che porta informazione. Il
+   movimento e' ammesso quando risponde a un gesto (hover, apertura della
+   scheda) o quando accompagna un valore che si legge all'apertura (l'anello
+   dell'avanzamento, che si riempie una volta e si ferma). Un ciclo perpetuo
+   tiene la pagina a ridisegnarsi per sempre, quindi ne esiste uno solo, e
+   dichiarato: l'anello dei nodi in lavorazione. Quello stato e' l'unico che
+   descrive qualcosa che sta accadendo mentre guardi, e girano solo i pochi
+   nodi rivendicati; chi ha chiesto quiete al sistema lo vede fermo.
+   Risorsa neutra di lingua, letta raw da render.py (nessun .format: le graffe
+   CSS sono al sicuro). Nessuna risorsa remota qui: i font e i token di base
+   (--ink, --muted, --faint, --bg, --sans, --display, --mono, ...) arrivano
+   gia' su :root da grafite.fonts.inline.css e grafite.offline.css, concatenati
+   prima di questo foglio (vedi leggi_css_dashboard). Dove il significato
+   coincide questo foglio non ridichiara il token (--ink, --muted, --faint,
+   --bg spariscono qui: sarebbe lo stesso valore scritto due volte), dove il
+   nome non combacia diventa un alias (--pane, --border, --code-bg). Le tinte
+   di stato (--st-*) e gli archi/griglia/velo (--edge*, --gridline, --scrim,
+   senza equivalente in Grafite) restano proprieta' di Atlas: e' la semantica
+   del grafo, non decorazione. Un colore d'interazione (--accent, il teal
+   dell'apertura di questo gate) c'era e non c'e' piu': la legge 1 di Grafite
+   vieta il colore come decorazione, e un accento di brand non e' ne' uno
+   stato di nodo ne' un semantico Grafite. Deciso dall'utente su Q03 (Q001):
+   monocromo pieno, restano colorati solo gli stati e i semantici che
+   segnalano davvero qualcosa. */
+*{box-sizing:border-box}
+/* codice e id in JetBrains Mono ovunque, anche fuori da .md pre (vedi sheet.css) */
+code{font-family:var(--mono)}
+:root{
+  color-scheme:light;
+  --pane:var(--bg-softer);
+  --pane-2:var(--bg-soft);
+  --border:var(--line);
+  --border-strong:color-mix(in srgb,var(--ink) 28%,var(--bg-softer));
+  --gridline:rgba(17,28,34,.07);
+  --edge:#93a6b0;
+  --scrim:rgba(17,28,34,.4);
+  /* Il tocco piu' scuro che Grafite da' a un controllo pieno all'hover
+     ('.btn-ghost:hover', '.kpi:hover') e' un letterale suo (#e9e9e8, #efefee),
+     non un token: bene per un foglio che non si tocca, male per uno che deve
+     restare senza esadecimali sciolti. Qui lo stesso scarto arriva da --ink
+     invece che da un numero magico, per i controlli di Atlas che non passano
+     dalle classi .btn-* di Grafite (icone, pillole composte). */
+  --bg-hover:color-mix(in srgb,var(--ink) 6%,var(--bg-soft));
+  /* Gli archi hanno la loro tavola, e non prendono il colore del bordo delle card.
+     Quel bordo e' scuro di proposito, perche' deve reggere come contorno di una
+     superficie gia' colorata; una curva di due pixel dipinta con lo stesso valore
+     esce spenta, e accanto a un blocco pieno sembra sbiadita. Qui il colore e'
+     quello che il blocco mostra davvero, cioe' il riempimento, portato alla
+     luminanza che serve a una linea sottile su questo fondo. */
+  --edge-frontier:#c08a00;
+  --edge-claimed:#1d7afc;
+  --edge-closed:#00a06c;
+  --edge-out-of-scope:#e2333a;
+  /* stati (validati su superficie chiara): bordo, riempimento, testo.
+     I riempimenti scalano col da-farsi, ma il chiuso non e' piu' "quasi spento":
+     a rgba(...,.07) su questo fondo dava 1.09 di rapporto contro la superficie e
+     1.07 contro un nodo bloccato, cioe' niente, e da lontano un lavoro finito e
+     uno fermo erano la stessa macchia grigia. Bordi e testi stanno a un rapporto
+     circa 1.3 volte quello di prima, misurato in WCAG contro il fondo. */
+  /* la frontiera e' giallo cantiere (RAL 1023). Su fondo chiaro il giallo pieno sta
+     a 1.14 di rapporto e come bordo sparirebbe, quindi il giallo lo porta il
+     riempimento, che deve colorare e non essere letto, mentre bordo e testo restano
+     sullo stesso hue scendendo di luminanza fin dove si leggono. */
+  --st-frontier:#7a5f00;   --st-frontier-bg:rgba(252,194,0,.45);  --st-frontier-tx:#5c4700;
+  --st-claimed:#1d4ed8;    --st-claimed-bg:rgba(29,122,252,.4);   --st-claimed-tx:#173288;
+  --st-closed:#04724f;     --st-closed-bg:rgba(0,196,106,.42);    --st-closed-tx:#054c38;
+  /* Il rosso sta sul fuori scopo, che e' una decisione presa e va vista; il bloccato
+     arretra in grigio, perche' e' solo lavoro che aspetta il suo turno ed e' la
+     maggioranza dei nodi di un grafo giovane. Il riempimento del fuori scopo resta
+     trasparente: il suo bordo tratteggiato basta gia' a dire che quel nodo e' fuori. */
+  --st-blocked:#8ea0aa;    --st-blocked-bg:transparent;           --st-blocked-tx:#75858e;
+  --st-out-of-scope:#b91c1c; --st-out-of-scope-bg:rgba(239,68,68,.22); --st-out-of-scope-tx:#7f1d1d;
+  --code-bg:var(--bg-soft);
+}
+/* la figura di ramo (theme.shape_svg) esce sulla card della mappa, nella
+   riga dei pannelli e nella tabella: tre fogli diversi, un solo layout base,
+   quindi vive qui (sempre caricato, anche dalla pagina alleggerita) invece
+   che in uno dei tre, da cui gli altri due la perderebbero. Le rifiniture per
+   contesto (margine nel chip della scheda, opacita' sulla card) restano dove
+   quel contesto e' disegnato. */
+.bshape{flex:none;align-self:center}
+/* ---------- quiete per chi la chiede ---------- */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation:none !important;transition:none !important}
+}

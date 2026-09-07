@@ -88,7 +88,13 @@ def chips(data: dict, idx: dict[str, int]) -> str:
 
 
 def panel(data: dict, idx: dict[str, int]) -> str:
-    """Il blocco laterale: chi lavora su cosa, con la stessa presa del chip."""
+    """Il blocco laterale: chi lavora su cosa, con la stessa presa del chip.
+
+    Veste .panel-dense/.row-dense/.badge-count (G03), come gli altri pannelli
+    della colonna: 'blocco' resta accanto a 'panel-dense' solo perche' edges.css
+    lo lega alla mappa, non porta piu' un aspetto suo (era il duplicato in
+    shell.css, tolto insieme a questa migrazione).
+    """
     if not idx:
         return ""
     fuori = [n["id"] for n in data["nodes"] if not owners_of(n)]
@@ -97,11 +103,13 @@ def panel(data: dict, idx: dict[str, int]) -> str:
         # una squadra resta in tondo: nomina persone gia' elencate sopra, e il
         # grassetto la farebbe leggere come una quarta persona.
         nome = escape(etichetta)
-        righe.append(f'<li data-owner="{idx[etichetta]}">'
-                     f'{nome if SEPARATORE in etichetta else f"<b>{nome}</b>"}'
-                     f'<span class="tag">{len(ids)}</span></li>')
+        label = nome if SEPARATORE in etichetta else f"<b>{nome}</b>"
+        righe.append(f'<li class="row-dense" data-owner="{idx[etichetta]}">'
+                     f'<span class="row-dense-label">{label}</span>'
+                     f'<span class="badge-count muted">{len(ids)}</span></li>')
     if fuori:
-        righe.append(f'<li data-owner="{NESSUNO}">{t("render.non_assegnati")}'
-                     f'<span class="tag">{len(fuori)}</span></li>')
-    return (f'<section class="blocco"><h2>{t("render.assegnazioni")}</h2>'
+        righe.append(f'<li class="row-dense" data-owner="{NESSUNO}">'
+                     f'<span class="row-dense-label">{t("render.non_assegnati")}</span>'
+                     f'<span class="badge-count muted">{len(fuori)}</span></li>')
+    return (f'<section class="blocco panel-dense"><h2 class="eyebrow">{t("render.assegnazioni")}</h2>'
             f'<ul>{"".join(righe)}</ul></section>')

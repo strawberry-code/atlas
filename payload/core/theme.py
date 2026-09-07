@@ -2,9 +2,9 @@
 
 Il colore porta lo stato, la forma porta il ramo, e uno stato si riconosce anche
 in scala di grigi perche' ogni stato ha il suo glifo oltre al suo colore. I colori
-veri pero' non stanno qui: vivono nei token di templates/dashboard.css, in doppia
-tavola light/dark, e l'SVG li aggancia con la classe CSS (st-<stato>). E' quel che
-rende possibile la dark mode senza rigenerare niente.
+veri pero' non stanno qui: vivono nei token di templates/tokens.css, e l'SVG li
+aggancia con la classe CSS (st-<stato>). Cambiare una tinta e' una modifica al
+foglio, non a questo file: qui resta solo la semantica.
 """
 from __future__ import annotations
 
