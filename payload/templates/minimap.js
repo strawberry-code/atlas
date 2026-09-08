@@ -96,9 +96,12 @@
     function muovi(ev) { centra(ev, false); }
     function fine(ev) {
       centra(ev, true);
-      // Tolta sempre: e' quel che impedisce a un pointercancel o a un
-      // rilascio fuori dalla minimap di lasciare la pagina bloccata (C13).
-      host.classList.remove("trascina"); document.body.classList.remove("trascina");
+      // La classe resta un giro in piu' (setTimeout 0), stessa ragione di
+      // canvas.js/drag.js: senza, il 'click' che chiude il gesto la trova gia'
+      // tolta e sheet.js perde la selezione sul nodo scelto in precedenza.
+      // Tolta comunque sempre, anche su un pointercancel o un rilascio fuori
+      // dalla minimap: e' quel che impedisce alla pagina di restare bloccata.
+      setTimeout(function () { host.classList.remove("trascina"); document.body.classList.remove("trascina"); }, 0);
       host.removeEventListener("pointermove", muovi);
       host.removeEventListener("pointerup", fine);
       host.removeEventListener("pointercancel", fine);

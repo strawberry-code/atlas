@@ -167,11 +167,15 @@ def canvas(data: dict, front_ids: set[str], gruppi: dict[str, int], *, lite: boo
         f'width="{larghezza}" height="{altezza}" xmlns="http://www.w3.org/2000/svg">'
         f'<defs>{render_edges.markers()}</defs>'
         # gli archi vanno prima delle card, non dopo: A03 li vuole dietro ai
-        # nodi, e in SVG l'ordine del documento e' l'ordine di disegno. Sotto
-        # una card piena spariscono del tutto, quindi ghosts() ne ridisegna
-        # sopra, ritagliata card per card, la sola porzione che ci passa
-        # sotto, appena visibile (render_edge_ghosts.py).
+        # nodi, e in SVG l'ordine del documento e' l'ordine di disegno. Una
+        # card non e' pero' un rettangolo pieno (le '--st-*-bg' di tokens.css
+        # portano alfa, cosi' il puntinato del canvas si intravede attraverso
+        # una card ferma): senza backings() in mezzo, lo stesso alfa
+        # lascerebbe intravedere l'arco vero a piena saturazione, non il filo
+        # tenue che ghosts() ridisegna sopra le card, ritagliato card per
+        # card, appena visibile (render_edge_ghosts.py).
         f'{render_edges.edges(data, pos, front_ids)}'
+        f'{render_edge_ghosts.backings(data, pos, front_ids)}'
         f'{boxes(data, pos, front_ids, gruppi, lite=lite)}'
         f'{render_edge_ghosts.ghosts(data, pos, front_ids)}'
         '</svg>'

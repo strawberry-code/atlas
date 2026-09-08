@@ -133,6 +133,15 @@ def hover_css(ids: list[str]) -> str:
     e le trovava tutte verdi. Entrata e uscita restano distinguibili senza colore:
     gli archi entranti arrivano sul bordo alto e vengono da mittenti diversi, quelli
     uscenti partono dal bordo basso e hanno tutti la tinta del nodo sotto il mouse.
+
+    'data-ghost-to'/'data-ghost-from' sono la stessa coppia su cui vive un arco,
+    ma sulla sua copia sfumata sotto un'altra card (render_edge_ghosts.ghosts()):
+    nomi diversi da 'data-to'/'data-from' apposta, perche' drag.js seleziona i
+    veri archi con 'path.edge[data-from]' per ricalcolarli al volo, e un ghost
+    preso in quel giro si ritroverebbe con una 'd' fatta di NaN (nessun
+    data-sx/sy/ex/ey da cui ripartire), invisibile a qualunque opacita' (bug
+    osservato in S13/10). Qui, stesso arco selezionato: anche il suo ghost va a
+    piena opacita', non i suoi vicini.
     """
     out = []
     for i in ids:
@@ -140,7 +149,9 @@ def hover_css(ids: list[str]) -> str:
         riga = f'body:has(.side [data-node="{i}"]:hover)'        # mouse sulla riga del pannello
         out.append(
             f'{nodo} :is(path,circle)[data-to="{i}"],{riga} :is(path,circle)[data-to="{i}"],'
-            f'{nodo} :is(path,circle)[data-from="{i}"],{riga} :is(path,circle)[data-from="{i}"]'
+            f'{nodo} :is(path,circle)[data-from="{i}"],{riga} :is(path,circle)[data-from="{i}"],'
+            f'{nodo} path[data-ghost-to="{i}"],{riga} path[data-ghost-to="{i}"],'
+            f'{nodo} path[data-ghost-from="{i}"],{riga} path[data-ghost-from="{i}"]'
             f'{{opacity:1}}'
             f'{nodo} path[data-to="{i}"],{riga} path[data-to="{i}"],'
             f'{nodo} path[data-from="{i}"],{riga} path[data-from="{i}"]{{stroke-width:2.6}}'

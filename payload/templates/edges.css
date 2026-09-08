@@ -23,10 +23,22 @@ circle.port.da-out-of-scope{fill:var(--edge-out-of-scope)}
 .tip-out-of-scope{fill:var(--edge-out-of-scope)}
 .tip{fill:var(--edge)}
 
+/* il piano opaco fra gli archi e una card che ne ha uno dietro
+   (render_edge_ghosts.backings()): sostituisce li' il puntinato del canvas
+   col suo stesso colore piatto, cosi' la card translucida sopra ci si tinge
+   come sempre, e l'arco vero sotto non trapela a piena saturazione */
+.edge-backing{fill:var(--bg);pointer-events:none}
 /* la copia sfumata sotto le card (render_edge_ghosts.py): stesso colore di
-   stato dell'arco vero, solo appena visibile, e mai un bersaglio del mouse
-   (l'arco cliccabile resta quello dietro alla card, non questo ritaglio) */
-.edge-ghost{opacity:.28;pointer-events:none}
+   stato dell'arco vero, ma molto tenue - il contrasto fra un tratto scuro e
+   uno sfondo chiaro resta leggibile anche a bassa opacita', quindi qui serve
+   piu' margine del solito - e mai un bersaglio del mouse (l'arco cliccabile
+   resta quello dietro alla card, non questo ritaglio). L'opacita' sta sul
+   singolo 'path', non sul gruppo: un'opacita' di gruppo si comporta come un
+   livello unico e non lascerebbe accendere un solo ghost quando il suo arco
+   e' quello selezionato (render_edges.hover_css(), 'data-ghost-to/from')
+   senza portare con se' tutti i suoi vicini. */
+.edge-ghost{pointer-events:none}
+.edge-ghost path{opacity:.17}
 /* Lo stesso effetto per hover e per selezione (.n.sel, sheet.js/keyboard.js):
    un clic lo rende persistente, non solo di passaggio come l'hover da solo.
    Le regole per-nodo (chi si accende davvero) sono generate in

@@ -57,8 +57,13 @@ a{text-decoration:none;color:inherit}
    contenitore scrollabile sotto l'header fisso, non piu' la domanda incollata
    al titolo e gli artefatti incollati al fondo. '.sheet-body' (il bersaglio di
    sheet.js) resta senza padding proprio, lo eredita dal wrapper. */
-.sheet-scroll{flex:1;overflow-y:auto;padding:16px 22px 22px;scrollbar-width:thin;
-  scrollbar-color:var(--border-strong) transparent}
+/* overflow-wrap qui, non solo su '.md code': senza, 'overflow-y:auto' con
+   'overflow-x' implicito a 'visible' diventa 'auto' anche in orizzontale (regola
+   CSS: un asse 'visible' accanto a uno scrollabile si comporta come l'altro), e
+   una singola parola piu' larga della colonna (un percorso, un identificatore)
+   apre uno scroll laterale sull'intero pannello invece di andare a capo. */
+.sheet-scroll{flex:1;overflow-y:auto;overflow-wrap:anywhere;padding:16px 22px 22px;
+  scrollbar-width:thin;scrollbar-color:var(--border-strong) transparent}
 .sheet-question{margin:0 0 14px;color:var(--muted);font-size:11px;line-height:1.5;font-style:italic}
 .sheet-foot{padding:11px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end}
 /* prima solo colore ad annunciare il link: rimosso il teal, l'affordance

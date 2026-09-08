@@ -188,7 +188,13 @@
       vp.removeEventListener("pointermove", muovi);
       vp.removeEventListener("pointerup", fine);
       vp.removeEventListener("pointercancel", fine);
-      if (mosso) { vp.classList.remove("trascina"); document.body.classList.remove("trascina"); salvaVista(); }   // C13: tolta anche su pointercancel
+      // La classe resta un giro in piu' (setTimeout 0): il 'click' nativo che
+      // chiude il gesto arriva nello stesso turno sincrono del 'pointerup', prima
+      // che questa rimozione fosse qui rinviata sheet.js lo trovava gia' tolto e
+      // un pan che finiva sopra il canvas vuoto deselezionava il nodo scelto
+      // prima (S13/9, bug osservato: la card restava evidenziata solo finche' non
+      // si spostava la vista).
+      if (mosso) { salvaVista(); setTimeout(function () { vp.classList.remove("trascina"); document.body.classList.remove("trascina"); }, 0); }   // tolta anche su pointercancel
     }
     vp.addEventListener("pointermove", muovi);
     vp.addEventListener("pointerup", fine);

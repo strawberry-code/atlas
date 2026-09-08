@@ -4,7 +4,6 @@
 
   var DATA = JSON.parse(document.getElementById("atlas-data").textContent);
   var quiete = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var vp = document.querySelector(".viewport");
 
   /* ---------- markdown minimo: prima si nega l'HTML, poi si concede il markdown ---------- */
   function esc(s) {
@@ -204,17 +203,25 @@
   }
 
   document.addEventListener("click", function (e) {
-    // 'trascina' la aggiungono canvas.js/drag.js a '.viewport' a inizio pan
-    // (e ora anche a 'body', per la selezione di testo: C13, non tocca questo
-    // controllo, che legge sempre e solo il viewport): un pan che finisce
-    // sopra una card non deve aprirla, ne' deselezionare.
-    if (vp.classList.contains("trascina")) return;
+    // 'trascina' la aggiungono su 'body' tutti e tre i gesti di trascinamento
+    // (canvas.js sul pan, drag.js su una card, minimap.js sulla minimap): e'
+    // il solo denominatore comune, controllarla solo su '.viewport' lascia
+    // fuori la minimap. La rimuovono con un giro di ritardo (setTimeout 0)
+    // apposta perche' il clic che chiude il gesto arriva nello stesso turno
+    // sincrono del 'pointerup': senza quel ritardo la si trova gia' tolta, e
+    // un pan o un trascinamento che finiscono sul canvas vuoto non devono
+    // aprire una card ne' deselezionare quella scelta in precedenza.
+    if (document.body.classList.contains("trascina")) return;
     var via = e.target.closest ? e.target.closest("[data-node]") : null;
     if (!via) {
-      // un clic altrove toglie la selezione, tranne dentro al pannello
-      // laterale: leggerne il contenuto non deve far sparire l'evidenziazione
-      // sulla mappa che quel contenuto sta spiegando.
-      if (!(e.target.closest && e.target.closest(".pannello"))) deseleziona();
+      // un clic altrove toglie la selezione, tranne dentro alla scheda
+      // laterale ('.notifiche', render_notifiche.py): leggerne il contenuto
+      // non deve far sparire l'evidenziazione sulla mappa che quel contenuto
+      // sta spiegando. Non '.pannello': quella e' la mappa stessa (il
+      // livello che canvas.js pana/zooma, render_canvas.py), non il pannello
+      // laterale - controllarla qui avrebbe protetto anche i clic sul canvas
+      // vuoto, che devono deselezionare invece.
+      if (!(e.target.closest && e.target.closest(".notifiche"))) deseleziona();
       return;
     }
     e.preventDefault();

@@ -164,11 +164,13 @@
       vp.removeEventListener("pointercancel", fine);
       g.classList.remove("trascina");
       if (!mosso) return;
-      // Tolta sempre che il gesto sia arrivato a 'mosso': pointercancel e
-      // rilascio fuori dalla card passano comunque di qui (C13).
-      vp.classList.remove("trascina"); document.body.classList.remove("trascina");
       var df = delta(id);
       vp.dispatchEvent(new CustomEvent("atlas:nodo-spostato", { detail: { id: id, dx: df.x, dy: df.y } }));
+      // La classe resta un giro in piu' (setTimeout 0), stessa ragione di
+      // canvas.js: il 'click' che chiude il trascinamento arriva nello stesso
+      // turno sincrono del 'pointerup', prima di questo rinvio sheet.js la
+      // trovava gia' tolta e perdeva la selezione sul nodo scelto in precedenza.
+      setTimeout(function () { vp.classList.remove("trascina"); document.body.classList.remove("trascina"); }, 0);
     }
     vp.addEventListener("pointermove", muovi);
     vp.addEventListener("pointerup", fine);
@@ -178,7 +180,11 @@
   // positions.js chiede un ricalcolo completo dopo aver applicato il layout
   // salvato (al caricamento) o averlo azzerato (bottone "layout automatico"):
   // qui e' l'unico modulo che sa disegnare un arco, quindi risponde per intero.
+  // '[data-from]' esclude le copie sfumate sotto le card (render_edge_ghosts.py,
+  // '.edge-ghost path.edge'): non portano data-sx/sy/ex/ey, quindi
+  // ricalcolaArco() le riscriverebbe con NaN e le farebbe collassare a zero -
+  // invisibili anche a opacita' piena, il bug dietro S13/10.
   vp.addEventListener("atlas:ricalcola-archi", function () {
-    document.querySelectorAll("path.edge").forEach(ricalcolaArco);
+    document.querySelectorAll("path.edge[data-from]").forEach(ricalcolaArco);
   });
 })();
