@@ -7,6 +7,8 @@ description: Builds a new Atlas task graph, starting from a text the user alread
 
 The result is never a hand-written JSON: it's a **mutation script** in `.atlas/scripts/`, which reads as a diff and re-runs. This skill goes from nothing to that script.
 
+If the project has no `.atlas/` yet (`atlas status` answers "no .atlas/ found above here"), install first with `atlas install --yes`: without `--yes` the command stops to ask for the project name on an interactive prompt that doesn't exist in a session.
+
 ## Step 0 — where to start
 
 Ask the user, with AskUserQuestion, one single thing:
@@ -70,6 +72,8 @@ Sprinkling names over loose nodes makes the frontier unreadable: nobody recognis
 atlas new <slug> -t "Graph title" -d "The destination, in one or two lines."
 atlas new-script first-draft
 ```
+
+`atlas new` already creates a default branch with key `A` ("Main path"). If the design reuses that same letter for its first branch, a `mutate.add_branch(g, "A", ...)` in the script fails because the key already exists: reuse it by writing `g.data["branches"]["A"] = {"label": ..., "color": ...}` directly, or pick a different letter for the first custom branch.
 
 Then fill in the generated script under `.atlas/scripts/`:
 

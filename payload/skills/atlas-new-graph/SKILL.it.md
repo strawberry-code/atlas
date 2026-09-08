@@ -7,6 +7,8 @@ description: Costruisce un grafo di task Atlas nuovo, partendo da un testo che l
 
 Il risultato non è mai un JSON scritto a mano: è uno **script di mutazione** in `.atlas/scripts/`, che si legge in diff e si riesegue. Questa skill porta dal nulla a quello script.
 
+Se il progetto non ha ancora `.atlas/` (`atlas status` risponde "nessun .atlas/ da qui in su"), installa prima con `atlas install --yes`: senza `--yes` il comando si ferma a chiedere il nome del progetto su un input interattivo che in sessione non esiste.
+
 ## Passo 0 — da dove si parte
 
 Chiedi all'utente, con AskUserQuestion, una cosa sola:
@@ -70,6 +72,8 @@ Sparpagliare nomi su nodi sciolti rende la frontiera illeggibile: nessuno ricono
 atlas new <slug> -t "Titolo del grafo" -d "La destinazione, in una o due righe."
 atlas new-script primo-disegno
 ```
+
+`atlas new` crea già da solo un ramo di default con chiave `A` ("Percorso principale"). Se il disegno usa quella stessa lettera per il primo ramo, un `mutate.add_branch(g, "A", ...)` nello script fallisce perché la chiave esiste già: riusa il nome scrivendo direttamente `g.data["branches"]["A"] = {"label": ..., "color": ...}`, oppure scegli un'altra lettera per il primo ramo custom.
 
 Poi riempi lo script generato in `.atlas/scripts/`:
 
