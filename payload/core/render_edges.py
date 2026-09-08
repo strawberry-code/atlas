@@ -3,6 +3,8 @@
 Spezzato da render_svg.py, che disegna i nodi e assembla il canvas: qui vive
 solo cio' che collega i nodi. Le costanti geometriche (W, H, PAD, ...) restano
 in render_svg.py, che le possiede insieme al layout: questo modulo le importa.
+La copia sfumata che passa sotto le card (ghosts(), A03) e' un altro file,
+render_edge_ghosts.py, che riusa _edge_records() da qui.
 """
 from __future__ import annotations
 
@@ -31,23 +33,20 @@ def _slots(ids: list[str], pos: dict, box_x: float, larghezza: float) -> dict[st
     return {i: box_x + margine + utile * k / (len(ordinati) - 1) for k, i in enumerate(ordinati)}
 
 
-def edges(data: dict, pos: dict, front_ids: set[str]) -> str:
-    """Arco ortogonale dal bordo basso del blocker al bordo alto del bloccato
-    (edge_geometry.smooth_step_path, porta di Nodavia: A01), con una porta di
-    aggancio (cerchietto) sull'uscita.
+def _edge_records(data: dict, pos: dict, front_ids: set[str]) -> list[dict]:
+    """Geometria e classi di ogni arco, calcolate una volta sola: edges() le
+    disegna dietro ai nodi, render_edge_ghosts.ghosts() ne riusa la stessa
+    lista per ritagliare la sola porzione che passa sotto una card, senza
+    rifare il calcolo dei punti di aggancio.
 
     Un arco che risale, cioe' il bloccato non sta sotto il blocker nel layout a
-    rank (C08: 'un arco che risale e' sempre un ritorno'), non passa da questa
-    geometria: prende loop_path, la corsia laterale con tratteggio (LOOP_DASH)
-    che lo distingue a colpo d'occhio da un arco sano, altrimenti un giro corto
-    in colonna si confonderebbe con uno in avanti.
-
-    data-from/data-to reggono l'evidenziazione al passaggio del mouse (vedi
-    hover_css). Ogni arco porta invece la classe da-<stato> del nodo da cui parte,
-    e il CSS gliene da' il colore: le frecce entranti dicono in che stato sono le
-    dipendenze senza doverle cercare sulla mappa, e un blocco con tutte le frecce
-    verdi e' un blocco pronto. Prima erano colorati gli archi entranti in un nodo
-    di frontiera, che di quella lettura era il solo caso gia' risolto.
+    rank (C08: 'un arco che risale e' sempre un ritorno'), non passa dalla
+    geometria in avanti (smooth_step_path, porta di Nodavia: A01): prende
+    loop_path, la corsia laterale con tratteggio (LOOP_DASH) che lo distingue
+    a colpo d'occhio da un arco sano, altrimenti un giro corto in colonna si
+    confonderebbe con uno in avanti. loop_lane tiene apposta quella corsia
+    fuori dagli altri nodi, quindi 'loop' esce marcato per farlo escludere
+    da ghosts().
     """
     from .render_svg import H, W
 
@@ -71,24 +70,48 @@ def edges(data: dict, pos: dict, front_ids: set[str]) -> str:
             sy = pos[dep][1] + H
             sx, ex = punti_uscita[dep][nid], punti_entrata[nid][dep]
             da = f"da-{stato_di[dep]}"
-            if ey > pos[dep][1]:
+            loop = ey <= pos[dep][1]
+            if not loop:
                 d, classi, tratto = smooth_step_path(sx, sy, ex, ey), f"edge {da}", ""
             else:
                 d = loop_path(sx, sy, ex, ey)["d"]
                 classi, tratto = f"edge loop {da}", f' stroke-dasharray="{LOOP_DASH}"'
-            out.append(
-                # data-sx/sy/ex/ey: i due punti di aggancio della geometria non
-                # gappata, che il JS non deve riparsare dalla 'd'. Restano gli
-                # unici quattro numeri che C10 non tocca mai: quando drag.js
-                # sposta un nodo ricalcola 'd' e le cx/cy delle porte, ma questi
-                # quattro restano il riferimento "a riposo" per ogni ricalcolo
-                # successivo, e per il ripristino del layout automatico.
-                f'<path class="{classi}" data-from="{dep}" data-to="{nid}" '
-                f'data-sx="{sx}" data-sy="{sy}" data-ex="{ex}" data-ey="{ey}"{tratto} '
-                f'd="{d}" '
-                f'marker-end="url(#tip-{stato_di[dep]})"/>'  # spessore e colore: edges.css
-                f'<circle class="port {da}" data-from="{dep}" data-to="{nid}" cx="{sx}" cy="{sy}" r="2.6"/>'
-            )
+            out.append({
+                "from": dep, "to": nid, "sx": sx, "sy": sy, "ex": ex, "ey": ey,
+                "da": da, "d": d, "classi": classi, "tratto": tratto, "loop": loop,
+                "marker": f"url(#tip-{stato_di[dep]})",
+            })
+    return out
+
+
+def edges(data: dict, pos: dict, front_ids: set[str]) -> str:
+    """Arco ortogonale dal bordo basso del blocker al bordo alto del bloccato,
+    con una porta di aggancio (cerchietto) sull'uscita: geometria in
+    _edge_records, qui solo il disegno.
+
+    data-from/data-to reggono l'evidenziazione al passaggio del mouse (vedi
+    hover_css). Ogni arco porta invece la classe da-<stato> del nodo da cui parte,
+    e il CSS gliene da' il colore: le frecce entranti dicono in che stato sono le
+    dipendenze senza doverle cercare sulla mappa, e un blocco con tutte le frecce
+    verdi e' un blocco pronto. Prima erano colorati gli archi entranti in un nodo
+    di frontiera, che di quella lettura era il solo caso gia' risolto.
+    """
+    out = []
+    for e in _edge_records(data, pos, front_ids):
+        out.append(
+            # data-sx/sy/ex/ey: i due punti di aggancio della geometria non
+            # gappata, che il JS non deve riparsare dalla 'd'. Restano gli
+            # unici quattro numeri che C10 non tocca mai: quando drag.js
+            # sposta un nodo ricalcola 'd' e le cx/cy delle porte, ma questi
+            # quattro restano il riferimento "a riposo" per ogni ricalcolo
+            # successivo, e per il ripristino del layout automatico.
+            f'<path class="{e["classi"]}" data-from="{e["from"]}" data-to="{e["to"]}" '
+            f'data-sx="{e["sx"]}" data-sy="{e["sy"]}" data-ex="{e["ex"]}" data-ey="{e["ey"]}"{e["tratto"]} '
+            f'd="{e["d"]}" '
+            f'marker-end="{e["marker"]}"/>'  # spessore e colore: edges.css
+            f'<circle class="port {e["da"]}" data-from="{e["from"]}" data-to="{e["to"]}" '
+            f'cx="{e["sx"]}" cy="{e["sy"]}" r="2.6"/>'
+        )
     return "".join(out)
 
 
@@ -97,6 +120,11 @@ def hover_css(ids: list[str]) -> str:
     del mouse sul nodo stesso o sulla sua riga nei pannelli laterali, e in quel
     secondo caso mettono in evidenza anche il nodo. Generate qui perche'
     dipendono dagli id del grafo, a differenza del tema statico (edges.css).
+
+    Sul nodo il segnale e' hover O selezione (':is(:hover,.sel)'): un clic
+    (sheet.js/keyboard.js) lo rende persistente oltre il mouseleave, finche'
+    non si seleziona un altro nodo o si clicca altrove. Sulla riga del
+    pannello resta solo l'hover, che non ha un equivalente di clic.
 
     L'evidenziazione ingrossa la linea e non la ricolora. Prima dipingeva di verde
     gli entranti e di rosso gli uscenti, e su un arco che porta gia' il colore del
@@ -108,7 +136,7 @@ def hover_css(ids: list[str]) -> str:
     """
     out = []
     for i in ids:
-        nodo = f'svg:has(#node-{i}:hover)'                       # mouse sul nodo
+        nodo = f'svg:has(#node-{i}:is(:hover,.sel))'              # mouse sul nodo, o selezionato (clic)
         riga = f'body:has(.side [data-node="{i}"]:hover)'        # mouse sulla riga del pannello
         out.append(
             f'{nodo} :is(path,circle)[data-to="{i}"],{riga} :is(path,circle)[data-to="{i}"],'

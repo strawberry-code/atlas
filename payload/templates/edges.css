@@ -22,10 +22,19 @@ circle.port.da-out-of-scope{fill:var(--edge-out-of-scope)}
 .tip-blocked{fill:var(--edge)}
 .tip-out-of-scope{fill:var(--edge-out-of-scope)}
 .tip{fill:var(--edge)}
-svg:has(.n:hover) .n{opacity:.3}
-svg:has(.n:hover) .n:hover{opacity:1}
-svg:has(.n:hover) path.edge{opacity:.12}
-svg:has(.n:hover) circle.port{opacity:.12}
+
+/* la copia sfumata sotto le card (render_edge_ghosts.py): stesso colore di
+   stato dell'arco vero, solo appena visibile, e mai un bersaglio del mouse
+   (l'arco cliccabile resta quello dietro alla card, non questo ritaglio) */
+.edge-ghost{opacity:.28;pointer-events:none}
+/* Lo stesso effetto per hover e per selezione (.n.sel, sheet.js/keyboard.js):
+   un clic lo rende persistente, non solo di passaggio come l'hover da solo.
+   Le regole per-nodo (chi si accende davvero) sono generate in
+   render_edges.hover_css() sullo stesso ':is(:hover,.sel)'. */
+svg:has(.n:hover,.n.sel) .n{opacity:.3}
+svg:has(.n:hover,.n.sel) .n:hover,svg:has(.n:hover,.n.sel) .n.sel{opacity:1}
+svg:has(.n:hover,.n.sel) path.edge{opacity:.12}
+svg:has(.n:hover,.n.sel) circle.port{opacity:.12}
 
 /* palline sugli archi del nodo selezionato (A05, edges.js, porta di
    pulse.tsx): il moto e' tutto in SMIL sul path dell'arco, qui restano solo

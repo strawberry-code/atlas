@@ -7,7 +7,7 @@ a{text-decoration:none;color:inherit}
    vista e' quella visibile) vive nella regola comune '.panel-vista' di
    notifiche.css, non duplicata qui. */
 .sheet{display:flex;flex-direction:column}
-.sheet-head{position:relative;padding:18px 22px 13px;border-bottom:1px solid var(--border)}
+.sheet-head{position:relative;padding:18px 22px 16px;border-bottom:1px solid var(--border)}
 .sheet-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 36px 10px 0;min-height:20px}
 /* stessa veste di '.chip-state' (Grafite): pillola mono senza bordo, su
    --bg-soft. Qui il pallino diventa il glifo di stato (o l'anello fermo),
@@ -53,17 +53,22 @@ a{text-decoration:none;color:inherit}
   font-size:9.5px;letter-spacing:.06em;text-decoration:none}
 .sheet-title .stt{text-decoration-color:transparent}
 .sheet-title .stt:hover{text-decoration-color:var(--ink)}
-.sheet-question{margin:6px 0 0;color:var(--muted);font-size:11px;line-height:1.5;font-style:italic}
-.sheet-body{flex:1;overflow-y:auto;padding:16px 22px 22px;scrollbar-width:thin;
+/* domanda, corpo markdown e artefatti scorrono insieme (S13): un unico
+   contenitore scrollabile sotto l'header fisso, non piu' la domanda incollata
+   al titolo e gli artefatti incollati al fondo. '.sheet-body' (il bersaglio di
+   sheet.js) resta senza padding proprio, lo eredita dal wrapper. */
+.sheet-scroll{flex:1;overflow-y:auto;padding:16px 22px 22px;scrollbar-width:thin;
   scrollbar-color:var(--border-strong) transparent}
+.sheet-question{margin:0 0 14px;color:var(--muted);font-size:11px;line-height:1.5;font-style:italic}
 .sheet-foot{padding:11px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end}
 /* prima solo colore ad annunciare il link: rimosso il teal, l'affordance
    diventa il sottolineato permanente (come '.md a'), non solo l'hover. */
 .sheet-foot a{color:var(--ink);font-size:11px;letter-spacing:.04em;
   text-decoration:underline;text-underline-offset:2px}
 .sheet-empty{color:var(--faint);font-style:italic}
-.sheet-artifacts{margin:0;padding:0 22px 14px;list-style:none;flex:none;display:flex;flex-direction:column;gap:4px}
-.sheet-artifacts:empty{display:none;padding:0}
+.sheet-artifacts{margin:0;padding:14px 0 0;border-top:1px solid var(--border);
+  list-style:none;display:flex;flex-direction:column;gap:4px}
+.sheet-artifacts:empty{display:none;padding:0;border:none}
 .sheet-artifacts-label{font-size:9.5px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;
   font-family:var(--display)}
 .sheet-artifacts code{font-size:10.5px;color:var(--ink);word-break:break-all}

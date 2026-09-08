@@ -30,7 +30,7 @@ from __future__ import annotations
 
 from html import escape
 
-from . import layout_rank, render_edges, render_owners, theme
+from . import layout_rank, render_edge_ghosts, render_edges, render_owners, theme
 from .model import owners_of
 from .theme import STATE, css_class, state_of
 
@@ -166,6 +166,13 @@ def canvas(data: dict, front_ids: set[str], gruppi: dict[str, int], *, lite: boo
         f'<svg viewBox="{origine_x} {origine_y} {larghezza} {altezza}" '
         f'width="{larghezza}" height="{altezza}" xmlns="http://www.w3.org/2000/svg">'
         f'<defs>{render_edges.markers()}</defs>'
-        f'{boxes(data, pos, front_ids, gruppi, lite=lite)}{render_edges.edges(data, pos, front_ids)}'
+        # gli archi vanno prima delle card, non dopo: A03 li vuole dietro ai
+        # nodi, e in SVG l'ordine del documento e' l'ordine di disegno. Sotto
+        # una card piena spariscono del tutto, quindi ghosts() ne ridisegna
+        # sopra, ritagliata card per card, la sola porzione che ci passa
+        # sotto, appena visibile (render_edge_ghosts.py).
+        f'{render_edges.edges(data, pos, front_ids)}'
+        f'{boxes(data, pos, front_ids, gruppi, lite=lite)}'
+        f'{render_edge_ghosts.ghosts(data, pos, front_ids)}'
         '</svg>'
     )

@@ -71,7 +71,15 @@ def sheet() -> str:
     e' una modale. La classe 'sheet' resta (sheet.js la cerca con
     'document.querySelector(".sheet")': cambiarla romperebbe l'intero modulo,
     non solo questa vista), affiancata da 'panel-vista panel-vista-nodo' per
-    il selettore di render_notifiche.py."""
+    il selettore di render_notifiche.py.
+
+    Fisso solo l'header (selettore schede piu' su, chip e titolo qui dentro):
+    domanda, corpo markdown e artefatti scorrono insieme dentro '.sheet-scroll',
+    non piu' la domanda fissa in testa e gli artefatti fissi in coda come prima
+    di S13. '.sheet-body' resta il bersaglio che sheet.js sovrascrive con
+    'innerHTML' (vedi corpo() li'): deve restare un fratello di
+    '.sheet-question'/'.sheet-artifacts' dentro lo scroll, mai un loro genitore,
+    o ogni rendering del markdown li cancellerebbe insieme al contenuto vecchio."""
     return (
         f'<div class="panel-vista panel-vista-nodo sheet" data-empty="{escape(t("render.sheet_vuoto"))}"'
         f' data-owner-label="{escape(t("render.sheet_assegnato"))}"'
@@ -81,9 +89,10 @@ def sheet() -> str:
         f' data-copia="{escape(t("render.copia"))}" data-copiato="{escape(t("render.copiato"))}">'
         '<header class="sheet-head"><div class="sheet-chips"></div>'
         f'<button type="button" class="sheet-close" aria-label="{escape(t("render.sheet_chiudi"))}">✕</button>'
-        '<h2 class="sheet-title"></h2><p class="sheet-question"></p></header>'
+        '<h2 class="sheet-title"></h2></header>'
+        '<div class="sheet-scroll"><p class="sheet-question"></p>'
         '<div class="sheet-body md"></div>'
-        '<ul class="sheet-artifacts"></ul>'
+        '<ul class="sheet-artifacts"></ul></div>'
         f'<footer class="sheet-foot"><a class="sheet-raw" target="_blank">{t("render.sheet_apri_file")}</a></footer>'
         '</div>'
     )

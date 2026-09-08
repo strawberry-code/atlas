@@ -93,6 +93,7 @@
   var toggle = pannello.querySelector(".notifiche-toggle");
   var chips = sheet.querySelector(".sheet-chips");
   var titolo = sheet.querySelector(".sheet-title");
+  var scorrimento = sheet.querySelector(".sheet-scroll");   // il contenitore che scorre (S13): non e' piu' '.sheet-body'
   var domanda = sheet.querySelector(".sheet-question");
   var corpo = sheet.querySelector(".sheet-body");
   var artefatti = sheet.querySelector(".sheet-artifacts");
@@ -146,7 +147,7 @@
     var md = (n.md || "").trim();
     corpo.innerHTML = md ? markdown(esc(md))
       : '<p class="sheet-empty">' + esc(sheet.dataset.empty) + "</p>";
-    corpo.scrollTop = 0;
+    scorrimento.scrollTop = 0;
     var listaArtefatti = Array.isArray(n.artifacts) ? n.artifacts : [];
     artefatti.innerHTML = listaArtefatti.length
       ? '<li class="sheet-artifacts-label">' + esc(sheet.dataset.artefattiLabel) + "</li>"
@@ -189,24 +190,34 @@
   /* Selezione: un nodo alla volta, la classe sta sulla card della mappa
      (render_svg.py, '.n.sel'), non su chi ha generato il clic - un clic dalla
      tabella o dal pannello seleziona comunque la carta giusta. E' il
-     presupposto delle palline sugli archi (A05) e della navigazione da
+     presupposto delle palline sugli archi (A05), dell'evidenziazione persistente
+     di archi/nodi (edges.css, render_edges.hover_css) e della navigazione da
      tastiera (C12): chi legge '.sel' non deve sapere come ci e' arrivata. */
-  function seleziona(id) {
+  function deseleziona() {
     var precedente = document.querySelector(".map .n.sel");
     if (precedente) precedente.classList.remove("sel");
+  }
+  function seleziona(id) {
+    deseleziona();
     var carta = document.getElementById("node-" + id);
     if (carta) carta.classList.add("sel");
   }
 
   document.addEventListener("click", function (e) {
-    var via = e.target.closest ? e.target.closest("[data-node]") : null;
-    if (!via) return;
-    e.preventDefault();
     // 'trascina' la aggiungono canvas.js/drag.js a '.viewport' a inizio pan
     // (e ora anche a 'body', per la selezione di testo: C13, non tocca questo
     // controllo, che legge sempre e solo il viewport): un pan che finisce
-    // sopra una card non deve aprirla.
+    // sopra una card non deve aprirla, ne' deselezionare.
     if (vp.classList.contains("trascina")) return;
+    var via = e.target.closest ? e.target.closest("[data-node]") : null;
+    if (!via) {
+      // un clic altrove toglie la selezione, tranne dentro al pannello
+      // laterale: leggerne il contenuto non deve far sparire l'evidenziazione
+      // sulla mappa che quel contenuto sta spiegando.
+      if (!(e.target.closest && e.target.closest(".pannello"))) deseleziona();
+      return;
+    }
+    e.preventDefault();
     var id = via.dataset.node || via.getAttribute("data-node");
     seleziona(id);
     apri(id);
