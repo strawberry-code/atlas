@@ -117,6 +117,8 @@ atlas render --open
 
 `exec` scrive i ticket mancanti, rigenera la mappa e la dashboard, e stampa la frontiera. Guardala insieme all'utente: un grafo con venti nodi tutti prendibili non ha dipendenze vere, uno con un nodo solo prendibile è una lista travestita da grafo, e più nodi terminali sono rami che non confluiscono nel finale.
 
+Subito dopo controlla la forma del grafo, che `doctor` non guarda: un arco `blockedBy` ridondante, cioè già implicato da un altro cammino, e un id citato nella domanda di un nodo ma assente dai suoi `blockedBy`. Uno script di poche righe su `graph.json` basta, e vale la pena scriverlo una volta e tenerlo. Un arco di troppo si toglie con `mutate.unlink` in uno script successivo; se il grafo non è ancora in git e nessun nodo è stato lavorato, correggi lo script e rigenera da zero, così la storia parte pulita.
+
 ## La domanda di ogni nodo
 
 Il campo `question` diventa il corpo del ticket, quindi scrivilo per intero: un paragrafo che dice cosa va deciso o fatto, e che cosa si considera una risposta. Un titolo breve più una domanda lunga si leggono bene; una domanda che ripete il titolo non aiuta nessuno.

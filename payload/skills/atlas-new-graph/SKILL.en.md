@@ -117,6 +117,8 @@ atlas render --open
 
 `exec` writes the missing tickets, regenerates the map and the dashboard, and prints the frontier. Look at it together with the user: a graph with twenty nodes all up for grabs has no real dependencies, one with only a single node up for grabs is a list disguised as a graph, and several terminal nodes are strands that don't flow into the final one.
 
+Right after, check the shape of the graph, which `doctor` does not look at: a redundant `blockedBy` edge, one already implied by another path, and an id mentioned in a node's question but missing from its `blockedBy`. A script of a few lines over `graph.json` is enough, and it is worth writing once and keeping. An extra edge comes off with `mutate.unlink` in a follow-up script; if the graph is not in git yet and no node has been worked, fix the script and regenerate from scratch, so the history starts clean.
+
 ## Each node's question
 
 The `question` field becomes the ticket's body, so write it out in full: a paragraph saying what needs to be decided or done, and what counts as an answer. A short title plus a long question reads well; a question that just repeats the title helps no one.
