@@ -9,7 +9,7 @@ This is an active discipline, not a reading: you challenge terms, invent edge-ca
 
 It works in pairs with `atlas-strategic-grilling` and `atlas-tactical-grilling`: the grilling brings the questions, this pins down the words the answer gets written in. Without it, the graph accumulates tickets that say "account" meaning three different things.
 
-The domain glossary has nothing to do with `vocab` in `.atlas/config.json`, which is the harness's vocabulary (types, modes, statuses) and not the project's.
+The domain glossary has nothing to do with `vocab` in `.atlas/config.json`, which is the harness's vocabulary (types, modes) and not the project's.
 
 ## During the session
 

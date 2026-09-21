@@ -29,6 +29,14 @@ STRINGS: dict[str, dict[str, str]] = {
     "help.take": {"it": "rivendica un nodo e ne stampa subito il contesto",
                   "en": "claims a node and prints its context right away"},
     "help.release": {"it": "restituisce un nodo alla frontiera", "en": "returns a node to the frontier"},
+    "help.suspend": {"it": "congela un lavoro parziale: il nodo torna prendibile, con la nota nel ticket",
+                     "en": "freezes partial work: the node becomes takeable again, with the note in the ticket"},
+    "help.suspend_nota": {"it": "dove sei arrivato e cosa manca, mai vuota",
+                          "en": "where you got to and what is left, never empty"},
+    "suspend.fatto": {"it": "  {id} sospeso: lavoro parziale congelato, prendibile di nuovo con 'atlas take'\n"
+                            "  la nota è nella Lavorazione di {path}",
+                      "en": "  {id} suspended: partial work frozen, takeable again with 'atlas take'\n"
+                            "  the note is in the Work section of {path}"},
     "help.give_up": {"it": "dichiara la resa su un nodo, con motivo e dettaglio",
                      "en": "declares surrender on a node, with a reason and a detail"},
     "help.give_up_motivo": {"it": "infeasible, missing-resource, blocked-environment, needs-redesign",
@@ -37,14 +45,14 @@ STRINGS: dict[str, dict[str, str]] = {
                                "en": "explains the reason to a human, never empty"},
     "give_up.fatto": {"it": "  {id} tornato alla frontiera, resa registrata ({motivo})",
                       "en": "  {id} back on the frontier, surrender recorded ({motivo})"},
-    "help.ask_human": {"it": "dichiara che serve una persona: apre un'Interazione e sospende il nodo",
-                       "en": "declares that a human is needed: opens an Interaction and suspends the node"},
+    "help.ask_human": {"it": "dichiara che serve una persona: apre un'Interazione e mette il nodo in attesa",
+                       "en": "declares that a human is needed: opens an Interaction and puts the node on hold"},
     "help.ask_human_domanda": {
         "it": "l'alternativa da proporre, non una domanda aperta: chi risponde sceglie fra due bottoni",
         "en": "the alternative to propose, not an open question: whoever answers picks one of two buttons"},
     "ask_human.fatto": {
-        "it": "  {id} sospeso: Interazione {interazione} aperta, scade {scadenza}",
-        "en": "  {id} suspended: Interaction {interazione} opened, expires {scadenza}"},
+        "it": "  {id} in attesa di una persona: Interazione {interazione} aperta, scade {scadenza}",
+        "en": "  {id} waiting for a person: Interaction {interazione} opened, expires {scadenza}"},
     "help.close": {"it": "chiude un nodo con la sua sintesi", "en": "closes a node with its summary"},
     "help.amend": {"it": "corregge artefatti, costo o sintesi di un nodo già chiuso",
                    "en": "fixes artifacts, cost or summary of an already closed node"},
@@ -57,6 +65,12 @@ STRINGS: dict[str, dict[str, str]] = {
                            "en": "investigating, implementing, verifying, writing-answer, blocked"},
     "help.progress_nota": {"it": "una riga facoltativa, mostrata solo a un umano",
                            "en": "an optional line, shown only to a human"},
+    "help.log": {"it": "appunta nella Lavorazione del ticket cosa hai fatto: chi, quando, cosa",
+                 "en": "notes in the ticket's Work section what you did: who, when, what"},
+    "help.log_testo": {"it": "cosa hai fatto, anche a metà, in una o più righe",
+                       "en": "what you did, even halfway, in one or more lines"},
+    "log.fatto": {"it": "  voce scritta nella Lavorazione di {path}",
+                  "en": "  entry written to the Work section of {path}"},
     "help.identity": {"it": "identità che tiene il lucchetto, vince su ATLAS_IDENTITY",
                       "en": "identity holding the lock, overrides ATLAS_IDENTITY"},
     "help.render_all": {"it": "rigenera tutti i grafi del progetto, non solo quello attivo",
@@ -207,6 +221,11 @@ STRINGS: dict[str, dict[str, str]] = {
     "doctor.lucchetto_fermo": {"it": "{id} è rivendicato ma {stato}", "en": "{id} is claimed but {stato}"},
     "doctor.dashboard_stantia": {"it": "la dashboard è più vecchia dell'ultima modifica al grafo: esegui 'atlas render'",
                                  "en": "the dashboard is older than the last change to the graph: run 'atlas render'"},
+    "doctor.sospeso_senza_registro": {
+        "it": "nodi sospesi con la sezione '{heading}' vuota nel ticket: {elenco}. Un sospeso senza registro "
+              "non si sa riprendere: scrivi lì cosa era stato fatto, o riportalo aperto con uno script",
+        "en": "suspended nodes with an empty '{heading}' section in the ticket: {elenco}. A suspended node "
+              "without a log cannot be resumed: write there what had been done, or reopen it with a script"},
     "doctor.ticket_scollegato": {"it": "in questi ticket manca il confine {mark} fra la parte generata e "
                                         "il testo scritto a mano: {elenco}. La loro testa non si riallinea "
                                         "più al grafo, e va rimessa a mano o ricreata cancellando il file.",

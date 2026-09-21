@@ -151,6 +151,8 @@ class DueCloni(unittest.TestCase):
     def _scrivi_risposta(self, clone: Path, slug: str, nid: str, ans: str) -> None:
         ticket = clone / ".atlas" / "graphs" / slug / "tickets" / f"{nid}.md"
         testo = ticket.read_text(encoding="utf-8-sig")
+        # una voce nel registro di Lavorazione, che close pretende quanto la Risposta
+        testo = testo.replace("## Lavorazione", "## Lavorazione\n\n- **prova** · 2026-01-01 00:00\n  lavoro svolto\n", 1)
         ticket.write_text(testo.rstrip() + f"\n\n{ans}\n", encoding="utf-8")
 
     def _chiudi(self, clone: Path, slug: str, nid: str, host: str, ident: str, ans: str) -> None:

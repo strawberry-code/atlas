@@ -13,7 +13,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import adapters, autopilot, claims, docs, doctor, drift, gitscan, howto, merge, mutate, peer_notify, providers, render as dash, report, scripts, serve, strings, topology
+from . import adapters, autopilot, claims, docs, doctor, drift, gitscan, howto, merge, mutate, peer_notify, providers, render as dash, report, scripts, serve, strings, topology, worklog
 from .config import ENV_IDENTITY, ConfigError, Workspace, workspace
 from .model import fog_line, node_of
 from .mutate import editing, validate
@@ -361,12 +361,12 @@ def _grafo(p: argparse.ArgumentParser) -> None:
 # (driver git) e conflicts (lettura diagnostica del merge).
 _RINNOVA_BATTITO = frozenset((
     "status", "next", "show", "brief",
-    "claim", "take", "release", "give-up", "ask-human", "close", "amend", "progress",
+    "claim", "take", "release", "suspend", "give-up", "ask-human", "close", "amend", "progress", "log",
     "ask", "asks", "answer", "fog", "assign", "unassign", "render",
 ))
 
-COMANDI = ("status", "next", "graphs", "use", "show", "brief", "claim", "take", "release",
-           "give-up", "ask-human", "close", "ask", "asks", "answer", "drift", "fog", "assign", "unassign", "whoami", "render", "serve", "run", "run-status", "run-log", "merge-graph",
+COMANDI = ("status", "next", "graphs", "use", "show", "brief", "claim", "take", "release", "suspend",
+           "give-up", "ask-human", "close", "log", "ask", "asks", "answer", "drift", "fog", "assign", "unassign", "whoami", "render", "serve", "run", "run-status", "run-log", "merge-graph",
            "conflicts", "new", "new-script", "exec", "renumber", "validate", "doctor", "how-to")
 
 
@@ -431,6 +431,8 @@ def aggiungi_comandi(sub) -> None:
     _identity(p); _grafo(p)
     p = sub.add_parser("release", help=t("help.release")); p.add_argument("node")
     p.add_argument("-r", "--ragione", default=None); _identity(p); _grafo(p)
+    p = sub.add_parser("suspend", help=t("help.suspend")); p.add_argument("node")
+    p.add_argument("-m", "--nota", required=True, help=t("help.suspend_nota")); _identity(p); _grafo(p)
     p = sub.add_parser("give-up", help=t("help.give_up"))
     p.add_argument("node")
     p.add_argument("--motivo", required=True, choices=list(claims.MOTIVI_RESA),
@@ -455,6 +457,8 @@ def aggiungi_comandi(sub) -> None:
     p.add_argument("step", choices=list(claims.PASSI), help=t("help.progress_step"))
     p.add_argument("nota", nargs="?", default=None, help=t("help.progress_nota"))
     _grafo(p)
+    p = sub.add_parser("log", help=t("help.log")); p.add_argument("node")
+    p.add_argument("testo", help=t("help.log_testo")); _identity(p); _grafo(p)
     p = sub.add_parser("ask", help=t("help.ask")); p.add_argument("node")
     p.add_argument("-q", "--question", required=True); p.add_argument("-a", "--assumption", required=True)
     _identity(p); _grafo(p)
@@ -605,6 +609,14 @@ def dispatch(ws: Workspace, args) -> int:
         print(riga)
         return 0
 
+    if args.cmd == "log":
+        # Come progress: niente refresh degli artefatti derivati, la voce sta nel
+        # ticket e il battito nel grafo. Un errore qui invece si vede, perche' una
+        # voce non scritta e' lavoro perso, non un segnale mancato.
+        path = ref.ticket_path(worklog.log(ref, args.node, args.testo)["id"])
+        print(t("log.fatto", path=path))
+        return 0
+
     if args.cmd == "amend":
         artefatti = _artefatti_cli(args.artefatti)
         with mutate.editing(ref) as g:
@@ -655,6 +667,9 @@ def dispatch(ws: Workspace, args) -> int:
         print(t("claim.fatto", id=node["id"], path=ref.ticket_path(node["id"])))
     elif args.cmd == "release":
         print(t("release.fatto", id=claims.release(ref, args.node, args.ragione)["id"]))
+    elif args.cmd == "suspend":
+        node = claims.suspend(ref, args.node, args.nota)
+        print(t("suspend.fatto", id=node["id"], path=ref.ticket_path(node["id"])))
     elif args.cmd == "give-up":
         node = claims.give_up(ref, args.node, args.motivo, args.dettaglio)
         print(t("give_up.fatto", id=node["id"], motivo=args.motivo))

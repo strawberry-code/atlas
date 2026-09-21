@@ -12,7 +12,14 @@
 
 ## Work
 
-<!-- notes, discarded alternatives, links to produced artifacts -->
+<!-- the log of whoever works the node, even halfway: one entry per activity, with
+`atlas log <ID> "what you did"` writing it in this form
+
+- **who** · YYYY-MM-DD HH:MM
+  what they did
+
+Notes, discarded alternatives and links to artifacts go inside the entries.
+`close` and `suspend` refuse a ticket with no entry; `suspend` adds one with its note. -->
 
 ## Answer
 

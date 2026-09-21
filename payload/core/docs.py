@@ -138,8 +138,8 @@ def _replace_section(text: str, heading: str, corpo: str) -> str:
 
 
 def decisions(data: dict) -> str:
-    """L'indice del percorso camminato, in ordine cronologico: chiusure e rilasci motivati.
-    Discende dal grafo.
+    """L'indice del percorso camminato, in ordine cronologico: chiusure, rilasci
+    motivati e sospensioni. Discende dal grafo.
 
     Tenerlo append-only lo rendeva l'unica parte della mappa che una rigenerazione
     non sapeva ricostruire: bastava perdere map.md per perdere la storia.
@@ -147,10 +147,13 @@ def decisions(data: dict) -> str:
     chiusi = [(n.get("closedAt") or "",
               f"- **{n['id']}** {n['title']}: {n['answer']} · [ticket](tickets/{n['id']}.md)")
              for n in data["nodes"] if n["status"] == "closed"]
-    rilasci = [(r["at"], f"- **{r['id']}** {r['title']} rilasciato: {r['reason']} · "
+    rilasci = [(r["at"], f"- **{r['id']}** {r['title']} {t('docs.rilasciato')}: {r['reason']} · "
                           f"[ticket](tickets/{r['id']}.md)")
               for r in data.get("releases", [])]
-    righe = [riga for _, riga in sorted(chiusi + rilasci, key=lambda x: x[0])]
+    sospesi = [(s["at"], f"- **{s['id']}** {s['title']} {t('docs.sospeso')}: {s['note']} · "
+                          f"[ticket](tickets/{s['id']}.md)")
+               for s in data.get("suspensions", [])]
+    righe = [riga for _, riga in sorted(chiusi + rilasci + sospesi, key=lambda x: x[0])]
     return "\n".join(righe) or t("docs.niente")
 
 

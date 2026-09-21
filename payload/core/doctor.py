@@ -3,11 +3,11 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from . import claims, docs, gitscan, questions, remotelock
+from . import claims, docs, gitscan, questions, remotelock, worklog
 from .config import ConfigError, Graph, Workspace
 from .model import by_id, claimed, is_done, istante, owners_of
 from .report import ETICHETTA
-from .store import StateError, load
+from .store import SUSPENDED, StateError, load
 from .strings import t
 from .topology import convergence
 
@@ -48,6 +48,14 @@ def doctor_avvisi(data: dict, ref: Graph, agente: dict) -> list[str]:
 
     if scollegati := docs.unalignable(ref, data):
         avvisi.append(t("doctor.ticket_scollegato", elenco=", ".join(scollegati), mark=docs.MARK_END))
+
+    # Un sospeso e' un lavoro parziale, e il lavoro parziale sta nel registro del
+    # ticket: suspend() rifiuta senza, quindi uno cosi' arriva solo da un grafo
+    # scritto a mano o da un ticket svuotato dopo. E' il nodo che nessuno sa riprendere.
+    if senza_registro := [n["id"] for n in data["nodes"]
+                          if n["status"] == SUSPENDED and not worklog.written(ref, n["id"])]:
+        avvisi.append(t("doctor.sospeso_senza_registro", elenco=", ".join(senza_registro),
+                        heading=t("heading.lavorazione")))
 
     index = by_id(data)
     for nodo in claimed(data):

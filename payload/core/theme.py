@@ -12,12 +12,14 @@ from __future__ import annotations
 STATE = {
     "frontier": ("▲", "state.frontier", None),
     "claimed": ("⬤", "state.claimed", None),
+    # mezzo pieno: un lavoro fatto a meta' e congelato, prendibile come la frontiera
+    "suspended": ("◐", "state.suspended", None),
     "closed": ("✓", "state.closed", None),
     "blocked": ("·", "state.blocked", None),
     "out-of-scope": ("✕", "state.out_of_scope", "4 3"),
 }
 
-ORDER = ["frontier", "claimed", "blocked", "closed", "out-of-scope"]
+ORDER = ["frontier", "claimed", "suspended", "blocked", "closed", "out-of-scope"]
 
 # ripiego per un ramo senza colore dichiarato: neutro, leggibile su chiaro e scuro
 BRANCH_FALLBACK = "#7d8da3"
@@ -79,9 +81,9 @@ def css_class(stato: str) -> str:
 
 
 def state_of(node: dict, front_ids: set[str]) -> str:
-    """Lo stato visivo non e' lo stato del nodo: 'open' si biforca in prendibile o bloccato."""
-    if node["status"] in ("closed", "out-of-scope"):
+    """Lo stato visivo non e' lo stato del nodo: 'open' si biforca in prendibile o
+    bloccato. Il sospeso invece resta se stesso anche quando un arco lo trattiene:
+    il lavoro parziale nel ticket e' l'informazione che conta, non il turno."""
+    if node["status"] in ("claimed", "suspended", "closed", "out-of-scope"):
         return node["status"]
-    if node["status"] == "claimed":
-        return "claimed"
     return "frontier" if node["id"] in front_ids else "blocked"

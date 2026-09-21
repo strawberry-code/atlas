@@ -23,10 +23,15 @@ CLAIM_CHIP = {
 
 
 def frontiera(front: list[dict]) -> list[str]:
+    """Un nodo sospeso sta in frontiera come gli altri, ma il chip che lo dice
+    resta visibile senza hover: e' il motivo per cui lo si sceglie o lo si evita."""
+    sospeso = (f'<span class="chip-state warn"><i class="chip-state-dot"></i>'
+               f'{t("state.suspended")}</span>')
     return [
         f'<li class="row-dense" data-node="{n["id"]}"><b>{n["id"]}</b>'
         f'<span class="row-dense-label">{escape(n["title"])}</span>'
-        f'<span class="row-dense-meta reveal-on-hover">{n["type"]}·{n["mode"]}</span></li>'
+        f'<span class="row-dense-meta reveal-on-hover">{n["type"]}·{n["mode"]}</span>'
+        f'{sospeso if n["status"] == "suspended" else ""}</li>'
         for n in front
     ]
 

@@ -1,4 +1,4 @@
-"""L'esito 'serve una persona' (H01/3, H05): 'atlas ask-human' sospende il nodo
+"""L'esito 'serve una persona' (H01/3, H05): 'atlas ask-human' mette il nodo in attesa
 sopra un'Interazione del ledger gia' esistente, invece di un canale nuovo. Qui si
 prova che il comando apre la card giusta e rilascia il claim, che claim() rifiuta
 di riprendere il nodo finche' la card resta aperta e lo lascia libero dopo la

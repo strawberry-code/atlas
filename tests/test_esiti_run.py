@@ -54,6 +54,8 @@ class TreGuastiVeri(unittest.TestCase):
         shutil.rmtree(self.tmp)
 
     def _scrivi_risposta(self, node_id):
+        from core import worklog
+        worklog.append(self.ref, node_id, "prova", "lavoro svolto")
         path = self.ref.ticket_path(node_id)
         path.write_text(path.read_text(encoding="utf-8") + "\nLavoro svolto e scritto qui.\n",
                         encoding="utf-8")

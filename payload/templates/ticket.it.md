@@ -12,7 +12,14 @@
 
 ## Lavorazione
 
-<!-- appunti, alternative scartate, link agli artefatti prodotti -->
+<!-- il registro di chi lavora il nodo, anche a metà: una voce per attività, con
+`atlas log <ID> "cosa hai fatto"` che la scrive in questa forma
+
+- **chi** · AAAA-MM-GG HH:MM
+  cosa ha fatto
+
+Appunti, alternative scartate e link agli artefatti stanno dentro le voci.
+`close` e `suspend` rifiutano un ticket senza nessuna voce; `suspend` ne aggiunge una con la nota. -->
 
 ## Risposta
 

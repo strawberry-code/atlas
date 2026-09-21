@@ -167,7 +167,8 @@ class PremessaScaduta(Base):
             self.model.node_of(data, node_id)["question"] = "la domanda e' cambiata"
 
     def chiudi(self, node_id: str = "F01", **kwargs):
-        with mock.patch.object(self.docs, "answer_written", return_value=True):
+        with mock.patch.object(self.docs, "answer_written", return_value=True), \
+             mock.patch.object(self.claims.worklog, "written", return_value=True):
             return self.claims.close(self.ref, node_id, "sintesi", **kwargs)
 
     def test_il_claim_registra_l_impronta(self):
@@ -237,7 +238,8 @@ class GitFuoriDalLock(Base):
             return []
 
         with mock.patch.object(self.claims.gitscan, "touched", spia), \
-             mock.patch.object(self.docs, "answer_written", return_value=True):
+             mock.patch.object(self.docs, "answer_written", return_value=True), \
+             mock.patch.object(self.claims.worklog, "written", return_value=True):
             self.claims.close(self.ref, "F01", "sintesi")
         self.assertEqual([True], libero, "git e' stato chiamato con il lock in mano")
 

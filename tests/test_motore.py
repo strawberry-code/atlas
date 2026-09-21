@@ -36,8 +36,8 @@ class Base(unittest.TestCase):
         for modulo in [m for m in sys.modules if m == "core" or m.startswith("core.")]:
             del sys.modules[modulo]
         from core import (config, docs, doctor, howto, identity, mutate, render, render_panels,
-                          store, model, topology, claims, strings, report)
-        self.config, self.docs, self.mutate = config, docs, mutate
+                          store, model, topology, claims, strings, report, worklog)
+        self.config, self.docs, self.mutate, self.worklog = config, docs, mutate, worklog
         self.render, self.store, self.model, self.claims = render, store, model, claims
         self.strings, self.report, self.howto, self.doctor = strings, report, howto, doctor
         self.topology, self.identity, self.render_panels = topology, identity, render_panels
@@ -62,7 +62,9 @@ class Base(unittest.TestCase):
         return self.store.load(self.ref.json_path)
 
     def rispondi(self, node_id: str):
+        """Il ticket pronto da chiudere: una voce nel registro di Lavorazione e la Risposta."""
         self.docs.write_stubs(self.ref, self.store.load(self.ref.json_path))
+        self.worklog.append(self.ref, node_id, "prova", "lavoro svolto")
         path = self.ref.ticket_path(node_id)
         path.write_text(path.read_text(encoding="utf-8") + "\nLa risposta.\n", encoding="utf-8")
 
@@ -1506,6 +1508,7 @@ class Assegnazioni(Base):
         self.claims.claim(self.ref, "F01")
         with self.mutate.editing(self.ref) as g:
             self.mutate.assign(g, "lucia", ["F01"])
+        self.worklog.append(self.ref, "F01", "prova", "lavoro svolto")
         path = self.ref.ticket_path("F01")
         path.write_text(path.read_text(encoding="utf-8").replace(
             "## Risposta", "## Risposta\n\nfatto"), encoding="utf-8")

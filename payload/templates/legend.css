@@ -54,9 +54,11 @@ body[data-owner] .legend .chip[data-owner]:not(.on){opacity:.5}
 .legend .chip i{width:8px;height:8px;flex:none}
 .chip.st-frontier i{background:var(--st-frontier-bg);border:1.5px solid var(--st-frontier)}
 .chip.st-claimed i{background:var(--st-claimed-bg);border:1.5px solid var(--st-claimed)}
+.chip.st-suspended i{background:var(--st-suspended-bg);border:1.5px solid var(--st-suspended)}
 .chip.st-closed i{background:var(--st-closed-bg);border:1.5px solid var(--st-closed)}
 .chip.st-blocked i{background:var(--st-blocked-bg);border:1.5px solid var(--st-blocked)}
 .chip.st-out-of-scope i{background:var(--st-out-of-scope-bg);border:1.5px dashed var(--st-out-of-scope)}
 .chip.st-frontier{color:var(--st-frontier-tx)}
 .chip.st-claimed{color:var(--st-claimed-tx)}
+.chip.st-suspended{color:var(--st-suspended-tx)}
 .chip.st-closed{color:var(--st-closed-tx)}

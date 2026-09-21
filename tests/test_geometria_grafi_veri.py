@@ -1,5 +1,5 @@
 """V02: le due geometrie provate da sole (edge_geometry.py/A01, layout_rank.py/
-C08, render_edges.py/A03) tenute insieme sui sei grafi veri di .atlas/graphs/,
+C08, render_edges.py/A03) tenute insieme sui sette grafi veri di .atlas/graphs/,
 mai sui casi sintetici che quei tre nodi hanno gia' coperto ognuno per conto
 proprio. Quattro invarianti, la stessa lista del ticket:
 
@@ -17,7 +17,7 @@ geometria e' tradotta) e' un diagramma a ingresso singolo. Con una radice sola
 l'invariante 4 falliva su 4 dei 6 grafi veri: LaProvaMorde la rompe di
 proposito per dimostrare che questo file se ne accorgerebbe.
 
-I sei grafi veri sono oggi tutti DAG (limite dichiarato da A03): la corsia
+I sette grafi veri sono oggi tutti DAG (limite dichiarato da A03): la corsia
 laterale e il tratteggio del ritorno restano provati solo su un ciclo
 costruito qui in memoria, mai scritto su un file del progetto.
 """
@@ -118,13 +118,13 @@ def _path_vuoti(svg: str) -> list[str]:
 
 
 class GraphReale(unittest.TestCase):
-    """Le quattro invarianti del ticket, su ognuno dei sei grafi veri."""
+    """Le quattro invarianti del ticket, su ognuno dei sette grafi veri."""
 
-    def test_sono_sei(self):
+    def test_sono_sette(self):
         # se questo fallisce le prove sotto sono vuote per assenza di dati,
         # non per assenza di difetti: un errore esplicito vale piu' di un
         # verde silenzioso
-        self.assertEqual(len(_grafi_veri()), 6)
+        self.assertEqual(len(_grafi_veri()), 7)
 
     def test_nessun_nan_nessuna_card_fuori_riquadro_nessuna_sovrapposizione(self):
         w, h, pad = render_svg.W, render_svg.H, render_svg.PAD
@@ -148,7 +148,7 @@ class GraphReale(unittest.TestCase):
                 self.assertEqual(_path_vuoti(svg), [], f"{nome}: path vuoto, arco sparito")
 
     def test_ogni_arco_che_risale_e_un_ritorno_vero(self):
-        """I sei grafi veri sono oggi tutti DAG (A03): senza un ciclo vero non
+        """I sette grafi veri sono oggi tutti DAG (A03): senza un ciclo vero non
         puo' esistere un ritorno vero, quindi nessun arco deve essere
         disegnato con la corsia laterale (class="edge loop")."""
         for nome, data in _grafi_veri():
@@ -166,7 +166,7 @@ class GraphReale(unittest.TestCase):
 
 class ArcoDiRitornoSintetico(unittest.TestCase):
     """La corsia laterale e il tratteggio (A01) restano provati solo qui, su
-    un ciclo costruito in memoria: nessuno dei sei grafi veri ne contiene uno
+    un ciclo costruito in memoria: nessuno dei sette grafi veri ne contiene uno
     (limite dichiarato da A03), e questo file non tocca i grafi veri."""
 
     def test_un_ciclo_vero_produce_almeno_un_ritorno_disegnato(self):

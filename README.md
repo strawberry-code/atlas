@@ -53,10 +53,10 @@ Install the CLI, install it in a project (creates `.atlas/`, registers the proje
 1. **Create or import a graph**, from a text you already have or by tracing it from scratch if the idea is still fog. The `atlas-wayfinder` and `atlas-new-graph` skills handle this.
 2. **Look at the frontier** with `atlas status`, or `atlas next` to rank it by impact when several nodes are up for grabs.
 3. **Take a node** with `atlas take <ID>`, before touching it: claims it and prints its context (question, blockers' answers, fog that names it) in the same step.
-4. **Work it**: if the node is AFK, the agent does it alone; if it's HITL, the `atlas-work` skill asks its questions one at a time and waits.
-5. **Close it** with `atlas close <ID> -s "summary"`, after writing the Answer section in the ticket. The map and dashboard regenerate on their own.
+4. **Work it**: if the node is AFK, the agent does it alone; if it's HITL, the `atlas-work` skill asks its questions one at a time and waits. What gets done, even halfway, is recorded in the ticket's Work section with `atlas log <ID> "what you did"`: one entry per activity, signed with who and when.
+5. **Close it** with `atlas close <ID> -s "summary"`, after writing the Answer section in the ticket; `close` refuses if the Answer is missing or the Work section has no entry. The map and dashboard regenerate on their own.
 
-Closing is not the only way to finish, and the other two matter most when an agent works with nobody watching. `atlas give-up <ID> --motivo <REASON>` declares that the work cannot be done, picking the reason from `infeasible`, `missing-resource`, `blocked-environment` and `needs-redesign`: Autopilot treats it as final and moves on, instead of throwing the same agent at the same wall again. `atlas ask-human <ID> -q "proposal"` declares that a person is needed: it opens an Interaction and the node waits without spending attempts. And while working, `atlas progress <ID> <STEP>` declares where the work has got to, so an agent that is stuck can be told apart from one that is thinking.
+Closing is not the only way to finish. If the work has to stop halfway but is worth keeping, `atlas suspend <ID> -m "where you got to and what is left"` freezes it: the node goes to `suspended`, drops the lock, stays on the frontier, and whoever resumes it with `atlas take` reads the note and the Work log, which `suspend` requires to be already written. The other two ways matter most when an agent works with nobody watching. `atlas give-up <ID> --motivo <REASON>` declares that the work cannot be done, picking the reason from `infeasible`, `missing-resource`, `blocked-environment` and `needs-redesign`: Autopilot treats it as final and moves on, instead of throwing the same agent at the same wall again. `atlas ask-human <ID> -q "proposal"` declares that a person is needed: it opens an Interaction and the node waits without spending attempts. And while working, `atlas progress <ID> <STEP>` declares where the work has got to, so an agent that is stuck can be told apart from one that is thinking.
 
 For an Autopilot run, `atlas run-status` shows the persistent state and `atlas run-log` shows the event history; `atlas run-log --tail N` limits the diagnosis to the latest events.
 
@@ -131,6 +131,8 @@ atlas next                           # frontier ranked by impact, as a suggestio
 atlas take F01                       # claims it and prints its context in one step
 # work it, then write the Answer section in .atlas/graphs/<slug>/tickets/F01.md
 atlas progress F01 verifying           # declare the step you have reached, while working
+atlas log F01 "read the lock, wrote the failing test"   # an entry in the Work log
+atlas suspend F01 -m "the Windows branch is missing"   # freezes partial work, takeable again
 atlas close F01 -s "one-line summary"
 atlas give-up F01 --motivo missing-resource -d "the bot token is needed"
 atlas ask-human F01 -q "I would go with schema A, confirm?"

@@ -90,6 +90,8 @@ class AutopilotEndToEnd(unittest.TestCase):
 
     def close_node(self, context):
         node_id = context.node["id"]
+        from core import worklog
+        worklog.append(context.run.graph, node_id, "fake", "lavoro svolto")
         ticket = context.run.graph.ticket_path(node_id)
         ticket.write_text(ticket.read_text(encoding="utf-8") + "\nRisposta fake.\n",
                           encoding="utf-8")

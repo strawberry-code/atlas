@@ -153,6 +153,8 @@ class RetryRunnerTest(unittest.TestCase):
         shutil.rmtree(self.tmp)
 
     def _chiudi(self):
+        from core import worklog
+        worklog.append(self.ref, "N01", "prova", "lavoro svolto")
         path = self.ref.ticket_path("N01")
         path.write_text(path.read_text(encoding="utf-8") + "\nRisposta eseguita.\n", encoding="utf-8")
         self.claims.close(self.ref, "N01", "eseguito", artifacts=[])

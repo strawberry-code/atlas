@@ -9,15 +9,18 @@ path.edge{stroke:var(--edge);fill:none;stroke-width:1.7;
   transition:opacity .15s ease,stroke .15s ease,stroke-width .15s ease}
 path.edge.da-frontier{stroke:var(--edge-frontier)}
 path.edge.da-claimed{stroke:var(--edge-claimed)}
+path.edge.da-suspended{stroke:var(--edge-suspended)}
 path.edge.da-closed{stroke:var(--edge-closed)}
 path.edge.da-out-of-scope{stroke:var(--edge-out-of-scope)}
 circle.port{fill:var(--edge);transition:fill .15s ease,opacity .15s ease}
 circle.port.da-frontier{fill:var(--edge-frontier)}
 circle.port.da-claimed{fill:var(--edge-claimed)}
+circle.port.da-suspended{fill:var(--edge-suspended)}
 circle.port.da-closed{fill:var(--edge-closed)}
 circle.port.da-out-of-scope{fill:var(--edge-out-of-scope)}
 .tip-frontier{fill:var(--edge-frontier)}
 .tip-claimed{fill:var(--edge-claimed)}
+.tip-suspended{fill:var(--edge-suspended)}
 .tip-closed{fill:var(--edge-closed)}
 .tip-blocked{fill:var(--edge)}
 .tip-out-of-scope{fill:var(--edge-out-of-scope)}
@@ -61,6 +64,7 @@ svg:has(.n:hover,.n.sel) circle.port{opacity:.12}
 /* filtro per stato dal chip di legenda */
 body[data-filter="frontier"] .n:not(.st-frontier),
 body[data-filter="claimed"] .n:not(.st-claimed),
+body[data-filter="suspended"] .n:not(.st-suspended),
 body[data-filter="closed"] .n:not(.st-closed),
 body[data-filter="blocked"] .n:not(.st-blocked),
 body[data-filter="out-of-scope"] .n:not(.st-out-of-scope){opacity:.13}
@@ -83,6 +87,7 @@ body[data-filter] path.edge{opacity:.25}
 .map:has(.chip.st-claimed:hover) .n:not(.st-claimed){opacity:.13}
 .side:has([data-hl="closed"]:hover) ~ .map .n:not(.st-closed),
 .map:has(.chip.st-closed:hover) .n:not(.st-closed){opacity:.13}
+.map:has(.chip.st-suspended:hover) .n:not(.st-suspended){opacity:.13}
 .map:has(.chip.st-blocked:hover) .n:not(.st-blocked){opacity:.13}
 .map:has(.chip.st-out-of-scope:hover) .n:not(.st-out-of-scope){opacity:.13}
 .side:has([data-hl]:hover) ~ .map :is(path.edge,circle.port),

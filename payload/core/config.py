@@ -29,9 +29,10 @@ DEFAULTS = {
     "notify": {"telegram_enabled": True},
     "drift": {"collector_paths": []},
     "git": {"commit_on_close": False, "commit_type": "feat", "stage": "node-paths"},
+    # Gli stati non stanno qui: sono il protocollo del motore (store.STATUSES), e
+    # un config.json che li elenca (quelli scritti prima della 0.20) viene ignorato.
     "vocab": {"types": ["grilling", "research", "prototype", "task"],
-              "modes": ["HITL", "AFK"],
-              "statuses": ["open", "claimed", "closed", "out-of-scope"]},
+              "modes": ["HITL", "AFK"]},
 }
 
 

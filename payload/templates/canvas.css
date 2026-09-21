@@ -59,6 +59,7 @@ body.trascina{user-select:none}
 .minimap .mn{opacity:.92}
 .minimap .mn.st-frontier{fill:var(--st-frontier)}
 .minimap .mn.st-claimed{fill:var(--st-claimed)}
+.minimap .mn.st-suspended{fill:var(--st-suspended)}
 .minimap .mn.st-closed{fill:var(--st-closed)}
 .minimap .mn.st-blocked{fill:var(--st-blocked)}
 .minimap .mn.st-out-of-scope{fill:var(--st-out-of-scope)}
@@ -133,11 +134,13 @@ a[data-node]:focus{outline:none}
 
 .st-frontier rect.card{fill:var(--st-frontier-bg);stroke:var(--st-frontier)}
 .st-claimed rect.card{fill:var(--st-claimed-bg);stroke:var(--st-claimed)}
+.st-suspended rect.card{fill:var(--st-suspended-bg);stroke:var(--st-suspended)}
 .st-closed rect.card{fill:var(--st-closed-bg);stroke:var(--st-closed)}
 .st-blocked rect.card{fill:var(--st-blocked-bg);stroke:var(--st-blocked)}
 .st-out-of-scope rect.card{fill:var(--st-out-of-scope-bg);stroke:var(--st-out-of-scope)}
 .st-frontier .nid,.st-frontier .ndot{fill:var(--st-frontier-tx)}
 .st-claimed .nid,.st-claimed .ndot{fill:var(--st-claimed-tx)}
+.st-suspended .nid,.st-suspended .ndot{fill:var(--st-suspended-tx)}
 .st-closed .nid,.st-closed .ndot{fill:var(--st-closed-tx)}
 .st-blocked .nid,.st-blocked .ndot{fill:var(--st-blocked-tx)}
 .st-out-of-scope .nid,.st-out-of-scope .ndot{fill:var(--st-out-of-scope-tx)}

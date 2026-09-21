@@ -46,7 +46,15 @@ Per i `prototype` usa `atlas-prototype`, per i `research` `atlas-research`, e pe
 
 ## 4. Lavora, e lascia traccia nel ticket
 
-Il ticket è `.atlas/graphs/<slug>/tickets/<ID>.md`. Scrivi da **Lavorazione** in giù: quel che sta sopra il commento `<!-- /atlas:auto -->` discende dal grafo e si riscrive da sé, quindi correggerlo a mano è tempo perso. Durante il lavoro annota in **Lavorazione** le alternative scartate e i link agli artefatti prodotti. Alla fine compila **Risposta**: è la sola cosa che `close` verifica, e serve a chi arriva dopo.
+Il ticket è `.atlas/graphs/<slug>/tickets/<ID>.md`. Scrivi da **Lavorazione** in giù: quel che sta sopra il commento `<!-- /atlas:auto -->` discende dal grafo e si riscrive da sé, quindi correggerlo a mano è tempo perso. Durante il lavoro tieni il registro in **Lavorazione**: una voce per attività, anche quella a metà, con chi, quando e a capo cosa hai fatto. La scrive `atlas log`, che firma e data la voce e la appende in coda:
+
+```sh
+atlas log <ID> "letto il lock in claims.py, scritto il test che fallisce su F02"
+```
+
+Chiamalo spesso, non a fine nodo: il registro è quel che resta se ti interrompono, e chi riprende il nodo (tu in un'altra sessione, o un altro agente) legge da lì. Le alternative scartate e i link agli artefatti stanno dentro le voci. Alla fine compila **Risposta**: `close` verifica che ci sia, e che il registro abbia almeno una voce.
+
+Se il nodo è `suspended`, `take` te lo ha detto insieme alla nota di sospensione: prima di fare qualsiasi cosa rileggi il registro nel ticket, perché il lavoro riparte da lì, non da zero.
 
 Se emerge qualcosa che meriterebbe un nodo suo, **non crearlo**. Appuntalo, indirizzato a un nodo se lo riguarda:
 
@@ -74,7 +82,15 @@ atlas give-up <ID> --motivo <MOTIVO> -d "<dettaglio>"
 
 `MOTIVO` è uno tra `infeasible` (la domanda è contraddittoria o impossibile), `missing-resource` (serve un segreto, un accesso o un servizio che non hai e non puoi procurarti da solo), `blocked-environment` (l'ambiente locale non regge il lavoro, non è un guasto transitorio), `needs-redesign` (serve prima cambiare il disegno a monte). È terminale per questo nodo in questo run: non viene ritentato, il nodo torna alla frontiera con la resa registrata.
 
-Se la prossima mossa è una decisione che non ti spetta, non deciderla al posto dell'utente e non fermarti in silenzio: proponi un'alternativa binaria e sospendi il nodo.
+Se devi fermarti con del lavoro fatto a metà che vale la pena tenere, congelalo invece di rilasciarlo:
+
+```sh
+atlas suspend <ID> -m "<dove sei arrivato e cosa manca>"
+```
+
+Il nodo passa a `suspended`: molla il lucchetto, resta in frontiera e chi lo riprende con `take` legge la nota, che finisce anche nel registro del ticket. `suspend` rifiuta se la Lavorazione è ancora vuota, perché il lavoro parziale sta lì: registralo prima con `atlas log`, oppure, se non c'è niente da registrare, usa `release`.
+
+Se la prossima mossa è una decisione che non ti spetta, non deciderla al posto dell'utente e non fermarti in silenzio: proponi un'alternativa binaria e metti il nodo in attesa.
 
 ```sh
 atlas ask-human <ID> -q "<procedo con X, confermi?>"
@@ -90,7 +106,7 @@ atlas close <ID> -s "la sintesi in una riga"
 
 Se vuoi lasciare un ordine di grandezza di quanto è costato (chiamate, token, tempo), aggiungi `-c/--costo "..."`. I file prodotti non devi elencarli: in una repo git `close` li ricava da solo, guardando cosa hai toccato da quando hai rivendicato il nodo. Se lavori in parallelo con altri nodi, questa deduzione salta e devi dichiarare gli artefatti con `--artefatti path/uno path/due`. Con `--artefatti` senza argomenti il campo rimane vuoto. Nel ticket, le sotto-sezioni **Scelte non canoniche**, **Debito dichiarato** e **Autorizzazioni ricevute** sotto Risposta sono facoltative: usale quando c'è davvero qualcosa da dire, altrimenti lasciale vuote.
 
-La sintesi finisce da sola in `map.md` sotto Decisioni prese, e la dashboard si rigenera. Se `close` rifiuta perché la Risposta è vuota, scrivila: non è un ostacolo da aggirare con `--force`.
+La sintesi finisce da sola in `map.md` sotto Decisioni prese, e la dashboard si rigenera. Se `close` rifiuta perché la Risposta è vuota, scrivila; se rifiuta perché la Lavorazione non ha nessuna voce, registra con `atlas log` cosa hai fatto. Nessuno dei due è un ostacolo da aggirare con `--force`.
 
 **Un nodo per sessione, anche quando ne resta uno prendibile.** Chiuso il nodo, fermati e riferisci cosa si è deciso e cosa si è aperto. Il nodo successivo è una scelta dell'utente, non l'inerzia della sessione.
 

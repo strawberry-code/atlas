@@ -64,6 +64,7 @@
 }
 .tchip.st-frontier{color:var(--st-frontier-tx);border-color:var(--st-frontier);background:var(--st-frontier-bg)}
 .tchip.st-claimed{color:var(--st-claimed-tx);border-color:var(--st-claimed);background:var(--st-claimed-bg)}
+.tchip.st-suspended{color:var(--st-suspended-tx);border-color:var(--st-suspended);background:var(--st-suspended-bg)}
 .tchip.st-closed{color:var(--st-closed-tx);border-color:var(--st-closed);background:var(--st-closed-bg)}
 .tchip.st-blocked{color:var(--st-blocked-tx);border-color:var(--st-blocked);background:var(--st-blocked-bg)}
 .tchip.st-out-of-scope{

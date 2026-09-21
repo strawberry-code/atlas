@@ -15,7 +15,7 @@ from datetime import datetime
 
 from .config import Graph
 from .model import node_of, owners_of
-from .store import StateError, transaction
+from .store import STATUSES, StateError, transaction
 from .strings import t
 from .topology import levels
 from .interactions import validate_interactions
@@ -58,7 +58,7 @@ def validate(data: dict, vocab: dict) -> None:
         if node["branch"] not in data["branches"]:
             raise StateError(t("mutate.ramo_inesistente", id=node["id"], branch=node["branch"]))
         for key, allowed in (("type", vocab["types"]), ("mode", vocab["modes"]),
-                             ("status", vocab["statuses"])):
+                             ("status", STATUSES)):
             if node[key] not in allowed:
                 raise StateError(t("mutate.vocab_non_valido", id=node["id"],
                                    chiave=key, valore=node[key], ammessi=allowed))

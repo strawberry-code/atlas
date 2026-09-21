@@ -51,8 +51,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "run paused: waiting on a person on nodes: {ids}. Not a failure: "
               "resolve the open Interaction (dashboard or Telegram) and relaunch the run."},
     # --- claims.py ---
-    "claim.non_aperto": {"it": "{id} non è aperto: sta a '{stato}'",
-                         "en": "{id} is not open: it's at '{stato}'"},
+    "claim.non_aperto": {"it": "{id} non è prendibile: sta a '{stato}'",
+                         "en": "{id} cannot be taken: it's at '{stato}'"},
     "claim.bloccato": {"it": "{id} è bloccato da {bloccanti}", "en": "{id} is blocked by {bloccanti}"},
     "claim.tetto": {"it": "questa sessione tiene già {tenuti}: il tetto è {tetto} per sessione.\n"
                           "  Rilascia con 'atlas release {primo}', apri un'altra sessione,\n"
@@ -77,6 +77,26 @@ STRINGS: dict[str, dict[str, str]] = {
                                 "en": "'{passo}' is not a valid step: {elenco}"},
     "progress.non_rivendicato": {"it": "{id} non è rivendicato: sta a '{stato}'",
                                  "en": "{id} is not claimed: it's at '{stato}'"},
+    "suspend.nota_vuota": {"it": "la nota di sospensione non può essere vuota: scrivi dove sei arrivato e cosa manca",
+                           "en": "the suspension note cannot be empty: write where you got to and what is left"},
+    "suspend.non_rivendicato": {"it": "{id} non è rivendicato: sta a '{stato}'",
+                                "en": "{id} is not claimed: it's at '{stato}'"},
+    "suspend.lavorazione_vuota": {"it": "la sezione Lavorazione di {file} è vuota: un nodo sospeso è un lavoro parziale,\n"
+                                        "  e il lavoro parziale sta lì. Registralo con 'atlas log {id} \"...\"' e poi sospendi;\n"
+                                        "  se non c'è niente da registrare, è un rilascio: 'atlas release {id}'.",
+                                  "en": "the Work section of {file} is empty: a suspended node is partial work,\n"
+                                        "  and the partial work lives there. Record it with 'atlas log {id} \"...\"' then suspend;\n"
+                                        "  if there is nothing to record, it is a release: 'atlas release {id}'."},
+    "log.testo_vuoto": {"it": "la voce di lavorazione non può essere vuota: scrivi cosa hai fatto",
+                        "en": "the work entry cannot be empty: write what you did"},
+    "log.non_rivendicato": {"it": "{id} non è rivendicato: sta a '{stato}'. Il registro si scrive mentre lo lavori:\n"
+                                  "  prendilo prima con 'atlas take {id}'",
+                            "en": "{id} is not claimed: it's at '{stato}'. The log is written while you work it:\n"
+                                  "  take it first with 'atlas take {id}'"},
+    "log.ticket_assente": {"it": "il ticket di {id} non esiste ({path}): rigeneralo con 'atlas render'",
+                           "en": "the ticket of {id} does not exist ({path}): regenerate it with 'atlas render'"},
+    "log.sezione_assente": {"it": "in {path} manca l'intestazione '{heading}': ripristinala prima di scrivere una voce",
+                            "en": "{path} lacks the '{heading}' heading: restore it before writing an entry"},
     "ask_human.domanda_vuota": {
         "it": "la proposta per la persona non può essere vuota: descrivi l'alternativa",
         "en": "the proposal for the human cannot be empty: describe the alternative"},
@@ -91,6 +111,12 @@ STRINGS: dict[str, dict[str, str]] = {
                              "en": "the Answer section of {file} is empty.\n"
                                    "  Write it before closing, or use --force if the node\n"
                                    "  closes without an answer because it became irrelevant."},
+    "close.lavorazione_vuota": {"it": "la sezione Lavorazione di {file} è vuota.\n"
+                                      "  Registra cosa hai fatto con 'atlas log <ID> \"...\"' prima di chiudere:\n"
+                                      "  chi arriva dopo legge da lì come si è arrivati alla Risposta. --force chiude comunque.",
+                                "en": "the Work section of {file} is empty.\n"
+                                      "  Record what you did with 'atlas log <ID> \"...\"' before closing:\n"
+                                      "  whoever comes next reads there how the Answer came to be. --force closes anyway."},
     "close.artifacts_non_dedotti": {"it": "artefatti non dedotti: più nodi sono in lavorazione insieme,\n"
                                           "  dichiarali con --artefatti",
                                     "en": "artifacts not deduced: several nodes are in progress at once,\n"

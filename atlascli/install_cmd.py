@@ -51,8 +51,7 @@ CONFIG = {
               "idle_hours": 4, "max_claims_per_session": 1},
     "git": {"commit_on_close": False, "commit_type": "feat", "stage": "node-paths"},
     "vocab": {"types": ["grilling", "research", "prototype", "task"],
-              "modes": ["HITL", "AFK"],
-              "statuses": ["open", "claimed", "closed", "out-of-scope"]},
+              "modes": ["HITL", "AFK"]},
 }
 
 # Il merge driver per i graph.json: git chiama 'atlas merge-graph' quando deve

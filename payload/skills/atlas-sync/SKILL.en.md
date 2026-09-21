@@ -15,7 +15,7 @@ A shared graph only changes through mutation scripts. When two agents work the s
 atlas status
 ```
 
-`status` shows the locks: if one of yours is still open, close the node with `atlas close <ID> -s "..."` or drop it with `atlas release <ID>`. Commit the work before going further.
+`status` shows the locks: if one of yours is still open, close the node with `atlas close <ID> -s "..."` or drop it with `atlas release <ID>`, or freeze the partial work with `atlas suspend <ID> -m "..."` if it is worth keeping. Commit the work before going further.
 
 ## 2. Merge, and let the driver work
 

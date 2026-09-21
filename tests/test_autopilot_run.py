@@ -140,6 +140,8 @@ class AutopilotRun(unittest.TestCase):
         return waiter_risolutore(self.ref, self.mutate, interactions)
 
     def _chiudi(self, node_id):
+        from core import worklog
+        worklog.append(self.ref, node_id, "prova", "lavoro svolto")
         path = self.ref.ticket_path(node_id)
         path.write_text(path.read_text(encoding="utf-8") + "\nRisposta eseguita.\n", encoding="utf-8")
         return self.claims.close(self.ref, node_id, "eseguito", artifacts=[])
@@ -155,9 +157,7 @@ class AutopilotRun(unittest.TestCase):
 
         def wait_for(node_id):
             attese.append(node_id)
-            path = self.ref.ticket_path(node_id)
-            path.write_text(path.read_text(encoding="utf-8") + "\nRisposta eseguita.\n", encoding="utf-8")
-            self.claims.close(self.ref, node_id, "eseguito", artifacts=[])
+            self._chiudi(node_id)
             return self.autopilot.ClosureEvent(node_id)
 
         with mock.patch.dict(os.environ, {"ATLAS_IDENTITY": "Luna"}):
@@ -271,9 +271,7 @@ class AutopilotRun(unittest.TestCase):
             nonlocal attivi
             attese.append(node_id)
             attivi -= 1
-            path = self.ref.ticket_path(node_id)
-            path.write_text(path.read_text(encoding="utf-8") + "\nRisposta eseguita.\n", encoding="utf-8")
-            self.claims.close(self.ref, node_id, "eseguito", artifacts=[])
+            self._chiudi(node_id)
 
         with mock.patch.dict(os.environ, {"ATLAS_IDENTITY": "Luna"}):
             risultato = self.autopilot.start(self.ref, 2).execute(launcher, wait_for)

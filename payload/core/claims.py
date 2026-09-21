@@ -18,7 +18,7 @@ import re
 import socket
 from datetime import datetime, timedelta
 
-from . import docs, gitscan, interactions, remotelock
+from . import docs, gitscan, interactions, remotelock, worklog
 from .config import ENV_HOST, Graph
 from .editor import editing
 from .identity import alive, e_mio, holder, identity, mio_come, nota, session
@@ -26,7 +26,7 @@ from .model import by_id, fingerprint, is_done, istante, node_of, claimed
 from .remotelock import (ACQUISITO, GARA, NON_SCADUTO, NON_TUO, RETE, TENUTO,
                          fresco, nome_lock, scadenza_epoch)
 from .run_state import RunState
-from .store import CLAIMED, CLOSED, OPEN, StateError, load, transaction
+from .store import CLAIMED, CLOSED, OPEN, SUSPENDED, WORKABLE, StateError, load, transaction
 from .strings import t
 
 
@@ -297,7 +297,7 @@ def claim(ref: Graph, node_id: str, assignee: str | None = None, force: bool = F
             _rinnova_locale(node, ttl)
             return dict(node)
         index = by_id(data)
-        if node["status"] != OPEN:
+        if node["status"] not in WORKABLE:
             raise StateError(t("claim.non_aperto", id=node_id, stato=node["status"]))
         if bloccanti := [d for d in node["blockedBy"] if not is_done(index[d])]:
             if not force:
@@ -429,6 +429,43 @@ def give_up(ref: Graph, node_id: str, reason: str, detail: str) -> dict:
         return dict(node)
 
 
+def suspend(ref: Graph, node_id: str, note: str) -> dict:
+    """La sospensione: lavoro parziale congelato nel nodo, non un esito.
+
+    Stessa transazione di release() sul lucchetto, ma il nodo va a SUSPENDED e
+    non a OPEN: chi lo trova sulla frontiera sa che nel ticket c'e' gia' del
+    lavoro da rileggere prima di ricominciare. La nota e' obbligatoria e finisce
+    in due posti, nel ledger 'suspensions' (da cui la mappa e il brief la
+    rileggono) e come voce del registro di Lavorazione. Il registro deve avere
+    gia' almeno una voce prima della nota: un lavoro parziale di cui il ticket
+    non dice niente non e' un lavoro parziale, e' un rilascio (release). La voce
+    nel ticket si scrive prima di toccare il nodo: se il ticket manca, il grafo
+    resta com'era.
+    """
+    if not isinstance(note, str) or not note.strip():
+        raise StateError(t("suspend.nota_vuota"))
+    with transaction(ref.json_path) as data:
+        node = node_of(data, node_id)
+        if node["status"] != CLAIMED:
+            raise StateError(t("suspend.non_rivendicato", id=node_id, stato=node["status"]))
+        if not worklog.written(ref, node_id):
+            raise StateError(t("suspend.lavorazione_vuota", id=node_id,
+                               file=ref.ticket_path(node_id).name))
+        chi, ora = worklog.author(ref, node), _adesso()
+        # Il ticket prima della ref remota: se la rete rifiuta, resta al massimo
+        # una voce 'sospeso' in piu' nel registro, mai un lucchetto remoto mollato
+        # con il nodo ancora rivendicato in locale.
+        worklog.append(ref, node_id, chi, t("log.sospeso", nota=note.strip()), ora)
+        if remotelock.attivo():
+            _assicura_rilascio(ref, node_id)
+        data.setdefault("suspensions", []).append({
+            "id": node_id, "title": node["title"], "note": note.strip(), "by": chi,
+            "at": ora.isoformat(timespec="seconds"),
+        })
+        node.update(status=SUSPENDED, assignee=None, claim=None)
+        return dict(node)
+
+
 def _run_id_corrente(ref: Graph) -> str:
     """Il campo runId della card (H05): il run-state di Autopilot se un run e'
     vivo su questo grafo, l'identita' di chi chiama per una sessione manuale
@@ -440,7 +477,7 @@ def _run_id_corrente(ref: Graph) -> str:
 
 
 def ask_human(ref: Graph, node_id: str, question: str) -> dict:
-    """L'esito 'serve una persona' (H01/3, H05): sospende il nodo sopra
+    """L'esito 'serve una persona' (H01/3, H05): mette il nodo in attesa sopra
     un'Interazione dell'unico ledger che gia' esiste (interactions.py), non un
     canale nuovo. A differenza di give_up non e' terminale: il claim si rilascia
     perche' un lease non deve restare acceso per le ore in cui una persona non ha
@@ -507,12 +544,14 @@ def _condiviso(ref: Graph, data: dict, node_id: str, da: datetime) -> str | obje
         chiuso = istante(nodo["closedAt"])
         if chiuso is None or chiuso >= da:
             return nodo["id"]
-    for rilascio in data.get("releases", []):
-        if rilascio.get("id") == node_id:
+    # Un rilascio o una sospensione altrui nella finestra dicono la stessa cosa di
+    # una chiusura: qualcun altro ha lavorato, e git non sa di chi e' ciascun file.
+    for evento in (*data.get("releases", []), *data.get("suspensions", [])):
+        if evento.get("id") == node_id:
             continue
-        mollato = istante(rilascio.get("at"))
+        mollato = istante(evento.get("at"))
         if mollato is None or mollato >= da:
-            return rilascio.get("id") or "?"
+            return evento.get("id") or "?"
     if remotelock.attivo():
         return _condiviso_remoto(ref, node_id, da)
     return None
@@ -670,6 +709,8 @@ def close(ref: Graph, node_id: str, summary: str, force: bool = False,
                 _consulta_ref_close(ref, node_id)
         if not docs.answer_written(ref, node_id) and not force:
             raise StateError(t("close.risposta_vuota", file=ref.ticket_path(node_id).name))
+        if not worklog.written(ref, node_id) and not force:
+            raise StateError(t("close.lavorazione_vuota", file=ref.ticket_path(node_id).name))
         # Un'impronta che non torna vuol dire che il nodo e' cambiato dopo la presa:
         # la scrittura entrerebbe pulita, ma la sintesi che sta arrivando e' stata
         # decisa guardando un nodo diverso. Assente sui claim presi prima della 0.7.0.

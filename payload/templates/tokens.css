@@ -52,6 +52,7 @@ code{font-family:var(--mono)}
      luminanza che serve a una linea sottile su questo fondo. */
   --edge-frontier:#c08a00;
   --edge-claimed:#1d7afc;
+  --edge-suspended:#7c3aed;
   --edge-closed:#00a06c;
   --edge-out-of-scope:#e2333a;
   /* stati (validati su superficie chiara): bordo, riempimento, testo.
@@ -66,6 +67,10 @@ code{font-family:var(--mono)}
      sullo stesso hue scendendo di luminanza fin dove si leggono. */
   --st-frontier:#7a5f00;   --st-frontier-bg:rgba(252,194,0,.45);  --st-frontier-tx:#5c4700;
   --st-claimed:#1d4ed8;    --st-claimed-bg:rgba(29,122,252,.4);   --st-claimed-tx:#173288;
+  /* il sospeso e' viola: lavoro parziale congelato, ne' giallo (prendibile e
+     vergine) ne' blu (qualcuno ci sta sopra adesso). Stessa scala di
+     luminanza del rivendicato, cosi' bordo e testo reggono sul fondo chiaro. */
+  --st-suspended:#5b21b6;  --st-suspended-bg:rgba(139,92,246,.32); --st-suspended-tx:#3b0f7a;
   --st-closed:#04724f;     --st-closed-bg:rgba(0,196,106,.42);    --st-closed-tx:#054c38;
   /* Il rosso sta sul fuori scopo, che e' una decisione presa e va vista; il bloccato
      arretra in grigio, perche' e' solo lavoro che aspetta il suo turno ed e' la

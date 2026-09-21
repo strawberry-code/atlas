@@ -158,6 +158,9 @@ def main() -> int:
 
         ticket = radice / "graphs" / datato("epic-test") / "tickets" / "F01.md"
         ticket.write_text(ticket.read_text(encoding="utf-8") + "\nLa risposta, scritta.\n", encoding="utf-8")
+        verifica(locale(target, "close", "F01", "-s", "x").returncode == 1, "close senza registro di Lavorazione rifiutato")
+        verifica(locale(target, "log", "F01", "letto il codice, scritta la risposta").returncode == 0, "log accettato")
+        verifica("- **" in ticket.read_text(encoding="utf-8"), "la voce del registro è nel ticket")
         verifica(locale(target, "close", "F01", "-s", "così si è deciso").returncode == 0, "close accettato")
         mappa = (radice / "graphs" / datato("epic-test") / "map.md").read_text(encoding="utf-8")
         verifica("così si è deciso" in mappa, "decisione registrata in map.md")
@@ -600,6 +603,7 @@ def verifica_scrittura_e_conflitti() -> None:
         verifica(tracciato.returncode != 0, "il grafo invece resta versionato")
 
         locale(target, "claim", "F01")
+        locale(target, "log", "F01", "lavoro svolto")
         ticket = radice / "graphs" / datato("epic-test") / "tickets" / "F01.md"
         ticket.write_text(ticket.read_text(encoding="utf-8").replace(
             "## Risposta", "## Risposta\n\nUna risposta scritta guardando la domanda di prima."),

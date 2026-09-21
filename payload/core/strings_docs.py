@@ -8,6 +8,10 @@ from __future__ import annotations
 STRINGS: dict[str, dict[str, str]] = {
     # --- docs.py ---
     "docs.niente": {"it": "_niente, per ora._", "en": "_nothing, for now._"},
+    "docs.rilasciato": {"it": "rilasciato", "en": "released"},
+    "docs.sospeso": {"it": "sospeso", "en": "suspended"},
+    # la voce che 'atlas suspend' scrive nel registro di Lavorazione del ticket
+    "log.sospeso": {"it": "sospeso: {nota}", "en": "suspended: {nota}"},
     "docs.nessuno_prendibile": {"it": "nessuno, prendibile subito", "en": "none, up for grabs right away"},
 
     # --- report.py ---
@@ -57,6 +61,11 @@ STRINGS: dict[str, dict[str, str]] = {
                                       "en": "    {id} {titolo}: still {stato}, no answer to read yet"},
     "report.brief_nebbia": {"it": "\n  Nebbia che lo nomina:", "en": "\n  Fog that names it:"},
     "report.brief_rilasci": {"it": "\n  Rilasci precedenti su questo nodo:", "en": "\n  Earlier releases of this node:"},
+    "report.brief_sospensioni": {"it": "\n  Sospensioni di questo nodo (il lavoro parziale è nella Lavorazione del ticket):",
+                                 "en": "\n  Suspensions of this node (the partial work is in the ticket's Work section):"},
+    "report.brief_sospensione_riga": {"it": "    {quando} · {chi}: {nota}", "en": "    {quando} · {chi}: {nota}"},
+    "report.frontiera_sospeso": {"it": "  · sospeso, lavoro parziale nel ticket",
+                                 "en": "  · suspended, partial work in the ticket"},
     "report.brief_interazioni": {"it": "\n  Interazioni su questo nodo:", "en": "\n  Interactions on this node:"},
     "report.brief_interazione_riga": {"it": "    {quando}: {sintesi} ({stato})",
                                       "en": "    {quando}: {sintesi} ({stato})"},
@@ -85,6 +94,7 @@ STRINGS: dict[str, dict[str, str]] = {
     # --- theme.py (etichette di stato nella dashboard) ---
     "state.frontier": {"it": "prendibile adesso", "en": "up for grabs now"},
     "state.claimed": {"it": "in lavorazione", "en": "in progress"},
+    "state.suspended": {"it": "sospeso", "en": "suspended"},
     "state.closed": {"it": "chiuso", "en": "closed"},
     "state.blocked": {"it": "bloccato", "en": "blocked"},
     "state.out_of_scope": {"it": "fuori scopo", "en": "out of scope"},

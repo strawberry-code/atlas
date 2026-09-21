@@ -22,7 +22,13 @@ SCHEMA_VERSION = 1
 # Quando SCHEMA_VERSION cambia, la lettura migrera' automaticamente i dati senza
 # flag per restare sul formato vecchio. Il grafo e' versionato in git (reversibile);
 # chi lo consuma non vede mai il JSON grezzo, solo la struttura in memoria.
-OPEN, CLAIMED, CLOSED, DROPPED = "open", "claimed", "closed", "out-of-scope"
+OPEN, CLAIMED, SUSPENDED, CLOSED, DROPPED = "open", "claimed", "suspended", "closed", "out-of-scope"
+# Gli stati sono il protocollo del motore, non un vocabolario del progetto: un
+# valore fuori da questi non avrebbe nessun gesto che lo produce o lo consuma.
+STATUSES = (OPEN, CLAIMED, SUSPENDED, CLOSED, DROPPED)
+# Da questi due stati si puo' rivendicare: 'suspended' e' un lavoro parziale
+# congelato nel ticket, prendibile come un aperto ma con una storia da rileggere.
+WORKABLE = (OPEN, SUSPENDED)
 
 if sys.platform == "win32":
     import msvcrt

@@ -9,7 +9,7 @@ from .model import (blocked, blocks, claimed, fog_for, frontier, is_done, node_o
                     owners, owners_of, progress, unowned, waiting_human)
 from .topology import ranked_frontier
 from .run_state import RunState
-from .store import load
+from .store import SUSPENDED, load
 from .strings import t
 
 ETICHETTA = {
@@ -38,7 +38,8 @@ def show_status(ref: Graph, data: dict) -> None:
     if front := frontier(data):
         print(t("report.frontiera_titolo"))
         for node in front:
-            print(f"    {node['id']}  {node['title']}  [{node['type']}/{node['mode']}]")
+            sospeso = t("report.frontiera_sospeso") if node["status"] == SUSPENDED else ""
+            print(f"    {node['id']}  {node['title']}  [{node['type']}/{node['mode']}]{sospeso}")
     elif not totale:
         print(t("report.grafo_vuoto_1"))
         print(t("report.grafo_vuoto_2"))
@@ -234,6 +235,14 @@ def show_brief(ref: Graph, data: dict, node_id: str) -> None:
         print(t("report.brief_rilasci"))
         for r in rilasci:
             print(f"    {r['at']}: {r['reason']}")
+
+    # Chi riprende un nodo sospeso trova qui dove si era arrivati, e nel ticket
+    # il registro di Lavorazione con il dettaglio: la nota e' l'indice, non il lavoro.
+    sospensioni = [s for s in data.get("suspensions", []) if s["id"] == node_id]
+    if sospensioni:
+        print(t("report.brief_sospensioni"))
+        for s in sospensioni:
+            print(t("report.brief_sospensione_riga", quando=s["at"], chi=s["by"], nota=s["note"]))
 
     # H05: chi riprende un nodo dopo un ask-human deve vedere qui la scelta della
     # persona (l'interazione risolta), non doverla ricostruire rileggendo il
