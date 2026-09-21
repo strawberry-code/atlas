@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 import sys
 import unittest
+import unittest.mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "payload"))
@@ -52,25 +53,32 @@ class ArcoInAvanti(unittest.TestCase):
 
 
 class ArcoDiRitorno(unittest.TestCase):
-    """Il bloccato non sta sotto il blocker (rango pari o a monte): C08 dice che
-    e' sempre un ritorno, e A01 lo vuole su loop_path con corsia e tratteggio."""
+    """Un ritorno e' un arco che chiude un ciclo (graph_walk.back_edges), e
+    A01 lo vuole su loop_path con corsia e tratteggio. Non lo decide la
+    geometria: prima bastava trascinare una card sopra il suo blocker perche'
+    un arco in avanti diventasse un finto ritorno tratteggiato."""
 
-    def test_usa_loop_path_con_corsia_e_tratteggio(self):
-        # B blocca A, ma nel layout A sta sopra B: back-edge
-        data = {"nodes": [_nodo("B01", []), _nodo("A01", ["B01"])]}
-        pos = {"B01": (100, 200), "A01": (100, 0)}
+    def test_un_ciclo_usa_loop_path_con_corsia_e_tratteggio(self):
+        # A01 e B01 si bloccano a vicenda: uno dei due archi e' un ritorno
+        data = {"nodes": [_nodo("B01", ["A01"]), _nodo("A01", ["B01"])]}
+        pos = {"B01": (100, 0), "A01": (100, 200)}
         svg = render_edges.edges(data, pos, front_ids={"B01"})
-        self.assertIn('class="edge loop da-frontier"', svg)
+        self.assertEqual(len(re.findall(r'class="edge loop', svg)), 1)
         self.assertIn(f'stroke-dasharray="{LOOP_DASH}"', svg)
         self.assertNotIn("nan", svg.lower())
 
-    def test_stessa_riga_e_trattata_come_ritorno(self):
-        # stesso rango (nessuna delle due righe e' sotto l'altra): non deve
-        # passare per smooth_step_path, che presume il bersaglio piu' in basso
+    def test_un_arco_che_risale_senza_ciclo_resta_in_avanti(self):
+        # B blocca A e nel disegno A sta sopra B (una card trascinata): niente
+        # ciclo, quindi niente corsia ne' tratteggio, e il path esiste lo stesso
         data = {"nodes": [_nodo("B01", []), _nodo("A01", ["B01"])]}
-        pos = {"B01": (100, 100), "A01": (400, 100)}
-        svg = render_edges.edges(data, pos, front_ids={"B01"})
-        self.assertIn("loop", svg)
+        for pos in ({"B01": (100, 200), "A01": (100, 0)}, {"B01": (100, 100), "A01": (400, 100)}):
+            with self.subTest(pos=pos):
+                svg = render_edges.edges(data, pos, front_ids={"B01"})
+                self.assertNotIn("loop", svg)
+                self.assertNotIn("stroke-dasharray", svg)
+                m = re.search(r' d="([^"]*)"', svg)
+                self.assertTrue(m and m.group(1))
+                self.assertNotIn("nan", svg.lower())
 
 
 class Porte(unittest.TestCase):
@@ -89,3 +97,26 @@ class Porte(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TrasparenzaSottoLeCard(unittest.TestCase):
+    """render_svg.canvas() disegna lo stato a riposo di backing e ritagli dentro
+    due contenitori fissi: ghosts.js li svuota e li rifa' a ogni trascinamento,
+    quindi devono esserci anche quando a riposo non contengono niente."""
+
+    def test_i_contenitori_esistono_e_il_ritaglio_segue_la_card(self):
+        from core import render_svg
+        # A01 -> A03 passa sotto A02, messa in colonna fra i due
+        def nodo(i, deps):
+            return {**_nodo(i, deps), "title": i, "question": "?", "mode": "HITL", "branch": "b", "type": "task"}
+        data = {"nodes": [nodo("A01", []), nodo("A02", []), nodo("A03", ["A01"])], "branches": {"b": {}}}
+        pos = {"A01": (100, 0), "A02": (100, 200), "A03": (100, 400)}
+        with unittest.mock.patch.object(render_svg, "positions", return_value=pos):
+            svg = render_svg.canvas(data, front_ids=set(), gruppi={})
+        self.assertIn('<g class="edge-backings"><rect class="edge-backing" x="100" y="200"', svg)
+        self.assertIn('<g class="edge-ghosts"><clipPath id="clip-A02">', svg)
+        self.assertIn('data-ghost-from="A01" data-ghost-to="A03"', svg)
+        with unittest.mock.patch.object(render_svg, "positions", return_value={**pos, "A02": (600, 200)}):
+            svg = render_svg.canvas(data, front_ids=set(), gruppi={})
+        self.assertIn('<g class="edge-backings"></g>', svg)
+        self.assertIn('<g class="edge-ghosts"></g>', svg)

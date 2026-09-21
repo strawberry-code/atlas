@@ -67,7 +67,7 @@ def leggi_css_lite() -> str:
 
 
 def leggi_js_dashboard() -> str:
-    """Dashboard JavaScript: undici moduli per argomento concatenati nell'ordine dichiarato.
+    """Dashboard JavaScript: tredici moduli per argomento concatenati nell'ordine dichiarato.
     Usato da render.py per il comportamento della dashboard.
 
     canvas.js prima di fitview.js/controls.js/minimap.js non e' un dettaglio:
@@ -79,9 +79,12 @@ def leggi_js_dashboard() -> str:
     drag.js prima di positions.js (C10) e' lo stesso vincolo: positions.js
     applica il layout salvato al caricamento e chiede subito un ricalcolo
     degli archi con l'evento 'atlas:ricalcola-archi', e drag.js dev'essere
-    gia' in ascolto, perche' e' l'unico che sa disegnare un arco. Entrambi
-    prima di minimap.js, che legge le posizioni gia' spostate per disegnare
-    una sagoma coerente con l'ultimo layout salvato.
+    gia' in ascolto, perche' e' l'unico che sa disegnare un arco. ghosts.js
+    sta in mezzo per la stessa ragione: drag.js gli manda
+    'atlas:archi-ricalcolati' dopo ogni giro, compreso quello che positions.js
+    chiede al caricamento, e deve gia' essere in ascolto. Tutti prima di
+    minimap.js, che legge le posizioni gia' spostate per disegnare una sagoma
+    coerente con l'ultimo layout salvato.
 
     keyboard.js (C12) chiude il gruppo Canvas: legge le stesse card gia'
     disegnate (come minimap.js) e parla con canvas.js coi soli eventi che
@@ -96,6 +99,7 @@ def leggi_js_dashboard() -> str:
     moduli = [
         "canvas.js",
         "drag.js",
+        "ghosts.js",
         "positions.js",
         "fitview.js",
         "controls.js",

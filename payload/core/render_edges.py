@@ -39,17 +39,22 @@ def _edge_records(data: dict, pos: dict, front_ids: set[str]) -> list[dict]:
     lista per ritagliare la sola porzione che passa sotto una card, senza
     rifare il calcolo dei punti di aggancio.
 
-    Un arco che risale, cioe' il bloccato non sta sotto il blocker nel layout a
-    rank (C08: 'un arco che risale e' sempre un ritorno'), non passa dalla
-    geometria in avanti (smooth_step_path, porta di Nodavia: A01): prende
-    loop_path, la corsia laterale con tratteggio (LOOP_DASH) che lo distingue
-    a colpo d'occhio da un arco sano, altrimenti un giro corto in colonna si
-    confonderebbe con uno in avanti. loop_lane tiene apposta quella corsia
-    fuori dagli altri nodi, quindi 'loop' esce marcato per farlo escludere
-    da ghosts().
+    Un arco di ritorno e' un fatto del grafo, non del disegno: e' uno degli
+    archi che graph_walk.back_edges() classifica cosi' con la stessa visita
+    del layout a rank (C08), cioe' un arco che chiude un ciclo. Solo quello
+    prende loop_path, la corsia laterale con tratteggio (LOOP_DASH) che lo
+    distingue a colpo d'occhio da un arco sano (A01). Deciderlo dalla
+    geometria (bloccato non sotto il blocker) sembrava equivalente sul layout
+    automatico e non lo era piu' appena una card veniva trascinata: un arco
+    in avanti che risaliva diventava un finto ritorno tratteggiato. Un arco
+    in avanti che risale resta su smooth_step_path, che il ramo speculare lo
+    gestisce. loop_lane tiene la corsia fuori dagli altri nodi, quindi 'loop'
+    esce marcato per farlo escludere da ghosts().
     """
-    from .render_svg import H, W
+    from .graph_walk import back_edges
+    from .render_svg import H, W, archi
 
+    ritorni = back_edges(*archi(data))
     stato_di = {n["id"]: state_of(n, front_ids) for n in data["nodes"] if n["id"] in pos}
     deps_per_nodo = {
         node["id"]: [d for d in node["blockedBy"] if d in pos]
@@ -70,7 +75,7 @@ def _edge_records(data: dict, pos: dict, front_ids: set[str]) -> list[dict]:
             sy = pos[dep][1] + H
             sx, ex = punti_uscita[dep][nid], punti_entrata[nid][dep]
             da = f"da-{stato_di[dep]}"
-            loop = ey <= pos[dep][1]
+            loop = (dep, nid) in ritorni
             if not loop:
                 d, classi, tratto = smooth_step_path(sx, sy, ex, ey), f"edge {da}", ""
             else:

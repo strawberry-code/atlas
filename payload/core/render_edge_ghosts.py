@@ -78,10 +78,10 @@ def ghosts(data: dict, pos: dict, front_ids: set[str]) -> str:
     render_edges.hover_css() li legge per accendere anche il ghost quando il
     suo arco e' quello selezionato, non solo l'arco vero.
 
-    Nota: durante un trascinamento (drag.js) la 'd' vera si ricalcola dal vivo,
-    questi ritagli restano quelli calcolati alla generazione della pagina e si
-    aggiornano solo al prossimo render: uno scarto visibile solo per la durata
-    del trascinamento, non oltre.
+    Questo e' lo stato a riposo: a ogni trascinamento (drag.js) ghosts.js
+    rifa' backing e ritagli con la stessa regola di _sotto_per_nodo, sulle
+    posizioni correnti. Prima restavano quelli calcolati qui e la
+    trasparenza rimaneva ferma dove la card era stata generata.
     """
     from .render_svg import H, W
 

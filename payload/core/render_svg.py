@@ -60,13 +60,20 @@ def _trunca(testo: str, n: int) -> str:
     return testo if len(testo) <= n else testo[: n - 1] + "…"
 
 
+def archi(data: dict) -> tuple[list[str], list[tuple[str, str]]]:
+    """Id e archi bloccante->bloccato del grafo, nell'ordine del file: la
+    stessa coppia per il layout (positions) e per la classificazione dei
+    ritorni (render_edges._edge_records), cosi' i due parlano dello stesso
+    grafo con la stessa visita."""
+    ids = [n["id"] for n in data["nodes"]]
+    validi = set(ids)
+    return ids, [(dep, n["id"]) for n in data["nodes"] for dep in n["blockedBy"] if dep in validi]
+
+
 def positions(data: dict) -> dict[str, tuple[float, float]]:
     """Le posizioni via layout_rank (C08): un arco 'blockedBy' e' un arco
     bloccante->bloccato, come lo legge render_edges.edges()."""
-    ids = [n["id"] for n in data["nodes"]]
-    validi = set(ids)
-    archi = [(dep, n["id"]) for n in data["nodes"] for dep in n["blockedBy"] if dep in validi]
-    return layout_rank.layout_positions(ids, archi, start=None)
+    return layout_rank.layout_positions(*archi(data), start=None)
 
 
 def _head(node: dict, stato: str, x: float, y: float) -> str:
@@ -174,9 +181,11 @@ def canvas(data: dict, front_ids: set[str], gruppi: dict[str, int], *, lite: boo
         # lascerebbe intravedere l'arco vero a piena saturazione, non il filo
         # tenue che ghosts() ridisegna sopra le card, ritagliato card per
         # card, appena visibile (render_edge_ghosts.py).
+        # I due contenitori sono il punto d'aggancio di ghosts.js, che li
+        # rifa' da capo a ogni trascinamento: qui c'e' solo lo stato a riposo.
         f'{render_edges.edges(data, pos, front_ids)}'
-        f'{render_edge_ghosts.backings(data, pos, front_ids)}'
+        f'<g class="edge-backings">{render_edge_ghosts.backings(data, pos, front_ids)}</g>'
         f'{boxes(data, pos, front_ids, gruppi, lite=lite)}'
-        f'{render_edge_ghosts.ghosts(data, pos, front_ids)}'
+        f'<g class="edge-ghosts">{render_edge_ghosts.ghosts(data, pos, front_ids)}</g>'
         '</svg>'
     )

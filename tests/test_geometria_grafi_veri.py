@@ -55,9 +55,17 @@ def _archi(data: dict) -> list[tuple[str, str]]:
     return [(dep, n["id"]) for n in data["nodes"] for dep in n["blockedBy"] if dep in validi]
 
 
+def _archi_che_risalgono(data: dict, pos: dict) -> list[tuple[str, str]]:
+    """Gli archi in avanti il cui bersaglio non sta sotto la sorgente: dalla
+    geometria di _edge_records, non dalla classe, che ora dice solo se
+    l'arco chiude un ciclo."""
+    return [(e["from"], e["to"]) for e in render_edges._edge_records(data, pos, set())
+            if not e["loop"] and e["ey"] <= pos[e["from"]][1]]
+
+
 def _ha_ciclo_indipendente(ids: list[str], archi: list[tuple[str, str]]) -> bool:
     """Rilevazione di ciclo scritta apposta per il test, indipendente dal
-    Tarjan di layout_rank._back_edges: se il ciclo lo cercassi con lo stesso
+    DFS di graph_walk.back_edges: se il ciclo lo cercassi con lo stesso
     codice che sto provando, un suo bug si scagionerebbe da solo. Kahn
     (ordinamento topologico per grado entrante): il grafo e' aciclico se e
     solo se l'ordinamento riesce a consumare tutti i nodi.
@@ -150,7 +158,9 @@ class GraphReale(unittest.TestCase):
     def test_ogni_arco_che_risale_e_un_ritorno_vero(self):
         """I sette grafi veri sono oggi tutti DAG (A03): senza un ciclo vero non
         puo' esistere un ritorno vero, quindi nessun arco deve essere
-        disegnato con la corsia laterale (class="edge loop")."""
+        disegnato con la corsia laterale (class="edge loop"), e nel layout
+        automatico nessun arco in avanti risale (C08): il bloccato sta
+        sempre sotto il suo blocker."""
         for nome, data in _grafi_veri():
             with self.subTest(grafo=nome):
                 ids = [n["id"] for n in data["nodes"]]
@@ -162,6 +172,8 @@ class GraphReale(unittest.TestCase):
                 risalgono = re.findall(r'class="edge loop[^"]*"', svg)
                 self.assertEqual(risalgono, [],
                                   f"{nome}: arco disegnato come ritorno ma il grafo e' un DAG")
+                self.assertEqual(_archi_che_risalgono(data, pos), [],
+                                 f"{nome}: arco in avanti che risale nel layout automatico")
 
 
 class ArcoDiRitornoSintetico(unittest.TestCase):
@@ -197,7 +209,9 @@ class LaProvaMorde(unittest.TestCase):
     def test_radice_singola_rompe_larco_che_risale(self):
         """La regressione di C08: layout_rank.ranks() con uno start esplicito
         (ingresso singolo, come Nodavia) invece di start=None (tutte le
-        radici) fa risalire un arco in avanti su un grafo vero."""
+        radici) fa risalire un arco in avanti su un grafo vero. Lo si legge
+        dalla geometria (_archi_che_risalgono), non dalla classe 'loop': un
+        arco che risale senza ciclo resta in avanti anche nel disegno."""
         rotto_su = []
         for nome, data in _grafi_veri():
             ids = [n["id"] for n in data["nodes"]]
@@ -214,8 +228,7 @@ class LaProvaMorde(unittest.TestCase):
                 for r, membri in by_rank.items()
                 for col, i in enumerate(membri)
             }
-            svg = render_edges.edges(data, pos_singola, front_ids=set())
-            if re.findall(r'class="edge loop[^"]*"', svg):
+            if _archi_che_risalgono(data, pos_singola):
                 rotto_su.append(nome)
         self.assertTrue(rotto_su, "start singolo dovrebbe rompere l'invariante su almeno un grafo vero")
 

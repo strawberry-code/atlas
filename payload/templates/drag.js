@@ -88,32 +88,28 @@
     g.style.setProperty("--dragx", dx + "px");
     g.style.setProperty("--dragy", dy + "px");
   }
-  // Il bordo alto "a riposo" del nodo (rect.card non si tocca mai: solo il
-  // transform CSS sposta la card), per decidere se un arco e' ancora in
-  // avanti o e' diventato un ritorno mentre lo si trascina.
-  function topY(id) {
-    var card = document.querySelector("#node-" + id + " rect.card");
-    return card ? parseFloat(card.getAttribute("y")) : 0;
-  }
-
   // data-sx/sy/ex/ey (render_edges.py) sono i quattro numeri "a riposo": non
   // si toccano mai, ogni ricalcolo riparte da li' sommando i due delta
-  // correnti, cosi' un trascinamento lungo non accumula deriva.
+  // correnti, cosi' un trascinamento lungo non accumula deriva. Se l'arco e'
+  // un ritorno lo dice la classe "loop" scritta dal server (graph_walk.
+  // back_edges: un arco che chiude un ciclo): trascinare una card cambia la
+  // forma, mai la natura dell'arco, e un arco in avanti che risale resta
+  // sullo smooth step, che il ramo speculare lo gestisce.
   function ricalcolaArco(path) {
     var dep = path.dataset.from, nid = path.dataset.to;
     var dDep = delta(dep), dNid = delta(nid);
     var sx = +path.dataset.sx + dDep.x, sy = +path.dataset.sy + dDep.y;
     var ex = +path.dataset.ex + dNid.x, ey = +path.dataset.ey + dNid.y;
-    var loop = !(ey > topY(dep) + dDep.y);
+    var loop = path.classList.contains("loop");
     path.setAttribute("d", loop ? loopPath(sx, sy, ex, ey) : smoothStepPath(sx, sy, ex, ey));
-    path.classList.toggle("loop", loop);
-    if (loop) path.setAttribute("stroke-dasharray", "5 5");
-    else path.removeAttribute("stroke-dasharray");
     var porta = document.querySelector('circle.port[data-from="' + dep + '"][data-to="' + nid + '"]');
     if (porta) { porta.setAttribute("cx", sx); porta.setAttribute("cy", sy); }
   }
+  // Dopo ogni giro avvisa ghosts.js, che rifa' la trasparenza sotto le card
+  // sulle 'd' appena scritte: non sa disegnare un arco, legge le nostre.
   function ricalcolaArchiDi(id) {
     document.querySelectorAll('path.edge[data-from="' + id + '"],path.edge[data-to="' + id + '"]').forEach(ricalcolaArco);
+    vp.dispatchEvent(new CustomEvent("atlas:archi-ricalcolati"));
   }
 
   // Un trascinamento che parte da fuori una card resta il pan della
@@ -186,5 +182,6 @@
   // invisibili anche a opacita' piena, il bug dietro S13/10.
   vp.addEventListener("atlas:ricalcola-archi", function () {
     document.querySelectorAll("path.edge[data-from]").forEach(ricalcolaArco);
+    vp.dispatchEvent(new CustomEvent("atlas:archi-ricalcolati"));
   });
 })();
