@@ -7,6 +7,8 @@ description: Costruisce un grafo di task Atlas nuovo, partendo da un testo che l
 
 Il risultato non è mai un JSON scritto a mano: è uno **script di mutazione** in `.atlas/scripts/`, che si legge in diff e si riesegue. Questa skill porta dal nulla a quello script.
 
+Se il progetto non ha ancora `.atlas/` (`atlas status` risponde "nessun .atlas/ da qui in su"), installa prima con `atlas install --yes`: senza `--yes` il comando si ferma a chiedere il nome del progetto su un input interattivo che in sessione non esiste.
+
 ## Passo 0 — da dove si parte
 
 Chiedi all'utente, con AskUserQuestion, una cosa sola:
@@ -71,6 +73,8 @@ atlas new <slug> -t "Titolo del grafo" -d "La destinazione, in una o due righe."
 atlas new-script primo-disegno
 ```
 
+`atlas new` crea già da solo un ramo di default con chiave `A` ("Percorso principale"). Se il disegno usa quella stessa lettera per il primo ramo, un `mutate.add_branch(g, "A", ...)` nello script fallisce perché la chiave esiste già: riusa il nome scrivendo direttamente `g.data["branches"]["A"] = {"label": ..., "color": ...}`, oppure scegli un'altra lettera per il primo ramo custom.
+
 Poi riempi lo script generato in `.atlas/scripts/`:
 
 ```python
@@ -112,6 +116,8 @@ atlas render --open
 ```
 
 `exec` scrive i ticket mancanti, rigenera la mappa e la dashboard, e stampa la frontiera. Guardala insieme all'utente: un grafo con venti nodi tutti prendibili non ha dipendenze vere, uno con un nodo solo prendibile è una lista travestita da grafo, e più nodi terminali sono rami che non confluiscono nel finale.
+
+Subito dopo controlla la forma del grafo, che `doctor` non guarda: un arco `blockedBy` ridondante, cioè già implicato da un altro cammino, e un id citato nella domanda di un nodo ma assente dai suoi `blockedBy`. Uno script di poche righe su `graph.json` basta, e vale la pena scriverlo una volta e tenerlo. Un arco di troppo si toglie con `mutate.unlink` in uno script successivo; se il grafo non è ancora in git e nessun nodo è stato lavorato, correggi lo script e rigenera da zero, così la storia parte pulita.
 
 ## La domanda di ogni nodo
 

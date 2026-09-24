@@ -9,7 +9,7 @@ description: Costruisce e affila il linguaggio del dominio mentre si decide: sfi
 
 Si usa in coppia con `atlas-strategic-grilling` e `atlas-tactical-grilling`: la griglia porta le domande, questa fissa le parole con cui la risposta viene scritta. Senza, il grafo accumula ticket che dicono "account" intendendo tre cose diverse.
 
-Il glossario del dominio non ha niente a che vedere con `vocab` in `.atlas/config.json`, che è il vocabolario dell'harness (tipi, modi, stati) e non del progetto.
+Il glossario del dominio non ha niente a che vedere con `vocab` in `.atlas/config.json`, che è il vocabolario dell'harness (tipi, modi) e non del progetto.
 
 ## Durante la sessione
 

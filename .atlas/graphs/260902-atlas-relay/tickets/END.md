@@ -3,6 +3,7 @@
 
 > Ramo: Consegna · Tipo: task · Modo: AFK
 > Bloccato da: F01
+> Link: nessuno
 > Stato e dipendenze vivono in `../graph.json`, e si cambiano solo con uno script di mutazione.
 
 ## Domanda

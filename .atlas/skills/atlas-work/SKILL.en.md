@@ -46,7 +46,15 @@ For `prototype` nodes use `atlas-prototype`, for `research` ones `atlas-research
 
 ## 4. Work, and leave a trail in the ticket
 
-The ticket is `.atlas/graphs/<slug>/tickets/<ID>.md`. Write from **Work** downwards: everything above the `<!-- /atlas:auto -->` comment descends from the graph and rewrites itself, so fixing it by hand is wasted effort. While working, note in **Work** the alternatives you discarded and links to the artifacts produced. At the end, fill in **Answer**: it's the only thing `close` checks, and it's for whoever arrives after you.
+The ticket is `.atlas/graphs/<slug>/tickets/<ID>.md`. Write from **Work** downwards: everything above the `<!-- /atlas:auto -->` comment descends from the graph and rewrites itself, so fixing it by hand is wasted effort. While working, keep the log in **Work**: one entry per activity, the half-done one included, with who, when and on the next line what you did. `atlas log` writes it, signing and dating the entry and appending it at the end:
+
+```sh
+atlas log <ID> "read the lock in claims.py, wrote the failing test on F02"
+```
+
+Call it often, not at the end of the node: the log is what remains if you get interrupted, and whoever resumes the node (you in another session, or another agent) reads from there. Discarded alternatives and links to artifacts go inside the entries. At the end, fill in **Answer**: `close` checks that it's there, and that the log has at least one entry.
+
+If the node is `suspended`, `take` told you so along with the suspension note: before doing anything, reread the log in the ticket, because the work resumes from there, not from scratch.
 
 If something comes up that would deserve a node of its own, **don't create it**. Note it down, addressed to a node if it concerns one:
 
@@ -74,7 +82,15 @@ atlas give-up <ID> --motivo <MOTIVO> -d "<dettaglio>"
 
 `MOTIVO` is one of `infeasible` (the question is internally contradictory or impossible), `missing-resource` (it needs a secret, an access, or a service you don't have and can't get on your own), `blocked-environment` (the local environment can't carry the work, and it's not a transient glitch), `needs-redesign` (the design upstream needs to change first). It's terminal for this node in this run: it's never retried, the node returns to the frontier with the surrender recorded.
 
-If the next move is a decision that isn't yours to make, don't decide it for the user and don't stall in silence: propose a binary alternative and suspend the node.
+If you have to stop with work half done that is worth keeping, freeze it instead of releasing it:
+
+```sh
+atlas suspend <ID> -m "<where you got to and what is left>"
+```
+
+The node goes to `suspended`: it drops the lock, stays on the frontier, and whoever resumes it with `take` reads the note, which also lands in the ticket's log. `suspend` refuses if Work is still empty, because the partial work lives there: record it first with `atlas log`, or, if there is nothing to record, use `release`.
+
+If the next move is a decision that isn't yours to make, don't decide it for the user and don't stall in silence: propose a binary alternative and put the node on hold.
 
 ```sh
 atlas ask-human <ID> -q "<I'll proceed with X, confirm?>"
@@ -90,7 +106,7 @@ atlas close <ID> -s "the one-line summary"
 
 To leave a rough order of magnitude for what it cost (calls, tokens, time), add `-c/--costo "..."`. You don't have to list the files you produced: inside a git repository `close` works them out on its own, from what you touched since you claimed the node. If you're working in parallel with other nodes, this deduction skips and you must declare the artifacts with `--artefatti path/one path/two`. `--artefatti` with no arguments leaves the field empty. In the ticket, the **Non-canonical choices**, **Declared debt**, and **Authorizations received** sub-sections under Answer are optional: use them when there's actually something to say, leave them empty otherwise.
 
-The summary lands on its own in `map.md` under Decisions made, and the dashboard regenerates. If `close` refuses because the Answer is empty, write it: it's not an obstacle to route around with `--force`.
+The summary lands on its own in `map.md` under Decisions made, and the dashboard regenerates. If `close` refuses because the Answer is empty, write it; if it refuses because Work has no entry, record what you did with `atlas log`. Neither is an obstacle to route around with `--force`.
 
 **One node per session, even when one more is still up for grabs.** Once the node is closed, stop and report what was decided and what opened up. The next node is the user's choice, not the session's inertia.
 

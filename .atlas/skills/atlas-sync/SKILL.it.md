@@ -15,7 +15,7 @@ Il grafo condiviso si cambia solo con script di mutazione. Quando due agenti lav
 atlas status
 ```
 
-`status` mostra i lucchetti: se ce n'è uno tuo ancora aperto, chiudi il nodo con `atlas close <ID> -s "..."` oppure molla con `atlas release <ID>`. Il lavoro va committato prima di passare oltre.
+`status` mostra i lucchetti: se ce n'è uno tuo ancora aperto, chiudi il nodo con `atlas close <ID> -s "..."` oppure molla con `atlas release <ID>`, o congela il lavoro parziale con `atlas suspend <ID> -m "..."` se vale la pena tenerlo. Il lavoro va committato prima di passare oltre.
 
 ## 2. Fondi, e lascia lavorare il driver
 

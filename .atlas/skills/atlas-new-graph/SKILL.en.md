@@ -7,6 +7,8 @@ description: Builds a new Atlas task graph, starting from a text the user alread
 
 The result is never a hand-written JSON: it's a **mutation script** in `.atlas/scripts/`, which reads as a diff and re-runs. This skill goes from nothing to that script.
 
+If the project has no `.atlas/` yet (`atlas status` answers "no .atlas/ found above here"), install first with `atlas install --yes`: without `--yes` the command stops to ask for the project name on an interactive prompt that doesn't exist in a session.
+
 ## Step 0 — where to start
 
 Ask the user, with AskUserQuestion, one single thing:
@@ -71,6 +73,8 @@ atlas new <slug> -t "Graph title" -d "The destination, in one or two lines."
 atlas new-script first-draft
 ```
 
+`atlas new` already creates a default branch with key `A` ("Main path"). If the design reuses that same letter for its first branch, a `mutate.add_branch(g, "A", ...)` in the script fails because the key already exists: reuse it by writing `g.data["branches"]["A"] = {"label": ..., "color": ...}` directly, or pick a different letter for the first custom branch.
+
 Then fill in the generated script under `.atlas/scripts/`:
 
 ```python
@@ -112,6 +116,8 @@ atlas render --open
 ```
 
 `exec` writes the missing tickets, regenerates the map and the dashboard, and prints the frontier. Look at it together with the user: a graph with twenty nodes all up for grabs has no real dependencies, one with only a single node up for grabs is a list disguised as a graph, and several terminal nodes are strands that don't flow into the final one.
+
+Right after, check the shape of the graph, which `doctor` does not look at: a redundant `blockedBy` edge, one already implied by another path, and an id mentioned in a node's question but missing from its `blockedBy`. A script of a few lines over `graph.json` is enough, and it is worth writing once and keeping. An extra edge comes off with `mutate.unlink` in a follow-up script; if the graph is not in git yet and no node has been worked, fix the script and regenerate from scratch, so the history starts clean.
 
 ## Each node's question
 
