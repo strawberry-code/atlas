@@ -17,6 +17,7 @@ import unittest
 import urllib.error
 import urllib.request
 from pathlib import Path
+from unittest import mock
 
 SORGENTE = Path(__file__).resolve().parent.parent / "payload"
 
@@ -30,6 +31,15 @@ class Base(unittest.TestCase):
         for cartella in ("graphs", "scripts"):
             (self.root / cartella).mkdir()
         sys.path.insert(0, str(self.root))
+        # Il pannello Telegram di render.build interroga il relay del profilo di
+        # macchina (~/.config/atlas/relay.json) con 5 s di timeout: senza isolarlo,
+        # su una macchina col relay configurato ma irraggiungibile ogni render
+        # costava 5 s e il test del canale /events scadeva prima del reload.
+        ambiente = mock.patch.dict(os.environ, {"ATLAS_INSTALL_HOME": str(self.tmp / "profilo")})
+        ambiente.start()
+        self.addCleanup(ambiente.stop)
+        for variabile in ("RELAY_PUBLIC_URL", "RELAY_HTTPS_HOSTNAME", "ATLAS_RELAY_TOKEN_REF"):
+            os.environ.pop(variabile, None)
         os.environ["ATLAS_ROOT"] = str(self.root)
         for modulo in [m for m in sys.modules if m == "core" or m.startswith("core.")]:
             del sys.modules[modulo]
