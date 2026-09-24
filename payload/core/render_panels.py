@@ -106,16 +106,8 @@ def _blocco_caution(data: dict, fatti: int, totale: int) -> str:
     )
 
 
-def _blocco_remoto(remoto: list[object], errore: bool) -> str:
-    voci = righe.remoto(remoto)
-    if errore:
-        voci.insert(0, f'<li class="remoto-rete">{escape(t("render.remoto_rete"))}</li>')
-    return _blocco_lista(t("render.remoto"), voci, t("render.remoto_vuoto"))
-
-
 def panels(ref: Graph, data: dict, front: list[dict], presi: list[dict],
-           gruppi: dict[str, int], remoto: list[object] | None = None,
-           remoto_errore: bool = False) -> str:
+           gruppi: dict[str, int]) -> str:
     agente = ref.workspace.config["agent"]
     fatti, totale = progress(data)
     blocchi = [
@@ -131,11 +123,6 @@ def panels(ref: Graph, data: dict, front: list[dict], presi: list[dict],
     if presi:
         blocchi.append(_blocco_lista(t("render.in_lavorazione"),
                                      righe.in_lavorazione(presi, agente), "", hl="claimed"))
-    # I lucchetti delle altre macchine: compaiono solo col lucchetto remoto attivo
-    # (serve.py li inietta come dati), e si mettono accanto a 'in lavorazione'
-    # perche' dicono la stessa cosa dall'altro lato della rete.
-    if remoto is not None or remoto_errore:
-        blocchi.append(_blocco_remoto(remoto or [], remoto_errore))
     chiusi = [n for n in data["nodes"] if n["status"] == "closed"]
     if chiusi:
         blocchi.append(_blocco_lista(t("render.chiusi"), righe.chiusi(chiusi), "",

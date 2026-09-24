@@ -1,6 +1,6 @@
-"""C02: prova su due cloni veri: merge driver e lucchetto remoto.
+"""C02: prova su due cloni veri: il merge driver.
 
-Due cloni dello stesso progetto Atlas, due identita' e due host diversi, un bare
+Due cloni dello stesso progetto Atlas, due identita' diverse, un bare
 repo locale come remote condiviso. La prova esercita i meccanismi veri, quelli
 che una prova compiacente lascerebbe stare:
 
@@ -10,12 +10,7 @@ che una prova compiacente lascerebbe stare:
     come unione pulita;
   - un conflitto vero (stesso nodo chiuso da entrambi) esce come JSON valido con
     il campo 'conflicts', 'atlas conflicts' lo elenca e '--resolve' lo dichiara
-    risolto togliendo il campo, senza marker git nel file;
-  - la ref remota refs/atlas/<slug>/<id> e' la guardia fra due macchine: presa su
-    una, l'altra e' rifiutata finche' la ref e' fresca; liberata sulla chiusura,
-    l'altra la riprende; scaduta, il furto e' lecito e il possessore cambia;
-  - senza rete le letture degradano con avviso (il rinnovo non allunga un lease
-    non dimostrabile) e le mutazioni restano fail-closed.
+    risolto togliendo il campo, senza marker git nel file.
 
 Si usa l'eseguibile vero (dist/atlas) come sottoprocesso nei due cloni, come fa
 tests/e2e.py: i moduli sorgente li coprono i test unitari, qui si prova il CLI.
@@ -28,7 +23,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import time
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -36,10 +30,6 @@ from types import SimpleNamespace
 ROOT = Path(__file__).resolve().parent.parent
 CLI = ROOT / "dist" / "atlas"
 GITHUB_OFF = "http://127.0.0.1:1"   # il check aggiornamenti fallisce subito, non dopo 15 s
-
-
-def _nome(riga: str) -> str:
-    return riga.split()[-1] if riga.strip() else ""
 
 
 class DueCloni(unittest.TestCase):
@@ -79,17 +69,7 @@ class DueCloni(unittest.TestCase):
 
     # --- sandbox ------------------------------------------------------------
 
-    def _set_config(self, clone: Path, ttl: int | None = None, lock_remote: str | None = None) -> None:
-        """Patch chirurgica di config.json: ttl del lease e/o lock.remote."""
-        cfgp = clone / ".atlas" / "config.json"
-        cfg = json.loads(cfgp.read_text(encoding="utf-8"))
-        if ttl is not None:
-            cfg.setdefault("agent", {})["lease_ttl_seconds"] = ttl
-        if lock_remote is not None:
-            cfg.setdefault("lock", {})["remote"] = lock_remote
-        cfgp.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-
-    def _sandbox(self, nodi: list[str], with_lock: bool = False, ttl: int | None = None) -> SimpleNamespace:
+    def _sandbox(self, nodi: list[str]) -> SimpleNamespace:
         """Progetto seed installato, bare remote, due cloni A e B allineati.
 
         Il seed nasce con i nodi chiesti (tutti aperti, ramo A, senza archi) e col
@@ -129,8 +109,6 @@ class DueCloni(unittest.TestCase):
             self._git(clone, "config", "user.email", "prova@prova")
             esito = self._atlas(clone, "install", str(clone), "--yes")
             self.assertEqual(0, esito.returncode, esito.stderr)
-            if with_lock or ttl is not None:
-                self._set_config(clone, ttl=ttl, lock_remote=str(remote) if with_lock else None)
         grafo = next((a / ".atlas" / "graphs").glob("*/graph.json"))
         slug = grafo.parent.name
         return SimpleNamespace(A=a, B=b, remote=remote, slug=slug, ramo=ramo, tmp=self.tmp)
@@ -168,18 +146,6 @@ class DueCloni(unittest.TestCase):
                           f"    mutate.link(g, '{nodo}', '{dep}')\n", encoding="utf-8")
         esito = self._atlas(clone, "exec", f".atlas/scripts/{script.name}")
         self.assertEqual(0, esito.returncode, esito.stderr)
-
-    def _refs(self) -> list[str]:
-        """Le ref del lucchetto remoto sul remote condiviso, come le vede git."""
-        esito = self._git(self.tmp / "remote.git", "for-each-ref", "refs/atlas")
-        return [_nome(r) for r in esito.stdout.splitlines() if r.strip()]
-
-    def _ref_host(self, refname: str) -> str | None:
-        """L'host scritto nel token della ref: 'ATLAS-LOCK <host> <epoch>'."""
-        sha = self._git(self.tmp / "remote.git", "rev-parse", refname).stdout.strip()
-        msg = self._git(self.tmp / "remote.git", "show", "-s", "--format=%s", sha).stdout.strip()
-        parti = msg.split()
-        return parti[1] if len(parti) >= 2 else None
 
     # --- il merge driver in un merge reale ----------------------------------
 
@@ -271,74 +237,6 @@ class DueCloni(unittest.TestCase):
         self._git(s.B, "add", str(rel))
         chiusura = self._git(s.B, "commit", "-q", "-m", "risolto: vince la chiusura locale")
         self.assertEqual(0, chiusura.returncode, chiusura.stderr)
-
-    # --- il lucchetto remoto fra due macchine -------------------------------
-
-    def test_lucchetto_remoto_esclude_e_consegna_fra_due_macchine(self):
-        """La ref refs/atlas/<slug>/<id> e' la guardia: presa su una macchina,
-        l'altra e' rifiutata finche' e' fresca; la chiusura libera la ref e
-        l'altra la riprende; scaduta, il furto e' lecito e cambia possessore."""
-        s = self._sandbox(["L01", "L02", "L03"], with_lock=True, ttl=3)
-
-        # A prende L01: la ref compare col nome di A
-        self.assertEqual(0, self._take(s.A, "L01", "macchina-A", "macchina-A").returncode)
-        ref_l01 = f"refs/atlas/{s.slug}/L01"
-        self.assertIn(ref_l01, self._refs())
-        self.assertEqual("macchina-A", self._ref_host(ref_l01))
-
-        # B prova a prendere lo stesso nodo: rifiutato, la ref e' fresca
-        rifiuto = self._take(s.B, "L01", "macchina-B", "macchina-B")
-        self.assertEqual(1, rifiuto.returncode)
-        self.assertIn("in lavorazione", rifiuto.stderr)
-        self.assertIn("macchina-A", rifiuto.stderr)
-
-        # B prende un altro nodo, che gli appartiene
-        self.assertEqual(0, self._take(s.B, "L02", "macchina-B", "macchina-B").returncode)
-        self.assertIn(f"refs/atlas/{s.slug}/L02", self._refs())
-
-        # A chiude L01: la ref si libera
-        self._chiudi(s.A, s.slug, "L01", "macchina-A", "macchina-A", "fatto da A")
-        self.assertNotIn(ref_l01, self._refs())
-
-        # B chiude L02: le ref sono tutte giu'
-        self._chiudi(s.B, s.slug, "L02", "macchina-B", "macchina-B", "fatto da B")
-        self.assertEqual([], self._refs())
-
-        # ora B puo' riprendere L01, che A ha mollato
-        self.assertEqual(0, self._take(s.B, "L01", "macchina-B", "macchina-B").returncode)
-        self.assertIn(ref_l01, self._refs())
-        self.assertEqual("macchina-B", self._ref_host(ref_l01))
-        # B libera la sua sessione
-        self.assertEqual(0, self._atlas(s.B, "release", "L01", "--identity", "macchina-B",
-                                        host="macchina-B", ident="macchina-B").returncode)
-
-        # scadenza: A prende L03 col lease breve, aspetta che scada, B glielo ruba
-        self.assertEqual(0, self._take(s.A, "L03", "macchina-A", "macchina-A").returncode)
-        ref_l03 = f"refs/atlas/{s.slug}/L03"
-        self.assertEqual("macchina-A", self._ref_host(ref_l03))
-        time.sleep(4)   # TTL 3 s: la ref di A scade
-        furto = self._take(s.B, "L03", "macchina-B", "macchina-B")
-        self.assertEqual(0, furto.returncode, furto.stderr)
-        self.assertEqual("macchina-B", self._ref_host(ref_l03))
-
-    def test_senza_rete_le_letture_degradano_e_le_scritture_rifiutano(self):
-        """Col remote irraggiungibile: una lettura esce con l'avviso (il rinnovo
-        non allunga un lease non dimostrabile), una scrittura resta chiusa."""
-        s = self._sandbox(["L01", "L02"], with_lock=True, ttl=3)
-        self.assertEqual(0, self._take(s.A, "L01", "macchina-A", "macchina-A").returncode)
-        time.sleep(2)   # il lease di A e' vicino alla scadenza: la lettura provera' a rinnovarlo
-
-        rotto = str(self.tmp / "manca.git")   # remote inesistente = rete assente
-        for clone in (s.A, s.B):
-            self._set_config(clone, ttl=3, lock_remote=rotto)
-
-        lettura = self._atlas(s.A, "status", host="macchina-A", ident="macchina-A")
-        self.assertEqual(0, lettura.returncode, lettura.stderr)
-        self.assertIn("remote non raggiungibile", lettura.stdout)
-
-        scrittura = self._take(s.B, "L02", "macchina-B", "macchina-B")
-        self.assertEqual(1, scrittura.returncode)
-        self.assertIn("non è raggiungibile", scrittura.stderr)
 
 
 if __name__ == "__main__":

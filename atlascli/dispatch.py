@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import subprocess
 import sys
 from pathlib import Path
 
@@ -124,54 +123,9 @@ def _allinea_lingua() -> None:
     strings_motore.set_language(lingua)
 
 
-def _inietta_lucchetto(radice: Path | None) -> None:
-    """Se il progetto dichiara lock.remote, costruisce il trasporto git-refs e lo
-    inietta nell'holder del motore. Feature spenta di default: senza lock.remote il
-    motore resta local-only e al boot non parte nessuna rete. Un config illeggibile
-    si ingoia, come per la lingua: a dirlo pensa il comando che quel file lo apre."""
-    if radice is None:
-        return
-    try:
-        dati = json.loads((radice / ".atlas" / "config.json").read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return
-    if not isinstance(dati, dict):
-        return
-    remote = dati.get("lock", {}).get("remote")
-    if not isinstance(remote, str) or not remote:
-        return
-    remoto_url = _risolvi_remote(radice, remote)
-    if remoto_url is None:
-        print(t("errore.remote_non_risolto", remote=remote), file=sys.stderr)
-        return
-    from core import remotelock as lucchetto
-    from .remotelock import TrasportoRefsGit
-    lucchetto.set_trasporto(TrasportoRefsGit(remoto_url))
-
-
-def _risolvi_remote(radice: Path, remoto: str) -> str | None:
-    """Risolvi un nome di remote nella copia del progetto, non nel puppet.
-
-    Un URL e' gia' risolto e viene passato al trasporto senza contattare la rete.
-    Un nome inesistente e' configurazione non risolvibile; l'eventuale errore di
-    rete arriva invece piu' tardi alle primitive del trasporto come RETE.
-    """
-    if "://" in remoto or remoto.startswith(("/", "./", "../", "~", "git@")):
-        return remoto
-    try:
-        risultato = subprocess.run(
-            ["git", "-C", str(radice), "remote", "get-url", remoto],
-            check=True, capture_output=True, text=True)
-    except (OSError, subprocess.CalledProcessError):
-        return None
-    url = risultato.stdout.strip()
-    return url or None
-
-
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else list(argv)
     _allinea_lingua()
-    _inietta_lucchetto(progetto_qui())
 
     if not argv or argv[0] in ("-h", "--help", "help"):
         build_parser().print_help()

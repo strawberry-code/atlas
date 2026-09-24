@@ -168,8 +168,6 @@ and save multiple files; missing paths are reported at close time.
 
 A claim can come from another machine. When two machines work on the same graph, a claim is a lease: it carries `host` and `lease_until`, and a remote claim is alive until its lease expires (default 3600 s, `lease_ttl_seconds` in `config.json`), not while its process happens to exist. Your own claims renew their heartbeat on every command that loads the graph, when less than half the TTL is left: one command per TTL keeps the lease alive, and a burst doesn't rewrite the file.
 
-The remote lock is opt-in. Set `lock.remote` in `.atlas/config.json` to a git remote (say `origin`), and Atlas coordinates the claim over shared git refs before touching a node; without it the behavior is unchanged, local only. Without the network the lock degrades on reads and closes on writes: `status`, `next`, `show` and `brief` show the local state with a "remote unreachable" notice, while `take` on a free node, `close` and `release` refuse to write, because without the ref you can't rule out that another machine holds the node; `doctor` reports the remote lock's state without dying. When the remote lock is active, the shared-window artifact deduction also sees remote refs taken by other machines during the work. `atlas serve` shows the other machines' locks in a panel of their own when the lock is active, degrading gracefully when the remote can't be reached.
-
 ## Who does what
 
 Assignments are optional, for when a graph is split across several people. An assigned node stays up for grabs: the lock is still the `claim`, the assignment says whose piece it is, not who has their hands on it right now.

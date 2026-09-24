@@ -94,11 +94,8 @@ def _mappa(data: dict, front_ids: set[str], gruppi: dict[str, int]) -> str:
     return render_canvas.mappa(data, front_ids, gruppi, legenda, t("render.legenda_caption"))
 
 
-def build(ref: Graph, data: dict, remoto: list[object] | None = None,
-          remoto_errore: bool = False) -> str:
-    """La pagina. 'remoto' e' la verita' dei lucchetti delle altre macchine come
-    l'ha letta serve.py (remotelock.elenca), None se il lucchetto remoto e' spento:
-    allora la vista e' quella di oggi, senza pannello."""
+def build(ref: Graph, data: dict) -> str:
+    """La pagina."""
     front = frontier(data)
     presi = claimed(data)
     front_ids = {n["id"] for n in front}
@@ -119,7 +116,7 @@ def build(ref: Graph, data: dict, remoto: list[object] | None = None,
         f'{stampo_prefs}<style>{css}</style></head>'
         f'<body data-slug="{escape(data["meta"]["slug"])}">'
         f'{_topbar(ref, data, front, presi)}'
-        f'<aside class="side">{render_panels.panels(ref, data, front, presi, gruppi, remoto=remoto, remoto_errore=remoto_errore)}</aside>'
+        f'<aside class="side">{render_panels.panels(ref, data, front, presi, gruppi)}</aside>'
         f'{_mappa(data, front_ids, gruppi)}'
         f'{render_notifiche.panel(ref, data)}'
         f'{render_table.table(data, front_ids)}'

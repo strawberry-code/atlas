@@ -3,15 +3,11 @@ sessione lavora, non solo al claim. La primitiva sta in claims.py, il gancio nel
 dispatcher (cli.py); qui si prova la primitiva e il gancio end-to-end.
 
 Si prova che: il rinnovo scatta su un lease stantio e non tocca un lease fresco;
-la cadenza (meta' del TTL) e' rispettata; senza trasporto il percorso e' local-only
-identico a oggi; con un trasporto iniettato il rinnovo estende anche la ref remota;
-una ref irraggiungibile degrada con avviso senza scrivere il claim (L07), mentre una
-ref altrui resta fail-closed (L05).
+la cadenza (meta' del TTL) e' rispettata; il rinnovo tocca solo i claim nostri.
 """
 from __future__ import annotations
 
 import contextlib
-import importlib
 import io
 import os
 import sys
@@ -22,37 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "payload"))
 
-from core.remotelock import ACQUISITO, Esito, NON_TUO, RETE  # noqa: E402
 from tests.test_motore import Base  # noqa: E402
-
-
-class StubTrasporto:
-    """Il trasporto minimo che serve al rinnovo: registra le chiamate a rinnova e
-    risponde con l'esito assegnato. Gli altri metodi del protocollo non servono
-    qui, ma il protocollo li pretende: rispondono Acquisito."""
-
-    def __init__(self):
-        self.rinnovi = []
-        self.rinnovo = Esito(ACQUISITO)
-
-    def rinnova(self, nome, host, scadenza):
-        self.rinnovi.append((nome, host, scadenza))
-        return self.rinnovo
-
-    def acquire(self, nome, host, scadenza):
-        return Esito(ACQUISITO)
-
-    def ruba(self, nome, host, scadenza):
-        return Esito(ACQUISITO)
-
-    def rilascia(self, nome, host):
-        return Esito(ACQUISITO)
-
-    def stato(self, nome):
-        return Esito(ACQUISITO)
-
-    def elenca(self):
-        return []
 
 
 class Battito(Base):
@@ -119,8 +85,7 @@ class Battito(Base):
         claim = self.model.node_of(self.store.load(self.ref.json_path), "F01")["claim"]
         self.assertEqual("altra-macchina", claim["host"], "un claim altrui non si tocca")
 
-    def test_senza_trasporto_il_percorso_e_local_only(self):
-        self.assertFalse(importlib.import_module("core.remotelock").attivo())
+    def test_il_percorso_e_local_only(self):
         self._claim()
         self._invecchia("F01", -60)
         self.assertTrue(self.claims.rinnova_se_necessario(self.ref))
@@ -160,65 +125,3 @@ class Battito(Base):
             self.assertEqual(0, cli.main(["status"]))
         self.assertEqual(prima, self.ref.json_path.read_bytes(),
                          "status con lease fresco non riscrive il grafo")
-
-
-class BattitoRemoto(Base):
-    """Con un trasporto iniettato il rinnovo estende anche la ref remota, e una
-    ref irraggiungibile o altrui fa fallire il rinnovo senza scrivere il claim."""
-
-    def setUp(self):
-        super().setUp()
-        os.environ["ATLAS_IDENTITY"] = "battito"
-        os.environ["ATLAS_HOST"] = "macchina-battito"
-        self.popola()
-        self.stub = StubTrasporto()
-        self.remotelock = importlib.import_module("core.remotelock")
-        self.remotelock.set_trasporto(self.stub)
-
-    def tearDown(self):
-        importlib.import_module("core.remotelock").set_trasporto(None)
-        os.environ.pop("ATLAS_IDENTITY", None)
-        os.environ.pop("ATLAS_HOST", None)
-        super().tearDown()
-
-    def _claim_stantio(self):
-        self.claims.claim(self.ref, "F01")
-        with self.store.transaction(self.ref.json_path) as data:
-            claim = self.model.node_of(data, "F01")["claim"]
-            claim["lease_until"] = (datetime.now().astimezone()
-                                    + timedelta(seconds=-60)).isoformat(timespec="seconds")
-
-    def _lease(self):
-        return self.model.node_of(self.store.load(self.ref.json_path),
-                                  "F01")["claim"]["lease_until"]
-
-    def test_rinnova_anche_la_ref_remota(self):
-        self._claim_stantio()
-        self.assertTrue(self.claims.rinnova_se_necessario(self.ref))
-        self.assertEqual(1, len(self.stub.rinnovi))
-        nome, host, scadenza = self.stub.rinnovi[0]
-        self.assertIn("F01", nome)
-        self.assertEqual("macchina-battito", host)
-        self.assertGreater(scadenza, int(datetime.now().astimezone().timestamp()))
-
-    def test_rete_degrada_il_rinnovo_senza_scrivere_il_claim(self):
-        """L07: la rete assente non fa morire una lettura. Il rinnovo degrada con un
-        avviso, non rinnova il lease locale (fingerebbe una lock non confermata) e
-        non alza: il claim resta stantio e chi legge vede lo stato locale."""
-        self._claim_stantio()
-        self.stub.rinnovo = Esito(RETE)
-        buffer = io.StringIO()
-        with contextlib.redirect_stdout(buffer):
-            self.assertFalse(self.claims.rinnova_se_necessario(self.ref))
-        self.assertIn("remote non raggiungibile", buffer.getvalue())
-        self.assertLess(datetime.fromisoformat(self._lease()),
-                        datetime.now().astimezone(), "il claim resta stantio")
-
-    def test_ref_altrui_fa_fallire_il_rinnovo(self):
-        self._claim_stantio()
-        self.stub.rinnovo = Esito(NON_TUO, host="altra-macchina")
-        with self.assertRaises(self.store.StateError) as caso:
-            self.claims.rinnova_se_necessario(self.ref)
-        self.assertIn("altra-macchina", str(caso.exception))
-        self.assertLess(datetime.fromisoformat(self._lease()),
-                        datetime.now().astimezone(), "il claim resta stantio")

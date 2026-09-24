@@ -2,7 +2,7 @@
 
 Spezzato da serve.py, che sta gia' sopra le 200 righe convenzionali: qui c'e'
 il solo POST /interactions/<id>/<action>, la' resta il resto del server (la
-dashboard viva, il canale SSE, i lucchetti remoti).
+dashboard viva, il canale SSE).
 """
 from __future__ import annotations
 

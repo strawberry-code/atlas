@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from . import claims, docs, gitscan, questions, remotelock, worklog
+from . import claims, docs, gitscan, questions, worklog
 from .config import ConfigError, Graph, Workspace
 from .model import by_id, claimed, is_done, istante, owners_of
 from .report import ETICHETTA
@@ -107,22 +107,6 @@ def doctor_avvisi(data: dict, ref: Graph, agente: dict) -> list[str]:
         canonico = owners_of(nodo)
         if grezzo is not None and grezzo != canonico:
             avvisi.append(t("doctor.owner_non_canonico", id=nodo["id"], chi=", ".join(canonico)))
-
-    # Il lucchetto remoto (L07): riferirne lo stato senza morire. Attivo e
-    # raggiungibile e' silenzio; dichiarato in config ma non attivo, o attivo ma
-    # irraggiungibile, e' un avviso: due macchine che non si vedono possono pestarsi,
-    # ed e' esattamente cio' che il lucchetto deve evitare. Un trasporto che alza
-    # invece di rispondere non deve far morire l'unico comando che serve quando qualcosa
-    # e' gia' rotto.
-    if remotelock.attivo():
-        try:
-            letto = remotelock.elenca()
-        except Exception:
-            letto = remotelock.Esito(remotelock.RETE)
-        if not isinstance(letto, list):
-            avvisi.append(t("doctor.remoto_rete"))
-    elif ref.workspace.config.get("lock", {}).get("remote"):
-        avvisi.append(t("doctor.remoto_spento"))
 
     return avvisi
 
