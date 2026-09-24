@@ -27,7 +27,7 @@ from __future__ import annotations
 
 from html import escape
 
-from . import render_svg, render_table, theme
+from . import render_owners, render_svg, render_table, theme
 from .config import Graph
 from .model import claimed, frontier, progress
 from .risorse import leggi_css_lite
@@ -72,7 +72,12 @@ def build(ref: Graph, data: dict) -> str:
         f'<style>{leggi_css_lite()}</style></head><body>'
         f'{_topbar(data, front, presi)}'
         f'<main class="map"><div class="viewport">'
-        f'{render_svg.canvas(data, front_ids, {}, lite=True)}</div>'
+        # niente legenda/pannello per persona su questa pagina (S11/4), ma
+        # l'indice serve comunque: senza, la pillola di un nodo assegnato
+        # perderebbe la sua tinta (render_owners.colore(), issue #34) pur
+        # mostrando ancora il nome giusto (render_pills.py legge i nomi da
+        # owners_of(), non dall'indice).
+        f'{render_svg.canvas(data, front_ids, render_owners.indice(data), lite=True)}</div>'
         f'<div class="legend">{_legenda()}</div></main>'
         f'{render_table.table(data, front_ids)}'
         '</body></html>'

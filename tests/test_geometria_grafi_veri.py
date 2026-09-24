@@ -222,9 +222,13 @@ class LaProvaMorde(unittest.TestCase):
             by_rank: dict[int, list[str]] = {}
             for i in ids:
                 by_rank.setdefault(rank_singola[i], []).append(i)
+            # stesso passo di layout_positions() (issue #34: il margine e'
+            # fisso, W/H no, vedi layout_rank.X_MARGIN/Y_MARGIN)
+            x_gap = render_svg.W + layout_rank.X_MARGIN
+            y_gap = render_svg.H + layout_rank.Y_MARGIN
             pos_singola = {
-                i: (layout_rank.X_BASE + col * layout_rank.X_GAP,
-                    layout_rank.Y_BASE + r * layout_rank.Y_GAP)
+                i: (layout_rank.X_BASE + col * x_gap,
+                    layout_rank.Y_BASE + r * y_gap)
                 for r, membri in by_rank.items()
                 for col, i in enumerate(membri)
             }

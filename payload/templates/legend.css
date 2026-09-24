@@ -50,8 +50,15 @@ body[data-owner] .legend .chip[data-owner]:not(.on){opacity:.5}
 .legend .chip.who b{color:var(--ink);font-weight:600}
 .legend .chip.who.none{font-style:italic}
 /* Il quadratino resta l'unico colore del chip, sia per stato che per persona:
-   il testo intorno e' sempre --muted/--ink, mai una terza tinta. */
+   il testo intorno e' sempre --muted/--ink, mai una terza tinta. Per una
+   persona il quadratino diventa un pallino (render_owners.colore(), issue
+   #34): la forma distingue subito i due assi, stato squadrato e persona
+   tonda, senza dover leggere il testo. */
 .legend .chip i{width:8px;height:8px;flex:none}
+.legend .chip.who i{border-radius:50%}
+/* La stessa tinta, in un pallino piu' piccolo, nella riga del pannello
+   assegnazioni (render_owners.panel()): stesso indice, stesso colore(). */
+.who-dot{width:7px;height:7px;border-radius:50%;flex:none}
 .chip.st-frontier i{background:var(--st-frontier-bg);border:1.5px solid var(--st-frontier)}
 .chip.st-claimed i{background:var(--st-claimed-bg);border:1.5px solid var(--st-claimed)}
 .chip.st-suspended i{background:var(--st-suspended-bg);border:1.5px solid var(--st-suspended)}

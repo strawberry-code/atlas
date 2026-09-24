@@ -141,10 +141,19 @@
     chips.appendChild(chip('<svg class="bshape" viewBox="0 0 24 24" width="9" height="9" ' +
       'aria-hidden="true"><path d="' + n.branchShape + '" fill="' + n.branchColor +
       '"/></svg>' + esc(n.branchLabel)));
+    // Pillole degli assegnatari (issue #34): stessa tinta della card, gia'
+    // calcolata da render_owners.colore() e incorporata in n.ownerColor - qui
+    // non si ricalcola nessuna tavolozza, solo lo stile inline che la applica.
+    // Senza assegnatari, una pillola sola e neutra: "Anonimo"/"Anonymous".
     var nomi = Array.isArray(n.owner) ? n.owner : (n.owner ? [n.owner] : []);
-    nomi.forEach(function (nome, i) {
-      chips.appendChild(chip(esc(i ? nome : sheet.dataset.ownerLabel + " " + nome), "who"));
-    });
+    if (nomi.length) {
+      nomi.forEach(function (nome) {
+        chips.appendChild(chip(esc(nome), "who", "background:" + n.ownerColor + ";color:#fff"));
+      });
+    } else {
+      chips.appendChild(chip(esc(sheet.dataset.anonimo), "who none",
+        "background:var(--border-strong);color:var(--ink)"));
+    }
     if (n.model) chips.appendChild(chip(esc(n.model)));
     if (n.cost) chips.appendChild(chip(esc(n.cost)));
     titolo.innerHTML = '<span class="sid" data-copy="' + esc(id) + '" title="' + esc(sheet.dataset.copia) +

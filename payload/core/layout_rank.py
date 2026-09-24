@@ -19,7 +19,12 @@ from __future__ import annotations
 
 from .graph_walk import Edge, NodeId, _adjacency, _reachable, _roots, _scc, back_edges
 
-X_GAP, Y_GAP, X_BASE, Y_BASE = 270, 195, 400, 60
+# Il margine fra due card (non il passo, quello si ricava sommando la
+# dimensione della card): 40px in orizzontale, 61px in verticale, misurati
+# quando la card era 230x134 (issue #34 l'ha allargata a 260x156). Letto da
+# render_svg.W/H dentro layout_positions(), mai duplicato come un secondo
+# 270/195 che poi diverge dal disegno vero.
+X_MARGIN, Y_MARGIN, X_BASE, Y_BASE = 40, 61, 400, 60
 
 def ranks(node_ids: list[NodeId], edges: list[Edge], start: NodeId | None = None) -> dict[NodeId, int]:
     """Il rango di ogni nodo: longest-path sulle componenti fortemente connesse.
@@ -88,11 +93,15 @@ def layout_positions(node_ids: list[NodeId], edges: list[Edge],
     pos: dict[NodeId, tuple[float, float]] = {}
     if not node_ids:
         return pos
+    # import differito: render_svg importa questo modulo a sua volta (C08), un
+    # import in testa al file creerebbe un ciclo (stesso schema di render_edges.py)
+    from .render_svg import H, W
+    x_gap, y_gap = W + X_MARGIN, H + Y_MARGIN
     rank = ranks(node_ids, edges, start)
     by_rank: dict[int, list[NodeId]] = {}
     for i in node_ids:
         by_rank.setdefault(rank[i], []).append(i)
     for r, ids in by_rank.items():
         for col, i in enumerate(ids):
-            pos[i] = (X_BASE + (col - (len(ids) - 1) / 2) * X_GAP, Y_BASE + r * Y_GAP)
+            pos[i] = (X_BASE + (col - (len(ids) - 1) / 2) * x_gap, Y_BASE + r * y_gap)
     return pos

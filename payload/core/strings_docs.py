@@ -113,7 +113,9 @@ STRINGS: dict[str, dict[str, str]] = {
     "render.rami": {"it": "rami", "en": "branches"},
     "render.assegnazioni": {"it": "assegnazioni", "en": "assignments"},
     "render.non_assegnati": {"it": "non assegnati", "en": "unassigned"},
-    "render.sheet_assegnato": {"it": "assegnato a", "en": "assigned to"},
+    # la pillola sulla card/scheda di un nodo senza assegnatari (issue #34):
+    # singolare, a differenza di 'render.non_assegnati' che conta piu' nodi
+    "render.anonimo": {"it": "Anonimo", "en": "Anonymous"},
     "render.nessun_ramo": {"it": "nessun ramo", "en": "no branches"},
     "render.in_lavorazione": {"it": "in lavorazione", "en": "in progress"},
     "render.chiusi": {"it": "chiusi", "en": "closed"},

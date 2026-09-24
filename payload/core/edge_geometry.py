@@ -22,7 +22,12 @@ import math
 CORNER = 10          # raccordo degli angoli, condiviso da arco in avanti e di ritorno
 OFFSET = 20          # tratto dritto fuori dall'handle prima di piegare (getSmoothStepPath)
 STEP_POSITION = 0.5  # frazione del segmento centrale dove cade la piega
-LANE = 135           # meta' del passo fra due colonne: la corsia cade fra due card, mai dentro
+# meta' larghezza della card (render_svg.W/2 = 130, issue #34 l'ha allargata
+# da 230 a 260) piu' lo stesso margine di OFFSET: la corsia cade nel corridoio
+# fra due colonne, mai dentro una card. Nessun import da render_svg (vedi il
+# docstring del modulo): il numero si aggiorna a mano insieme a W, come gia'
+# faceva prima con la card piu' stretta (115 + 20 = 135).
+LANE = 150
 DROP = 26            # tratto verticale sotto la sorgente prima di scartare di lato
 LOOP_DASH = "5 5"    # il tratto che distingue un arco di ritorno da uno sano (decisione A01)
 

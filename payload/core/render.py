@@ -120,7 +120,7 @@ def build(ref: Graph, data: dict) -> str:
         f'{_mappa(data, front_ids, gruppi)}'
         f'{render_notifiche.panel(ref, data)}'
         f'{render_table.table(data, front_ids)}'
-        f'{render_sheet.data_island(ref, data, front_ids)}'
+        f'{render_sheet.data_island(ref, data, front_ids, gruppi)}'
         f'<script>{js}</script>'
         '</body></html>'
     )

@@ -6,11 +6,12 @@ finisce mai il nome ma un indice numerico: un nome arriva dalla riga di comando,
 e infilarlo dentro un selettore vorrebbe dire lasciare che chi lo scrive
 componga il foglio di stile della pagina.
 
-Le persone non hanno un colore proprio: sulla mappa il colore porta lo stato e
-il bordo porta il ramo, e una terza scala cromatica renderebbe illeggibili le
-prime due. Chi ha cosa si legge dal filtro e dal pannello, che accendono i nodi
-di un insieme di assegnatari alla volta: una persona sola, oppure la squadra
-esatta che quel nodo ha.
+Sulla card il colore di stato resta l'unico riempimento pieno e il bordo resta
+del ramo: le persone hanno una tinta propria (colore(), sotto), ma la portano
+solo le pillole degli assegnatari, mai la card intera, o la terza scala
+cromatica renderebbe illeggibili le prime due. Chi ha cosa si legge anche dal
+filtro e dal pannello, che accendono i nodi di un insieme di assegnatari alla
+volta: una persona sola, oppure la squadra esatta che quel nodo ha.
 """
 from __future__ import annotations
 
@@ -21,6 +22,27 @@ from .strings import t
 
 NESSUNO = 0    # i nodi senza assegnatario stanno tutti nello stesso gruppo
 SEPARATORE = " + "    # una squadra si legge come i suoi nomi uniti; il '+' nei nomi e' vietato
+
+# Otto tinte, una per indice di insieme (vedi indice()/gruppi()): round-robin
+# oltre l'ottava. Scelte scure a sufficienza da reggere testo bianco sopra (le
+# pillole della card e della scheda, render_svg.py/sheet.js), non tarate sui
+# token di stato (--st-*) perche' quelli restano il solo asse cromatico dello
+# stato del nodo (Q001/Q03): un insieme di assegnatari e' un'altra domanda
+# ("di chi e'"), non un'altra sfumatura della stessa. Un solo elenco, letto
+# dal chip del filtro, dalla riga del pannello, dalla card e dalla scheda:
+# quattro elenchi indipendenti prima o poi divergono.
+PALETTE = (
+    "#b45309", "#0f766e", "#7c3aed", "#be123c",
+    "#0369a1", "#4d7c0f", "#a21caf", "#c2410c",
+)
+
+
+def colore(i: int) -> str:
+    """La tinta di un insieme di assegnatari, stabile per indice. Nessuno
+    (indice NESSUNO) non ha una tinta propria: torna stringa vuota, perche' i
+    nodi senza assegnatario restano neutri e non vanno confusi con una vera
+    persona che sia finita per caso sullo stesso indice."""
+    return PALETTE[(i - 1) % len(PALETTE)] if i > NESSUNO else ""
 
 
 def voci(data: dict) -> list[tuple[str, list[str]]]:
@@ -71,18 +93,22 @@ def chips(data: dict, idx: dict[str, int]) -> str:
     """La fila di chip in legenda: una persona per chip, piu' i non assegnati.
 
     Tace del tutto su un grafo senza assegnazioni: chi non usa questa parte non
-    si ritrova una fila di controlli che non gli dicono niente.
+    si ritrova una fila di controlli che non gli dicono niente. Il quadratino
+    porta la stessa tinta di colore(): e' lo stesso indice che finisce sulla
+    pillola della card e della scheda (issue #34), non un secondo calcolo.
     """
     if not idx:
         return ""
     fuori = sum(1 for n in data["nodes"] if not owners_of(n))
     righe = [
         f'<button type="button" class="chip who" data-owner="{idx[etichetta]}">'
+        f'<i style="background:{colore(idx[etichetta])}"></i>'
         f'{escape(etichetta)} <b>{len(ids)}</b></button>'
         for etichetta, ids in voci(data)
     ]
     if fuori:
         righe.append(f'<button type="button" class="chip who none" data-owner="{NESSUNO}">'
+                     f'<i style="background:var(--border-strong)"></i>'
                      f'{t("render.non_assegnati")} <b>{fuori}</b></button>')
     return "".join(righe)
 
@@ -105,10 +131,12 @@ def panel(data: dict, idx: dict[str, int]) -> str:
         nome = escape(etichetta)
         label = nome if SEPARATORE in etichetta else f"<b>{nome}</b>"
         righe.append(f'<li class="row-dense" data-owner="{idx[etichetta]}">'
+                     f'<i class="who-dot" style="background:{colore(idx[etichetta])}"></i>'
                      f'<span class="row-dense-label">{label}</span>'
                      f'<span class="badge-count muted">{len(ids)}</span></li>')
     if fuori:
         righe.append(f'<li class="row-dense" data-owner="{NESSUNO}">'
+                     f'<i class="who-dot" style="background:var(--border-strong)"></i>'
                      f'<span class="row-dense-label">{t("render.non_assegnati")}</span>'
                      f'<span class="badge-count muted">{len(fuori)}</span></li>')
     return (f'<section class="blocco panel-dense"><h2 class="eyebrow">{t("render.assegnazioni")}</h2>'

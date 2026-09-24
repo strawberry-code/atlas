@@ -79,14 +79,21 @@ body.trascina{user-select:none}
 }
 /* ---------- i nodi: carta bianca flottante, come customNodes.tsx ----------
    Struttura SVG (non foreignObject: 'rect.card' resta l'aggancio a cui
-   render_edges.hover_css() lega le sue regole, A03): .neyebrow+.ndot sono la
-   riga rf-head (tipo a sinistra, stato a destra), .nid l'id sotto, .ntt il
-   corpo, .nfoot il footer (modo, assegnatario, costo). */
-.neyebrow{font:500 9px var(--display);letter-spacing:.13em;text-transform:uppercase;fill:var(--faint)}
-.ndot{font:11px var(--mono)}
-.nid{font:500 14px var(--display);letter-spacing:-.01em}
-.ntt{font:11.5px var(--display);fill:var(--ink)}
-.nfoot{font:9.5px var(--mono);fill:var(--muted)}
+   render_edges.hover_css() lega le sue regole, A03): .nid (l'id, in evidenza)
+   e .neyebrow+.ndot (tipo e stato) condividono la riga in cima, .ntt e' il
+   titolo, .npill-testo/.npill-modo sono il testo delle pillole in fondo
+   (render_pills.py: assegnatari, modo, ramo). Tutto il testo della card resta
+   su --ink (o sui --st-*-tx per id/stato): niente --faint/--muted sul fondo
+   tinto, che a distanza si leggeva male (issue #34/Q0x). */
+.neyebrow{font:600 9px var(--display);letter-spacing:.12em;text-transform:uppercase;fill:var(--ink)}
+.ndot{font:12px var(--mono)}
+.nid{font:700 16px var(--display);letter-spacing:-.01em}
+.ntt{font:13px var(--display);fill:var(--ink)}
+/* pillole della riga in fondo: piena (assegnatario) porta testo bianco sopra
+   la tinta di render_owners.colore(), a contorno (modo, o 'Anonimo' senza
+   assegnatari) porta testo --ink, mai --muted (Q0x). */
+.npill-testo{font:600 10.5px var(--mono);fill:#fff}
+.npill-modo{font:600 10.5px var(--mono);fill:var(--ink)}
 
 /* --dragx/--dragy (C10, positions.js/drag.js): lo scarto in spazio-grafo di
    una card spostata a mano, sempre 0px finche' nessuno la tocca. E' una
@@ -130,7 +137,6 @@ a[data-node]:focus{outline:none}
    Il chiuso arretra col colore e non con la trasparenza: a .72 il velo mangiava
    proprio il verde che distingue un nodo finito da uno fermo. */
 .st-closed{opacity:.9}
-.st-closed .ntt{fill:var(--muted)}
 
 .st-frontier rect.card{fill:var(--st-frontier-bg);stroke:var(--st-frontier)}
 .st-claimed rect.card{fill:var(--st-claimed-bg);stroke:var(--st-claimed)}
@@ -144,4 +150,3 @@ a[data-node]:focus{outline:none}
 .st-closed .nid,.st-closed .ndot{fill:var(--st-closed-tx)}
 .st-blocked .nid,.st-blocked .ndot{fill:var(--st-blocked-tx)}
 .st-out-of-scope .nid,.st-out-of-scope .ndot{fill:var(--st-out-of-scope-tx)}
-.st-out-of-scope .ntt{fill:var(--faint)}

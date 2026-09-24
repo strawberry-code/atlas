@@ -158,7 +158,7 @@ def render_sintetico_ciclo() -> tuple[str, str | None]:
         f'{dash._mappa(data, front_ids, gruppi)}'
         f'{render_notifiche.panel(ref, data)}'
         f'{render_table.table(data, front_ids)}'
-        f'{render_sheet.sheet()}{render_sheet.data_island(ref, data, front_ids)}'
+        f'{render_sheet.sheet()}{render_sheet.data_island(ref, data, front_ids, gruppi)}'
         f'<script>{js}</script></body></html>'
     )
     return html, messaggio_ciclo

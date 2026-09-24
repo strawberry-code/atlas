@@ -16,7 +16,10 @@
   // Porta di edge_geometry.py (A01): stesse costanti, stessa forma. Duplicata
   // qui e non importata perche' i moduli di questa pagina si scambiano solo
   // via DOM (contratto di progetto), mai per riferimento diretto fra IIFE.
-  var OFFSET = 20, CORNER = 10, STEP = .5, LANE = 135, DROP = 26;
+  // LANE = 150 dall'issue #34 (card piu' larga, 260 invece di 230): meta' card
+  // (130) piu' lo stesso margine di OFFSET, tenuta in pari a mano con la
+  // costante Python gemella.
+  var OFFSET = 20, CORNER = 10, STEP = .5, LANE = 150, DROP = 26;
 
   function dist(ax, ay, bx, by) { return Math.hypot(bx - ax, by - ay); }
 

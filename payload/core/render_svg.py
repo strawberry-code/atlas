@@ -17,24 +17,43 @@ mappa intera resta un solo elemento pannabile/zoomabile via CSS transform
 tinta di stato, ed e' anche il gancio a cui si agganciano le regole generate
 da render_edges.hover_css(): cambiarne la classe romperebbe quel file senza
 avviso, quindi la card resta un rettangolo con testo intorno, non un
-foreignObject. La struttura (eyebrow/id/stato a destra, corpo, footer) e'
-quella di customNodes.tsx, tradotta in elementi SVG.
+foreignObject.
+
+L'id e' la prima cosa che si legge (Q0x): e' quello che si usa per parlarne
+del nodo (un comando, un link, un riferimento in chat), il tipo era la prima
+cosa prima, ma nessuno apre una card per leggere 'task'. Sotto, il titolo fino
+a tre righe; in fondo la riga delle pillole (assegnatari, modo, ramo), che
+sostituisce il vecchio footer testuale: un rettangolo arrotondato si misura da
+solo se il font e' monospace (larghezza = caratteri * CHAR_W), quindi non
+serve un motore JS a misurarlo dopo il primo paint, che questa pagina non ha
+prima. Tutto il testo della card resta su --ink (o sui --st-*-tx per id/stato,
+come sempre): niente piu' --faint/--muted sul fondo tinto, che a distanza
+si leggeva male (Q0x).
 
 I colori di stato non sono attributi SVG ma classi CSS (st-<stato>, vedi
 canvas.css): e' cio' che fa funzionare il tema chiaro/scuro su un file gia'
-generato. Ogni nodo porta data-node, che il JavaScript della pagina usa per
-aprire la scheda e per selezionarlo (sheet.js); l'href resta come ripiego per
-chi naviga senza script.
+generato. Il colore di un assegnatario invece e' un valore letterale
+(render_owners.colore()), come gia' il colore del ramo: arriva da un indice
+calcolato a runtime, non da uno stato fisso, quindi non ha una classe CSS sua.
+Ogni nodo porta data-node, che il JavaScript della pagina usa per aprire la
+scheda e per selezionarlo (sheet.js); l'href resta come ripiego per chi
+naviga senza script.
 """
 from __future__ import annotations
 
 from html import escape
 
-from . import layout_rank, render_edge_ghosts, render_edges, render_owners, theme
-from .model import owners_of
+from . import layout_rank, render_edge_ghosts, render_edges, render_owners, render_pills, theme
 from .theme import STATE, css_class, state_of
 
-W, H, PAD, PAD_IN = 230, 134, 40, 14
+W, H, PAD, PAD_IN = 260, 156, 40, 16
+
+# Riga id/tipo/stato: un solo rigo in cima, baseline unica per i tre elementi.
+ROW1_Y = 29
+# Titolo: fino a tre righe, spaziate uniformemente sotto la riga 1.
+TITLE_Y0, TITLE_LINE = 51, 17
+# Riga delle pillole (render_pills.py), ancorata al fondo della card.
+PILL_Y, PILL_H = H - PAD_IN - 20, 20
 
 
 def wrap(text: str, limit: int = 26, lines: int = 3) -> list[str]:
@@ -77,37 +96,22 @@ def positions(data: dict) -> dict[str, tuple[float, float]]:
 
 
 def _head(node: dict, stato: str, x: float, y: float) -> str:
-    """Eyebrow (tipo) a sinistra e stato a destra, come rf-head di
-    customNodes.tsx; sotto, l'id in display. Un nodo in lavorazione porta
-    l'anello che gira al posto del glifo fermo: e' l'unico stato che descrive
-    qualcosa che accade adesso, e il movimento lo dice meglio di un pallino."""
-    eyebrow = f'<text class="neyebrow" x="{x + PAD_IN}" y="{y + PAD_IN + 3}">{escape(node["type"])}</text>'
+    """Id in evidenza a sinistra (16px, colore di stato); tipo e stato a
+    destra, sulla stessa riga. Un nodo in lavorazione porta l'anello che gira
+    al posto del glifo fermo: e' l'unico stato che descrive qualcosa che
+    accade adesso, e il movimento lo dice meglio di un pallino."""
+    nid = f'<text class="nid" x="{x + PAD_IN}" y="{y + ROW1_Y}">{escape(node["id"])}</text>'
+    eyebrow = (f'<text class="neyebrow" x="{x + W - PAD_IN - 18}" y="{y + ROW1_Y - 1}" '
+               f'text-anchor="end">{escape(node["type"])}</text>')
     if stato != "claimed":
-        stato_svg = (f'<text class="ndot" x="{x + W - PAD_IN}" y="{y + PAD_IN + 3}" '
+        stato_svg = (f'<text class="ndot" x="{x + W - PAD_IN}" y="{y + ROW1_Y}" '
                      f'text-anchor="end">{STATE[stato][0]}</text>')
     else:
-        stato_svg = (f'<g transform="translate({x + W - PAD_IN - 6},{y + PAD_IN - 1})"><g class="spin">'
+        stato_svg = (f'<g transform="translate({x + W - PAD_IN - 6},{y + ROW1_Y - 10})"><g class="spin">'
                      f'<circle class="spin-arc" r="{theme.RING["r"]}" fill="none" '
                      f'stroke-width="{theme.RING["spessore"]}" stroke-linecap="round" '
                      f'stroke-dasharray="{theme.RING["tratto"]}"/></g></g>')
-    nid = f'<text class="nid" x="{x + PAD_IN}" y="{y + PAD_IN + 24}">{escape(node["id"])}</text>'
-    return eyebrow + stato_svg + nid
-
-
-def _footer(node: dict, x: float, y: float) -> str:
-    """Modo, assegnatario, costo: gli stessi tre badge del footer di
-    customNodes.tsx (modello, runner, costo), qui come un'unica riga di testo
-    perche' un pill con lo sfondo richiederebbe misurare il testo a runtime,
-    e questa pagina non ha un motore JS per farlo prima del primo paint."""
-    pezzi = [node["mode"]]
-    assegnatari = owners_of(node)
-    if assegnatari:
-        pezzi.append(" + ".join(assegnatari))
-    costo = node.get("cost")
-    if costo:
-        pezzi.append(costo)
-    testo = _trunca(" · ".join(pezzi), 32)
-    return f'<text class="nfoot" x="{x + PAD_IN}" y="{y + H - PAD_IN + 2}">{escape(testo)}</text>'
+    return nid + eyebrow + stato_svg
 
 
 def boxes(data: dict, pos: dict, front: set[str], gruppi: dict[str, int],
@@ -120,21 +124,26 @@ def boxes(data: dict, pos: dict, front: set[str], gruppi: dict[str, int],
         x, y = pos[node["id"]]
         stato = state_of(node, front)
         dash = STATE[stato][2]
+        ramo_indice = ordine_rami.index(node["branch"])
         ramo = data["branches"][node["branch"]].get("color", theme.BRANCH_FALLBACK)
         tratto = f' stroke-dasharray="{dash}"' if dash else ""
+        owner_g = render_owners.gruppi(node, gruppi)
+        tinta = render_owners.colore(int(owner_g))
         titolo = "".join(
-            f'<text class="ntt" x="{x + PAD_IN}" y="{y + PAD_IN + 46 + i * 15}">{escape(r)}</text>'
+            f'<text class="ntt" x="{x + PAD_IN}" y="{y + TITLE_Y0 + i * TITLE_LINE}">{escape(r)}</text>'
             for i, r in enumerate(wrap(node["title"])) if r
         )
         # la pagina alleggerita (S11/4, render_lite.py) non porta la domanda del
         # nodo nemmeno nel tooltip: e' testo del ticket, non grafo/titoli/stati
         tip = (escape(node["title"]) if lite
                else f'{escape(node["title"])} — {escape(node["question"])}')
+        pillole = render_pills.riga(node, x, y, pad_in=PAD_IN, w_card=W, pill_y=PILL_Y,
+                                    pill_h=PILL_H, tinta=tinta, ramo_colore=ramo, ramo_indice=ramo_indice)
         out.append(
             f'<a href="tickets/{node["id"]}.md" data-node="{node["id"]}">'
             f'<g class="n {css_class(stato)}" id="node-{node["id"]}" '
             f'data-branch="{escape(node["branch"])}" '
-            f'data-owners="{render_owners.gruppi(node, gruppi)}">'
+            f'data-owners="{owner_g}">'
             f'<title>{tip}</title>'
             f'<rect class="card" x="{x}" y="{y}" width="{W}" height="{H}" rx="14" '
             f'stroke-width="1"{tratto}/>'
@@ -142,11 +151,7 @@ def boxes(data: dict, pos: dict, front: set[str], gruppi: dict[str, int],
             f'rx="12.5" fill="none"/>'
             f'{_head(node, stato, x, y)}'
             f'{titolo}'
-            f'{_footer(node, x, y)}'
-            # la figura del ramo, in basso a destra: l'angolo che il footer lascia
-            # libero, perche' il testo del footer parte da sinistra
-            f'<g class="bmark" transform="translate({x + W - 26},{y + H - 26}) scale(.66)">'
-            f'<path d="{theme.shape_of(ordine_rami.index(node["branch"]))}" fill="{ramo}"/></g>'
+            f'{pillole}'
             f'</g></a>'
         )
     return "".join(out)

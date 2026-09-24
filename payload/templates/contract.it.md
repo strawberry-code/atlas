@@ -129,7 +129,7 @@ Un nodo può essere assegnato a una o più persone con `atlas assign <nomi> <ID.
 
 `--branch <ramo>` prende i nodi che quel ramo ha in quel momento, e uno aggiunto dopo nasce senza assegnatario. Assegnare un ramo sovrascrive anche i nodi che erano già di qualcun altro, e il comando stampa gli id che ha cambiato. `--add <nome>` aggiunge una persona a quelle che il nodo ha già, `--remove <nome>` ne toglie una sola lasciando le altre, e `--me` assegna a te senza riscrivere il nome, perché chi lavora da questa copia lo ricorda `atlas whoami <nome>`. Il file `.atlas/whoami` non è versionato. `atlas unassign <ID...>` riporta il nodo a nessuno.
 
-L'assegnazione non è il lucchetto e non lo sostituisce: dice di chi è quel pezzo di lavoro, mentre il `claim` dice chi ci ha le mani sopra adesso. Un nodo assegnato resta prendibile da chiunque, e assegnarlo mentre qualcuno lo sta lavorando non gli impedisce di chiuderlo. Se non le usi, il grafo si comporta esattamente come prima: nessun nodo nasce assegnato e la dashboard non mostra niente in più.
+L'assegnazione non è il lucchetto e non lo sostituisce: dice di chi è quel pezzo di lavoro, mentre il `claim` dice chi ci ha le mani sopra adesso. Un nodo assegnato resta prendibile da chiunque, e assegnarlo mentre qualcuno lo sta lavorando non gli impedisce di chiuderlo. Se non le usi, il grafo si comporta esattamente come prima: nessun nodo nasce assegnato, e ogni card mostra comunque la sua pillola nel colore di chi ce l'ha in carico, o «Anonimo» finché nessuno lo prende.
 
 ### Più grafi
 

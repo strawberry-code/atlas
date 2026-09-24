@@ -35,12 +35,13 @@ class Base(unittest.TestCase):
         os.environ["ATLAS_ROOT"] = str(self.root)
         for modulo in [m for m in sys.modules if m == "core" or m.startswith("core.")]:
             del sys.modules[modulo]
-        from core import (config, docs, doctor, howto, identity, mutate, render, render_panels,
-                          store, model, topology, claims, strings, report, worklog)
+        from core import (config, docs, doctor, howto, identity, mutate, render, render_owners,
+                          render_panels, store, model, topology, claims, strings, report, worklog)
         self.config, self.docs, self.mutate, self.worklog = config, docs, mutate, worklog
         self.render, self.store, self.model, self.claims = render, store, model, claims
         self.strings, self.report, self.howto, self.doctor = strings, report, howto, doctor
         self.topology, self.identity, self.render_panels = topology, identity, render_panels
+        self.render_owners = render_owners
         self.ws = config.workspace(self.tmp)
         self.ref = mutate.create_graph(self.ws, "prova", "Grafo di prova", "Verificare il motore.")
 
@@ -1796,13 +1797,18 @@ class Assegnazioni(Base):
         pagina = self.render.build(self.ref, self.store.load(self.ref.json_path))
 
         pannello = pagina.split(">assegnazioni<")[1].split("</section>")[0]
+        # il pallino porta la tinta di render_owners.colore(), la stessa che
+        # finisce sulla pillola della card (issue #34): un solo calcolo, non
+        # ricalcolato qui a mano.
         self.assertIn('<li class="row-dense" data-owner="1">'
+                      f'<i class="who-dot" style="background:{self.render_owners.colore(1)}"></i>'
                       '<span class="row-dense-label"><b>marco</b></span>'
                       '<span class="badge-count muted">1</span>', pannello,
                       "marco conta il nodo suo soltanto, non quello condiviso")
         self.assertNotIn("anna<", pannello,
                          "anna non ha nodi suoi soltanto, quindi non ha una riga sua")
         self.assertIn('<li class="row-dense" data-owner="2">'
+                      f'<i class="who-dot" style="background:{self.render_owners.colore(2)}"></i>'
                       '<span class="row-dense-label">anna + marco</span>'
                       '<span class="badge-count muted">1</span>', pannello,
                       "la squadra e' una riga sua, dopo le persone")

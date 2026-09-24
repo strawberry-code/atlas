@@ -17,7 +17,7 @@ import json
 import re
 from html import escape
 
-from . import theme
+from . import render_owners, theme
 from .config import Graph
 from .model import owners_of, url_valido
 from .strings import t
@@ -35,11 +35,15 @@ def _ticket_md(ref: Graph, node_id: str) -> str:
     return _AUTO.sub("", path.read_text(encoding="utf-8"), count=1)
 
 
-def data_island(ref: Graph, data: dict, front_ids: set[str]) -> str:
+def data_island(ref: Graph, data: dict, front_ids: set[str], gruppi: dict[str, int]) -> str:
     """Nodi, ticket e etichette di stato, incorporati per la side sheet.
 
     La sequenza '</' viene spezzata: dentro un blocco script anche un banale
     '</p>' nel markdown di un ticket chiuderebbe il tag e romperebbe la pagina.
+    'gruppi' e' lo stesso indice che la card porta in 'data-owners' (issue
+    #34): 'ownerColor' esce gia' calcolato da render_owners.colore(), cosi'
+    sheet.js non ricalcola una sua tavolozza che prima o poi diverge da quella
+    della card.
     """
     nodi = {}
     ordine_rami = list(data["branches"])
@@ -56,6 +60,7 @@ def data_island(ref: Graph, data: dict, front_ids: set[str]) -> str:
             "cost": n.get("cost") or "",
             "model": n.get("model") or "",
             "owner": owners_of(n),
+            "ownerColor": render_owners.colore(int(render_owners.gruppi(n, gruppi))),
             "artifacts": n.get("artifacts") or [],
             # Filtrato qui, non solo giudicato da validate(): un graph.json scritto a
             # mano puo' non essere mai passato da una mutazione, e un href javascript:/
@@ -87,7 +92,9 @@ def sheet() -> str:
     o ogni rendering del markdown li cancellerebbe insieme al contenuto vecchio."""
     return (
         f'<div class="panel-vista panel-vista-nodo sheet" data-empty="{escape(t("render.sheet_vuoto"))}"'
-        f' data-owner-label="{escape(t("render.sheet_assegnato"))}"'
+        # la pillola di un nodo senza assegnatari (issue #34): stessa chiave
+        # della card, mai 'render.non_assegnati' che conta piu' nodi insieme
+        f' data-anonimo="{escape(t("render.anonimo"))}"'
         f' data-artefatti-label="{escape(t("render.sheet_artefatti"))}"'
         # le etichette del click-to-copy viaggiano nel markup, non nel JS, che resta
         # neutro di lingua: le rilegge da qui quando compone il titolo della scheda

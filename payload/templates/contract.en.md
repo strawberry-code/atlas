@@ -129,7 +129,7 @@ A node can be assigned to one or more people with `atlas assign <names> <ID...>`
 
 `--branch <branch>` takes the nodes that branch has at that moment, and one added later is born unassigned. Assigning a branch overwrites the nodes that already belonged to someone else, and the command prints the ids it changed. `--add <name>` adds a person to the ones the node already has, `--remove <name>` takes away just one and leaves the others, and `--me` assigns to you without retyping the name, because `atlas whoami <name>` remembers who works from this copy of the project. The `.atlas/whoami` file is not versioned. `atlas unassign <ID...>` brings the node back to nobody.
 
-An assignment is not the lock and does not replace it: it says whose piece of work this is, while the `claim` says who has their hands on it right now. An assigned node stays up for grabs, and assigning it while someone is working on it doesn't stop them from closing it. If you don't use them, the graph behaves exactly as before: no node is born assigned and the dashboard shows nothing extra.
+An assignment is not the lock and does not replace it: it says whose piece of work this is, while the `claim` says who has their hands on it right now. An assigned node stays up for grabs, and assigning it while someone is working on it doesn't stop them from closing it. If you don't use them, the graph behaves exactly as before: no node is born assigned, and every card still shows its pill in the color of whoever holds it, or "Anonymous" until someone does.
 
 ### Multiple graphs
 
