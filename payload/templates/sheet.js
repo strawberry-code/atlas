@@ -11,6 +11,14 @@
       .replace(/"/g, "&quot;");
   }
   var SCHEMA_SICURO = /^(https?:|mailto:|#|[.]{0,2}\/|[\w.-]+[.](md|txt|png|jpe?g|svg|pdf)([#?]|$))/i;
+  /* Il fallback quando il link non ha una label: il dominio, non l'URL intero,
+     che su un link lungo (una ricerca Jira con la query in coda) spingerebbe il
+     pulsante fuori dalla riga. new URL() su un href gia' filtrato lato Python
+     (url_valido, solo http/https) non dovrebbe mai sollevare, ma un try/catch
+     costa niente contro un graph.json che un domani bypassasse quel filtro. */
+  function dominio(url) {
+    try { return new URL(url).hostname; } catch (e) { return url; }
+  }
   function inline(s) {
     return s
       .replace(/`([^`]+)`/g, function (_, c) { return "<code>" + c + "</code>"; })
@@ -94,6 +102,7 @@
   var titolo = sheet.querySelector(".sheet-title");
   var scorrimento = sheet.querySelector(".sheet-scroll");   // il contenitore che scorre (S13): non e' piu' '.sheet-body'
   var domanda = sheet.querySelector(".sheet-question");
+  var linkEsterni = sheet.querySelector(".sheet-links");
   var corpo = sheet.querySelector(".sheet-body");
   var artefatti = sheet.querySelector(".sheet-artifacts");
   var raw = sheet.querySelector(".sheet-raw");
@@ -143,6 +152,12 @@
       '<span class="stt" data-copy="' + esc(n.title) + '" title="' + esc(sheet.dataset.copia) +
       '" data-copiato="' + esc(sheet.dataset.copiato) + '">' + esc(n.title) + "</span>";
     domanda.textContent = n.question;
+    var listaLink = Array.isArray(n.links) ? n.links : [];
+    linkEsterni.innerHTML = listaLink.map(function (l) {
+      var etichetta = esc(l.label || dominio(l.url));
+      return '<a class="btn-small btn-ghost sheet-link-btn" href="' + esc(l.url) +
+        '" target="_blank" rel="noopener noreferrer">' + etichetta + "</a>";
+    }).join("");
     var md = (n.md || "").trim();
     corpo.innerHTML = md ? markdown(esc(md))
       : '<p class="sheet-empty">' + esc(sheet.dataset.empty) + "</p>";

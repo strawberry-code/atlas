@@ -226,6 +226,48 @@ class Forma(Base):
                 self.mutate.add_node(g, id="F02", branch="A", title="X", question="?", model=42)
         self.assertEqual([], self.store.load(self.ref.json_path)["nodes"])
 
+    def test_link_external_aggiunge_url_con_e_senza_label(self):
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.add_node(g, id="F01", branch="A", title="X", question="?")
+            self.mutate.link_external(g, "F01", "https://example.com/JIRA-1", label="Jira")
+            self.mutate.link_external(g, "F01", "https://example.com/senza-label")
+        node = self.model.node_of(self.store.load(self.ref.json_path), "F01")
+        self.assertEqual(
+            [{"label": "Jira", "url": "https://example.com/JIRA-1"},
+             {"label": None, "url": "https://example.com/senza-label"}],
+            node["links"])
+
+    def test_link_external_vale_anche_su_nodo_chiuso(self):
+        self.popola()
+        self.rispondi("F01")
+        self.claims.claim(self.ref, "F01")
+        self.claims.close(self.ref, "F01", "fatto")
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.link_external(g, "F01", "https://example.com/issue")
+        node = self.model.node_of(self.store.load(self.ref.json_path), "F01")
+        self.assertEqual("https://example.com/issue", node["links"][0]["url"])
+        self.assertEqual(self.store.CLOSED, node["status"])
+
+    def test_link_url_non_http_non_passa_la_validazione(self):
+        for url in ("javascript:alert(1)", "ftp://host/file", "https://", "  "):
+            with self.subTest(url=url):
+                with self.assertRaises(self.store.StateError) as caso:
+                    with self.mutate.editing(self.ref) as g:
+                        self.mutate.add_node(g, id="F01", branch="A", title="X", question="?")
+                        self.mutate.link_external(g, "F01", url)
+                self.assertIn("F01", str(caso.exception))
+                self.assertEqual([], self.store.load(self.ref.json_path)["nodes"])
+
+    def test_link_malformato_scritto_a_mano_non_passa_la_validazione(self):
+        with self.assertRaises(self.store.StateError):
+            with self.mutate.editing(self.ref) as g:
+                node = self.mutate.add_node(g, id="F01", branch="A", title="X", question="?")
+                node["links"] = [{"label": 42, "url": "https://example.com"}]
+        with self.assertRaises(self.store.StateError):
+            with self.mutate.editing(self.ref) as g:
+                node = self.mutate.add_node(g, id="F02", branch="A", title="X", question="?")
+                node["links"] = "https://example.com"   # non e' una lista
+
     def test_id_duplicato(self):
         self.popola()
         with self.assertRaises(self.store.StateError):
@@ -1048,6 +1090,64 @@ class Artefatti(Base):
             self.assertEqual(0, cli.main(["amend", "F01", "--artefatti"]))
         node = self.model.node_of(self.store.load(self.ref.json_path), "F01")
         self.assertEqual([], node["artifacts"])
+
+    def test_link_external_dalla_cli(self):
+        from core import cli
+        self.popola()
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            self.assertEqual(0, cli.main(["link-external", "F01", "https://example.com/JIRA-1", "-l", "Jira"]))
+        self.assertIn("F01", buffer.getvalue())
+        node = self.model.node_of(self.store.load(self.ref.json_path), "F01")
+        self.assertEqual([{"label": "Jira", "url": "https://example.com/JIRA-1"}], node["links"])
+
+    def test_link_external_cli_rifiuta_schema_non_http(self):
+        from core import cli
+        self.popola()
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(1, cli.main(["link-external", "F01", "javascript:alert(1)"]))
+        node = self.model.node_of(self.store.load(self.ref.json_path), "F01")
+        self.assertNotIn("links", node)
+
+    def test_ticket_mostra_i_link_esterni_sopra_il_marcatore(self):
+        self.popola()
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.link_external(g, "F01", "https://example.com/JIRA-1", label="Jira")
+        self.render_tutto()
+        testa = self.ref.ticket_path("F01").read_text(encoding="utf-8").split(self.docs.MARK_END)[0]
+        self.assertIn("[Jira](https://example.com/JIRA-1)", testa)
+
+    def test_ticket_senza_link_mostra_nessuno(self):
+        self.popola()
+        self.render_tutto()
+        testa = self.ref.ticket_path("F01").read_text(encoding="utf-8").split(self.docs.MARK_END)[0]
+        self.assertIn("nessuno", testa)
+
+    def test_dashboard_mostra_i_link_del_nodo_su_richiesta(self):
+        self.popola()
+        with self.mutate.editing(self.ref) as g:
+            self.mutate.link_external(g, "F01", "https://example.com/JIRA-1", label="Jira")
+        self.render_tutto()
+        html = self.ref.dashboard_path.read_text(encoding="utf-8")
+        isola = html.split('<script type="application/json" id="atlas-data">', 1)[1].split("</script>", 1)[0]
+        dati = json.loads(isola.replace("<\\/", "</"))
+        self.assertEqual([{"label": "Jira", "url": "https://example.com/JIRA-1"}], dati["nodes"]["F01"]["links"])
+        self.assertEqual([], dati["nodes"]["F02"]["links"])
+        self.assertIn("sheet-links", html)
+
+    def test_dashboard_filtra_link_con_schema_non_valido_scritti_a_mano(self):
+        """Difesa in profondità (OWASP): un graph.json corrotto a mano, mai passato da
+        'atlas validate', non deve far arrivare uno schema pericoloso al browser."""
+        self.popola()
+        with self.store.transaction(self.ref.json_path) as grezzo:
+            for n in grezzo["nodes"]:
+                if n["id"] == "F01":
+                    n["links"] = [{"label": "cattivo", "url": "javascript:alert(1)"}]
+        self.render_tutto()
+        html = self.ref.dashboard_path.read_text(encoding="utf-8")
+        isola = html.split('<script type="application/json" id="atlas-data">', 1)[1].split("</script>", 1)[0]
+        dati = json.loads(isola.replace("<\\/", "</"))
+        self.assertEqual([], dati["nodes"]["F01"]["links"])
 
     def test_i_markdown_generati_non_hanno_il_bom(self):
         """Ticket e mappa.md vanno scritti in UTF-8 puro, senza BOM."""

@@ -19,7 +19,7 @@ from html import escape
 
 from . import theme
 from .config import Graph
-from .model import owners_of
+from .model import owners_of, url_valido
 from .strings import t
 from .theme import ORDER, STATE, state_of
 
@@ -57,6 +57,11 @@ def data_island(ref: Graph, data: dict, front_ids: set[str]) -> str:
             "model": n.get("model") or "",
             "owner": owners_of(n),
             "artifacts": n.get("artifacts") or [],
+            # Filtrato qui, non solo giudicato da validate(): un graph.json scritto a
+            # mano puo' non essere mai passato da una mutazione, e un href javascript:/
+            # data: non deve arrivare al browser solo perche' nessuno ha lanciato
+            # 'atlas validate' prima di 'atlas render' (OWASP).
+            "links": [l for l in (n.get("links") or []) if url_valido(l.get("url"))],
             "md": _ticket_md(ref, n["id"]),
         }
     # il marcatore, non il glifo nudo: per un nodo in lavorazione e' l'anello, lo
@@ -91,6 +96,7 @@ def sheet() -> str:
         f'<button type="button" class="sheet-close" aria-label="{escape(t("render.sheet_chiudi"))}">✕</button>'
         '<h2 class="sheet-title"></h2></header>'
         '<div class="sheet-scroll"><p class="sheet-question"></p>'
+        '<div class="sheet-links"></div>'
         '<div class="sheet-body md"></div>'
         '<ul class="sheet-artifacts"></ul></div>'
         f'<footer class="sheet-foot"><a class="sheet-raw" target="_blank">{t("render.sheet_apri_file")}</a></footer>'

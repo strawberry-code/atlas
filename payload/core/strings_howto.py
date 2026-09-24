@@ -76,6 +76,10 @@ STRINGS: dict[str, dict[str, str]] = {
                                "en": "changes the descriptive fields; status and claim don't go through here"},
     "howto.mutate.remove_node": {"it": "cancella davvero: se il nodo è stato lavorato, drop() è quasi sempre meglio",
                                  "en": "really deletes it: if the node has been worked, drop() is almost always better"},
+    "howto.mutate.link_external": {"it": "aggiunge un link a una risorsa esterna (Jira, GitHub, Confluence, "
+                                         "una pagina); vale anche su un nodo già chiuso",
+                                   "en": "adds a link to an external resource (Jira, GitHub, Confluence, "
+                                         "a web page); valid even on an already closed node"},
     "howto.mutate.link": {"it": "aggiunge una dipendenza: node_id resta fermo finché blocked_by non chiude",
                           "en": "adds a dependency: node_id waits until blocked_by closes"},
     "howto.mutate.unlink": {"it": "toglie una dipendenza", "en": "removes a dependency"},

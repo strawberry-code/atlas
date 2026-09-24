@@ -65,6 +65,13 @@ a{text-decoration:none;color:inherit}
 .sheet-scroll{flex:1;overflow-y:auto;overflow-wrap:anywhere;padding:16px 22px 22px;
   scrollbar-width:thin;scrollbar-color:var(--border-strong) transparent}
 .sheet-question{margin:0 0 14px;color:var(--muted);font-size:11px;line-height:1.5;font-style:italic}
+/* i pulsanti dei link esterni (issue #33): niente segnaposto quando il nodo non
+   ne ha, come '.sheet-artifacts' qui sotto. '.btn-small'/'.btn-ghost' sono di
+   Grafite, non si toccano: qui solo il layout a riga e il reset di un'ancora
+   che deve sembrare un bottone, non un link sottolineato. */
+.sheet-links{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+.sheet-links:empty{display:none;margin:0}
+.sheet-link-btn{display:inline-block;text-decoration:none}
 .sheet-foot{padding:11px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end}
 /* prima solo colore ad annunciare il link: rimosso il teal, l'affordance
    diventa il sottolineato permanente (come '.md a'), non solo l'hover. */

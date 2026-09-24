@@ -361,12 +361,12 @@ def _grafo(p: argparse.ArgumentParser) -> None:
 # (driver git) e conflicts (lettura diagnostica del merge).
 _RINNOVA_BATTITO = frozenset((
     "status", "next", "show", "brief",
-    "claim", "take", "release", "suspend", "give-up", "ask-human", "close", "amend", "progress", "log",
+    "claim", "take", "release", "suspend", "give-up", "ask-human", "close", "amend", "link-external", "progress", "log",
     "ask", "asks", "answer", "fog", "assign", "unassign", "render",
 ))
 
 COMANDI = ("status", "next", "graphs", "use", "show", "brief", "claim", "take", "release", "suspend",
-           "give-up", "ask-human", "close", "log", "ask", "asks", "answer", "drift", "fog", "assign", "unassign", "whoami", "render", "serve", "run", "run-status", "run-log", "merge-graph",
+           "give-up", "ask-human", "close", "amend", "link-external", "log", "ask", "asks", "answer", "drift", "fog", "assign", "unassign", "whoami", "render", "serve", "run", "run-status", "run-log", "merge-graph",
            "conflicts", "new", "new-script", "exec", "renumber", "validate", "doctor", "how-to")
 
 
@@ -451,6 +451,10 @@ def aggiungi_comandi(sub) -> None:
     p = sub.add_parser("amend", help=t("help.amend"))
     p.add_argument("node"); p.add_argument("--artefatti", action="append", nargs="?", default=None)
     p.add_argument("-c", "--costo", default=None); p.add_argument("-s", "--sintesi", default=None)
+    _identity(p); _grafo(p)
+    p = sub.add_parser("link-external", help=t("help.link_external"))
+    p.add_argument("node"); p.add_argument("url")
+    p.add_argument("-l", "--label", default=None, help=t("help.link_external_label"))
     _identity(p); _grafo(p)
     p = sub.add_parser("progress", help=t("help.progress"))
     p.add_argument("node")
@@ -626,6 +630,14 @@ def dispatch(ws: Workspace, args) -> int:
         with read_transaction(ref.json_path) as data:
             refresh(ref, data)
         print(t("amend.fatto", id=args.node, campi=", ".join(corretti)))
+        return 0
+
+    if args.cmd == "link-external":
+        with mutate.editing(ref) as g:
+            mutate.link_external(g, args.node, args.url, label=args.label)
+        with read_transaction(ref.json_path) as data:
+            refresh(ref, data)
+        print(t("link_external.fatto", id=args.node, url=args.url))
         return 0
 
     if args.cmd == "ask":

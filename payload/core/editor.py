@@ -14,7 +14,7 @@ from contextlib import contextmanager
 from datetime import datetime
 
 from .config import Graph
-from .model import node_of, owners_of
+from .model import node_of, owners_of, url_valido
 from .store import STATUSES, StateError, transaction
 from .strings import t
 from .topology import levels
@@ -64,6 +64,15 @@ def validate(data: dict, vocab: dict) -> None:
                                    chiave=key, valore=node[key], ammessi=allowed))
         if "model" in node and (not isinstance(node["model"], str) or not node["model"].strip()):
             raise StateError(t("mutate.modello_non_valido", id=node["id"]))
+        if "links" in node:
+            if not isinstance(node["links"], list):
+                raise StateError(t("mutate.link_lista_non_valida", id=node["id"]))
+            for link in node["links"]:
+                if not isinstance(link, dict) or (
+                        link.get("label") is not None and not isinstance(link.get("label"), str)):
+                    raise StateError(t("mutate.link_invalido", id=node["id"]))
+                if not url_valido(link.get("url")):
+                    raise StateError(t("mutate.link_url_non_valido", id=node["id"], url=link.get("url")))
         for dep in node["blockedBy"]:
             if dep not in seen:
                 raise StateError(t("mutate.dipendenza_inesistente", id=node["id"], dep=dep))

@@ -137,6 +137,7 @@ atlas close F01 -s "one-line summary"
 atlas give-up F01 --motivo missing-resource -d "the bot token is needed"
 atlas ask-human F01 -q "I would go with schema A, confirm?"
 atlas amend F01 --artefatti src/a.py # fixes the bookkeeping of an already closed node
+atlas link-external F01 https://issues/JIRA-1 -l "Jira"  # links an external resource, as a button in the dashboard
 atlas fog "what surfaced and has no node yet"
 atlas fog --list                     # the fog collected so far
 atlas ask "the question" --assumption "how I proceed meanwhile"

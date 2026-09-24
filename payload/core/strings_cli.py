@@ -56,6 +56,12 @@ STRINGS: dict[str, dict[str, str]] = {
     "help.close": {"it": "chiude un nodo con la sua sintesi", "en": "closes a node with its summary"},
     "help.amend": {"it": "corregge artefatti, costo o sintesi di un nodo già chiuso",
                    "en": "fixes artifacts, cost or summary of an already closed node"},
+    "help.link_external": {"it": "collega una risorsa esterna (Jira, GitHub, Confluence, una pagina): "
+                                 "un pulsante nella scheda del nodo, in dashboard",
+                           "en": "links an external resource (Jira, GitHub, Confluence, a page): "
+                                 "a button on the node's card, in the dashboard"},
+    "help.link_external_label": {"it": "l'etichetta del pulsante; senza, la dashboard mostra il dominio",
+                                 "en": "the button's label; without one, the dashboard shows the domain"},
     "help.ask": {"it": "registra una domanda non bloccante", "en": "records a non-blocking question"},
     "help.asks": {"it": "mostra le domande aperte", "en": "shows open questions"},
     "help.answer": {"it": "risponde a una domanda registrata", "en": "answers a recorded question"},
@@ -278,6 +284,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "close.fatto": {"it": "  {id} chiuso · riga aggiunta in map.md", "en": "  {id} closed · line added to map.md"},
     "amend.fatto": {"it": "  {id} corretto · campi riscritti a mano: {campi}",
                     "en": "  {id} amended · fields rewritten by hand: {campi}"},
+    "link_external.fatto": {"it": "  {id} collegato a {url}", "en": "  {id} linked to {url}"},
     "close.artefatti_dedotti": {"it": "  artefatti dedotti da git ({n}): {elenco}",
                                 "en": "  artifacts deduced from git ({n}): {elenco}"},
     "ask.fatto": {"it": "  {id} registrata per {origin} · autore {author}",

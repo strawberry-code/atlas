@@ -52,6 +52,22 @@ def edit_node(g: Editor, node_id: str, **fields) -> dict:
     return node
 
 
+def link_external(g: Editor, node_id: str, url: str, label: str | None = None) -> dict:
+    """Registra un link a una risorsa esterna al grafo (Jira, GitHub, Confluence, una pagina web).
+
+    Vale anche su un nodo gia' chiuso, come amend per gli artefatti: un link e'
+    contabilita' del nodo, non lavoro da riaprire. Lo schema si controlla in
+    validate() e non qui, per lo stesso motivo per cui 'model' si controlla li' e
+    non in add_node: un solo posto giudica la forma del grafo, valido anche su un
+    graph.json arrivato da un merge o scritto a mano.
+    """
+    node = g.node(node_id)
+    etichetta = label.strip() if isinstance(label, str) and label.strip() else None
+    node.setdefault("links", []).append(
+        {"label": etichetta, "url": url.strip() if isinstance(url, str) else url})
+    return node
+
+
 def remove_node(g: Editor, node_id: str) -> None:
     """Cancella davvero. Se il nodo e' stato lavorato, drop() e' quasi sempre meglio."""
     if dipendenti := [n["id"] for n in g.data["nodes"] if node_id in n["blockedBy"]]:

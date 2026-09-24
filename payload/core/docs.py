@@ -62,12 +62,21 @@ def _modello(ref: Graph) -> tuple[str, str]:
     return testa + MARK_END, coda
 
 
+def _links_line(node: dict) -> str:
+    """I link esterni del nodo, in markdown: la label se c'e', altrimenti l'URL nudo."""
+    voci = node.get("links") or []
+    if not voci:
+        return t("report.nodo_nessuno")
+    return " · ".join(f"[{v['label'] or v['url']}]({v['url']})" for v in voci)
+
+
 def _testa(modello: str, node: dict, rami: dict) -> str:
     """La parte del ticket che discende dal grafo: titolo, ramo, tipo, modo, bloccanti, domanda."""
     return modello.format(
         id=node["id"], title=node["title"], type=node["type"], mode=node["mode"],
         branch=rami[node["branch"]]["label"], question=node["question"],
         blocked=", ".join(node["blockedBy"]) or t("docs.nessuno_prendibile"),
+        links=_links_line(node),
     )
 
 

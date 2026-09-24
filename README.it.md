@@ -138,6 +138,7 @@ atlas close F01 -s "sintesi in una riga"
 atlas give-up F01 --motivo missing-resource -d "serve il token del bot"
 atlas ask-human F01 -q "procedo con lo schema A, confermi?"
 atlas amend F01 --artefatti src/a.py # corregge la contabilità di un nodo già chiuso
+atlas link-external F01 https://issues/JIRA-1 -l "Jira"  # collega una risorsa esterna, come pulsante in dashboard
 atlas fog "quel che è emerso e non ha ancora un nodo"
 atlas fog --list                     # la nebbia raccolta finora
 atlas ask "la domanda" --assumption "come procedo intanto"

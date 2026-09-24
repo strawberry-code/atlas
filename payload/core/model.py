@@ -8,6 +8,7 @@ import hashlib
 import json
 import re
 from datetime import datetime
+from urllib.parse import urlsplit
 
 # La lettura degli assegnatari sta in owners.py: col campo a vettore qui non ci stava piu'.
 # Si ri-esporta da model perche' e' li' che la cercano i chiamanti, dentro e fuori dal motore.
@@ -33,6 +34,19 @@ def istante(testo: str | None) -> datetime | None:
     except (ValueError, TypeError):
         return None
     return letto if letto.tzinfo else letto.astimezone()
+
+
+def url_valido(url: object) -> bool:
+    """Un URL di risorsa esterna che vale cliccare: solo http o https, con un host.
+
+    OWASP: uno schema diverso (javascript:, data:, file:) non deve mai finire in un
+    href cliccabile della dashboard. Il giudizio e' minimo apposta, niente DNS ne'
+    normalizzazione: chi chiama vuole sapere se e' sicuro renderlo, non se risponde.
+    """
+    if not isinstance(url, str) or not url.strip():
+        return False
+    pezzi = urlsplit(url.strip())
+    return pezzi.scheme in ("http", "https") and bool(pezzi.netloc)
 
 
 def by_id(graph: dict) -> dict[str, dict]:
