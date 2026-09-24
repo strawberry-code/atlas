@@ -251,6 +251,20 @@ class NotificheTest(unittest.TestCase):
             self.addCleanup(shutil.rmtree, self._tmp_isolata, True)
         return self._tmp_isolata
 
+    def test_col_relay_spento_il_pannello_non_ha_il_blocco_telegram(self):
+        """relay_client.ABILITATO spento: niente bottone di pairing, niente
+        levetta, niente promessa, e nessuna domanda al relay durante il render."""
+        from core import relay_client, render_notifiche, serve_pairing
+
+        self.assertFalse(relay_client.ABILITATO)
+        self.assertIsNone(relay_client.configurazione({"RELAY_PUBLIC_URL": "https://relay.example",
+                                                       "ATLAS_RELAY_TOKEN_REF": "t"}))
+        with mock.patch.object(serve_pairing, "collegato", side_effect=AssertionError("rete")):
+            html = render_notifiche.panel(self.ref, {"interactions": []}, now=datetime.now().astimezone())
+        self.assertNotIn("pairing-telegram", html)
+        self.assertNotIn("notif-canali", html)
+
+    @unittest.skip("relay Telegram disabilitato (relay_client.ABILITATO = False): da riprendere")
     def test_il_pairing_telegram_e_un_bottone_unico_senza_campi(self):
         """D05: nessun input per token bot, chat ID, hostname o config - solo
         il bottone e uno span di stato che dashboard.js riempie da solo.
@@ -273,6 +287,7 @@ class NotificheTest(unittest.TestCase):
         self.assertIn("data-pairing-rifiutato=", html)
         self.assertIn("data-pairing-senza-gestore=", html)
 
+    @unittest.skip("relay Telegram disabilitato (relay_client.ABILITATO = False): da riprendere")
     def test_il_pairing_dice_la_promessa_nulla_sul_bottone(self):
         """A04/grilling 33: la promessa (servizio sperimentale, puo' finire
         quando il gestore vuole) sta accanto al bottone che attiva il
@@ -299,6 +314,7 @@ class NotificheTest(unittest.TestCase):
         self.assertNotIn("notif-muto", html)
         self.assertNotIn(t("render.notif_muto_silenzia"), html)
 
+    @unittest.skip("relay Telegram disabilitato (relay_client.ABILITATO = False): da riprendere")
     def test_con_telegram_configurato_la_levetta_compare_accesa_di_default(self):
         from core import render_notifiche
         from core.strings import t
@@ -316,6 +332,7 @@ class NotificheTest(unittest.TestCase):
         self.assertIn(t("render.notif_muto_attivo"), html)
         self.assertIn(t("render.notif_muto_silenzia"), html)
 
+    @unittest.skip("relay Telegram disabilitato (relay_client.ABILITATO = False): da riprendere")
     def test_con_la_levetta_spenta_nel_config_il_pannello_mostra_lo_stato_spento(self):
         from core import render_notifiche
         from core.strings import t

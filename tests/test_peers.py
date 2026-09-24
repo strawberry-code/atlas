@@ -87,5 +87,9 @@ class CostruisciAvvisoTest(unittest.TestCase):
         self.assertEqual(self.messaggi, [(43, peers.TESTO_AVVISO)])
 
 
+def setUpModule():
+    raise unittest.SkipTest("relay Telegram disabilitato (relay_client.ABILITATO = False): da riprendere")
+
+
 if __name__ == "__main__":
     unittest.main()

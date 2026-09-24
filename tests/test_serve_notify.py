@@ -99,6 +99,7 @@ class ServeNotifyTest(unittest.TestCase):
         # non c'e' nulla da consegnare, senza toccare l'utility di sistema.
         self.serve_notify.avvisa(self.ref)
 
+    @unittest.skip("relay Telegram disabilitato (relay_client.ABILITATO = False): da riprendere")
     def test_canali_attivi_include_telegram_solo_se_relay_e_capability_configurati(self):
         self.assertNotIn("telegram", self.serve_notify._canali_attivi(self.ref))
         os.environ.update({"RELAY_HTTPS_HOSTNAME": "relay.test", "ATLAS_RELAY_TOKEN_REF": "t",
@@ -140,6 +141,7 @@ class ServeNotifyTest(unittest.TestCase):
         self.assertEqual("prova", dati["project"])
         self.assertEqual(False, dati["notify"]["telegram_enabled"])
 
+    @unittest.skip("relay Telegram disabilitato (relay_client.ABILITATO = False): da riprendere")
     def test_una_interaction_aperta_arriva_al_canale_telegram_appaiato(self):
         # 'local' e' sempre attivo (_canali_attivi): il registro deve
         # comunque servirlo, anche se qui interessa solo verificare telegram.

@@ -31,6 +31,15 @@ from urllib.parse import urlencode
 
 from . import relay_identity
 
+# Interruttore del relay Telegram (2026-09-24): spento finche' il relay non torna
+# affidabile. Con False configurazione() risponde None, cioe' 'relay non
+# configurato', e ogni chiamante (pannello, notifiche, tunnel di autopilot,
+# avviso peer, pairing) lo tratta come tale: nessuna chiamata di rete parte.
+# I test del relay si saltano con setUpModule (cerca
+# 'relay Telegram disabilitato' in tests/). Per riaccendere: True qui e via
+# quelle righe.
+ABILITATO = False
+
 ENV_URL = "RELAY_PUBLIC_URL"
 ENV_HOSTNAME = "RELAY_HTTPS_HOSTNAME"
 ENV_TOKEN = "ATLAS_RELAY_TOKEN_REF"
@@ -104,7 +113,9 @@ def configurazione(env: Mapping[str, str]) -> TunnelConfig | None:
     era messo il computer di chi li lanciava.
 
     L'ambiente vince sul profilo, cosi' una prova una tantum non deve toccare
-    il file di nessuno."""
+    il file di nessuno. Con ABILITATO spento risponde None senza leggere nulla."""
+    if not ABILITATO:
+        return None
     base = env.get(ENV_URL) or (f"https://{env[ENV_HOSTNAME]}" if env.get(ENV_HOSTNAME) else None)
     token = env.get(ENV_TOKEN)
     if not base or not token:

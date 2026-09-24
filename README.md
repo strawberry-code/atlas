@@ -78,7 +78,7 @@ One way to orchestrate several nodes at once, if the project has many available:
 
 ## Atlas Interactions
 
-One of that right-side panel's two views turns HITL nodes, blocked runs, exhausted retries and END into actionable cards, resolved with `atlas serve` running, no polling: a valid response resumes Autopilot straight from the commit. Browser and system notifications work with no setup; a Himalaya profile already configured on the machine adds email alerts and escalation; a one-tap Telegram pairing button (no token, chat ID or hostname to type in) adds inline-button actions through an opt-in Atlas Relay. Setup, diagnostics and the deploy prerequisites for the Telegram relay are in `docs/atlas-interactions-quickstart.md`.
+One of that right-side panel's two views turns HITL nodes, blocked runs, exhausted retries and END into actionable cards, resolved with `atlas serve` running, no polling: a valid response resumes Autopilot straight from the commit. Browser and system notifications work with no setup; a Himalaya profile already configured on the machine adds email alerts and escalation. The Telegram channel through the Atlas Relay is disabled for now and will come back in a future release.
 
 ## Installing the CLI
 

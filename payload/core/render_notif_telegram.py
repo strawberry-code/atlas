@@ -58,7 +58,11 @@ def blocco(ref: Graph) -> str:
     sta subito sotto, quando visibile. In fondo la promessa nulla di grilling
     33 ('servizio sperimentale, si puo' fermare quando vuole chi lo
     gestisce'): sempre a video, non solo dopo il tap, mai in un documento che
-    nessuno legge."""
+    nessuno legge. Col relay spento (relay_client.ABILITATO) il blocco non
+    c'e': un bottone di pairing verso un servizio fermo sarebbe una promessa
+    falsa, e chiedere a ogni render se si e' collegati costava 5 s di timeout."""
+    if not relay_client.ABILITATO:
+        return ""
     return (
         '<div class="notif-canali">'
         '<div class="pairing-riga">'

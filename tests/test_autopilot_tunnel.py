@@ -78,5 +78,9 @@ class AvviaTunnelTelegram(unittest.TestCase):
         autopilot._ferma_tunnel_telegram(None, None)
 
 
+def setUpModule():
+    raise unittest.SkipTest("relay Telegram disabilitato (relay_client.ABILITATO = False): da riprendere")
+
+
 if __name__ == "__main__":
     unittest.main()

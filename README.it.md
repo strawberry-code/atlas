@@ -79,7 +79,7 @@ Un modo di orchestrare più nodi insieme, se il progetto ne ha molti prendibili:
 
 ## Atlas Interactions
 
-Una delle due viste di quel pannello a destra trasforma nodi HITL, run bloccati, retry esauriti e END in card azionabili, risolte con `atlas serve` attivo, senza polling: una risposta valida risveglia Autopilot subito al commit. Gli avvisi browser e di sistema funzionano senza configurazione; un profilo Himalaya già configurato sulla macchina aggiunge alert ed escalation via email; un bottone di pairing Telegram one-tap (nessun token, chat ID o hostname da digitare) aggiunge azioni con bottoni inline tramite un Atlas Relay opt-in. Setup, diagnostica e prerequisiti di deploy del relay Telegram sono in `docs/atlas-interactions-quickstart.md`.
+Una delle due viste di quel pannello a destra trasforma nodi HITL, run bloccati, retry esauriti e END in card azionabili, risolte con `atlas serve` attivo, senza polling: una risposta valida risveglia Autopilot subito al commit. Gli avvisi browser e di sistema funzionano senza configurazione; un profilo Himalaya già configurato sulla macchina aggiunge alert ed escalation via email. Il canale Telegram tramite l'Atlas Relay per ora è disabilitato e tornerà in una release futura.
 
 ## Installare il CLI
 
