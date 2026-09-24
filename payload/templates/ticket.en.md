@@ -3,8 +3,7 @@
 
 > Branch: {branch} · Type: {type} · Mode: {mode}
 > Blocked by: {blocked}
-> Links: {links}
-> Status and dependencies live in `../graph.json`, and change only via a mutation script.
+{links}> Status and dependencies live in `../graph.json`, and change only via a mutation script.
 
 ## Question
 

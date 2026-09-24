@@ -1116,13 +1116,14 @@ class Artefatti(Base):
             self.mutate.link_external(g, "F01", "https://example.com/JIRA-1", label="Jira")
         self.render_tutto()
         testa = self.ref.ticket_path("F01").read_text(encoding="utf-8").split(self.docs.MARK_END)[0]
-        self.assertIn("[Jira](https://example.com/JIRA-1)", testa)
+        self.assertIn("> Link: [Jira](https://example.com/JIRA-1)\n> ", testa)
 
-    def test_ticket_senza_link_mostra_nessuno(self):
+    def test_ticket_senza_link_non_ha_la_riga(self):
         self.popola()
         self.render_tutto()
         testa = self.ref.ticket_path("F01").read_text(encoding="utf-8").split(self.docs.MARK_END)[0]
-        self.assertIn("nessuno", testa)
+        self.assertNotIn("> Link", testa)
+        self.assertIn("> Bloccato da: ", testa)
 
     def test_dashboard_mostra_i_link_del_nodo_su_richiesta(self):
         self.popola()

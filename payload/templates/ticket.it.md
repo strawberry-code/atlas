@@ -3,8 +3,7 @@
 
 > Ramo: {branch} · Tipo: {type} · Modo: {mode}
 > Bloccato da: {blocked}
-> Link: {links}
-> Stato e dipendenze vivono in `../graph.json`, e si cambiano solo con uno script di mutazione.
+{links}> Stato e dipendenze vivono in `../graph.json`, e si cambiano solo con uno script di mutazione.
 
 ## Domanda
 

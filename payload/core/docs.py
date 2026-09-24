@@ -63,11 +63,13 @@ def _modello(ref: Graph) -> tuple[str, str]:
 
 
 def _links_line(node: dict) -> str:
-    """I link esterni del nodo, in markdown: la label se c'e', altrimenti l'URL nudo."""
+    """La riga dei link esterni del nodo, in markdown: la label se c'e', altrimenti
+    l'URL nudo. Vuota, a capo compreso, su un nodo senza link: una riga 'nessuno'
+    su ogni ticket era rumore, visto che quasi nessun nodo ne ha."""
     voci = node.get("links") or []
     if not voci:
-        return t("report.nodo_nessuno")
-    return " · ".join(f"[{v['label'] or v['url']}]({v['url']})" for v in voci)
+        return ""
+    return t("docs.riga_link", elenco=" · ".join(f"[{v['label'] or v['url']}]({v['url']})" for v in voci))
 
 
 def _testa(modello: str, node: dict, rami: dict) -> str:

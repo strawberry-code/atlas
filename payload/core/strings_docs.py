@@ -12,6 +12,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "docs.sospeso": {"it": "sospeso", "en": "suspended"},
     # la voce che 'atlas suspend' scrive nel registro di Lavorazione del ticket
     "log.sospeso": {"it": "sospeso: {nota}", "en": "suspended: {nota}"},
+    "docs.riga_link": {"it": "> Link: {elenco}\n", "en": "> Links: {elenco}\n"},
     "docs.nessuno_prendibile": {"it": "nessuno, prendibile subito", "en": "none, up for grabs right away"},
 
     # --- report.py ---
