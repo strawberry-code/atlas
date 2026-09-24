@@ -10,6 +10,11 @@ __pycache__/
 # Stato del pairing Telegram (D05), scritto a runtime dal relay: mai dati d'esempio da versionare
 /relay/state/
 
+# Worktree dei subagent isolati (isolation: worktree): li crea l'harness,
+# non vanno versionati. release.py rifiuta un git status sporco per questa
+# cartella se resta solo in .git/info/exclude: va tracciata qui.
+.claude/worktrees/
+
 # Atlas: artefatti rigenerabili
 .atlas/graphs/*/dashboard.html
 .atlas/graphs/*/graph.json.lock
