@@ -64,6 +64,13 @@ def doctor_avvisi(data: dict, ref: Graph, agente: dict) -> list[str]:
         if chi and autoverificati:
             avvisi.append(t("doctor.autoverifica", id=nodo["id"], chi=chi, elenco=", ".join(autoverificati)))
 
+    radice = ref.workspace.project_root
+    try:
+        grafo = ref.json_path.resolve().relative_to(radice.resolve()).as_posix()
+    except ValueError:
+        grafo = None
+    sporchi = None   # il working tree non dipende dal nodo: si legge una volta, e solo se serve
+    tracciati = gitscan.indice(radice)   # idem per l'indice (issue #35: erano processi per artefatto)
     for nodo in data["nodes"]:
         chiuso = nodo.get("closedAt")
         if nodo["status"] != "closed" or not chiuso or not nodo.get("artifacts"):
@@ -71,31 +78,29 @@ def doctor_avvisi(data: dict, ref: Graph, agente: dict) -> list[str]:
         mancanti = []
         non_tracciati = []
         tocchi = []
-        radice = ref.workspace.project_root
-        try:
-            grafo = ref.json_path.resolve().relative_to(radice.resolve()).as_posix()
-        except ValueError:
-            grafo = None
         base = gitscan.closing_commit(radice, grafo, nodo["id"], chiuso) if grafo else None
+        cambiati = gitscan.postumi(radice, chiuso, base)
+        if cambiati is not None and sporchi is None:
+            sporchi = gitscan.non_committati(radice)
         for a in nodo["artifacts"]:
             try:
-                if not (ref.workspace.project_root / a).is_file():
+                # Una cartella e' un artefatto legittimo (close --artefatti research/b06):
+                # conta come presente, e cambiata se lo e' un file sotto di lei.
+                if not (radice / a).exists():
                     mancanti.append(a)
                     continue
-                if gitscan.tracked(ref.workspace.project_root, a) is False:
+                if tracciati is not None and not gitscan.contiene(tracciati, a):
                     non_tracciati.append(a)
-                # Usa git se siamo in una repo per verificare se il file e' davvero cambiato.
-                # Se gitscan non puo' verificare (repo non git O rev-list vuoto), fallback all'mtime.
-                result = gitscan.changed_since(ref.workspace.project_root, a, chiuso, base)
-                if result is True:
-                    tocchi.append(a)
-                elif result is None:
-                    # Fallback all'mtime: il file e' stato scritto dopo la chiusura.
-                    soglia = istante(chiuso)
-                    if soglia is None:
-                        continue        # senza un istante leggibile non c'e' confronto da fare
-                    if datetime.fromtimestamp((ref.workspace.project_root / a).stat().st_mtime).astimezone() > soglia:
+                if cambiati is not None:
+                    if gitscan.contiene(cambiati, a) or gitscan.contiene(sporchi, a):
                         tocchi.append(a)
+                    continue
+                # git non puo' verificare (repo non git O rev-list vuoto): ripiego sull'mtime.
+                soglia = istante(chiuso)
+                if soglia is None:
+                    continue        # senza un istante leggibile non c'e' confronto da fare
+                if datetime.fromtimestamp((radice / a).stat().st_mtime).astimezone() > soglia:
+                    tocchi.append(a)
             except OSError as errore:
                 avvisi.append(t("doctor.artefatto_non_ispezionabile", id=nodo["id"],
                                 path=a, errore=errore))

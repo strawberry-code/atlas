@@ -2165,6 +2165,19 @@ class Doctor(Base):
         avvisi = self.doctor.doctor_avvisi(data, self.ref, self.ws.config["agent"])
         self.assertTrue(any("F01" in a and "sparito.txt" in a and "mancano" in a for a in avvisi))
 
+    def test_artefatto_cartella_non_e_mancante(self):
+        """Issue #35: close --artefatti research/b06 registra una cartella esistente,
+        e doctor non deve dirla sparita dal disco."""
+        self.popola()
+        self.rispondi("F01")
+        self.claims.claim(self.ref, "F01")
+        (self.ws.project_root / "research" / "b06").mkdir(parents=True)
+        (self.ws.project_root / "research" / "b06" / "nota.md").write_text("x", encoding="utf-8")
+        _, _ = self.claims.close(self.ref, "F01", "fatto", artifacts=["research/b06"])
+        data = self.store.load(self.ref.json_path)
+        avvisi = self.doctor.doctor_avvisi(data, self.ref, self.ws.config["agent"])
+        self.assertFalse(any("research/b06" in a and "mancano" in a for a in avvisi))
+
     def test_artefatto_non_tracciato_segnalato(self):
         """Un artefatto presente ma non nell'indice Git e' recuperabile prima di
         un clean, quindi doctor deve renderlo esplicito."""
@@ -2189,15 +2202,15 @@ class Doctor(Base):
         _, _ = self.claims.close(self.ref, "F01", "fatto",
                                  artifacts=["nome-troppo-lungo.txt", "sparito.txt"])
         data = self.store.load(self.ref.json_path)
-        is_file = Path.is_file
+        exists = Path.exists
 
-        def is_file_con_path_non_valido(*args):
+        def exists_con_path_non_valido(*args, **kwargs):
             path = args[0] if args else None
             if path is not None and path.name == "nome-troppo-lungo.txt":
                 raise OSError("[Errno 36] File name too long")
-            return is_file(path) if path is not None else False
+            return exists(path, **kwargs) if path is not None else False
 
-        with mock.patch.object(Path, "is_file", autospec=True, side_effect=is_file_con_path_non_valido):
+        with mock.patch.object(Path, "exists", autospec=True, side_effect=exists_con_path_non_valido):
             avvisi = self.doctor.doctor_avvisi(data, self.ref, self.ws.config["agent"])
 
         self.assertTrue(any("F01" in a and "nome-troppo-lungo.txt" in a and "non riesco a ispezionare" in a

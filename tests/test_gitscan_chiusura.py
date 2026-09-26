@@ -73,6 +73,22 @@ class CommitDiChiusura(unittest.TestCase):
         self.assertIsNone(gitscan.closing_commit(self.root, GRAFO, "N1",
                                                  "2026-01-02T10:00:00+00:00"))
 
+    def test_una_cartella_e_un_artefatto_che_cambia_coi_suoi_file(self):
+        """Issue #35: close --artefatti research/b06 registra una cartella."""
+        chiuso = "2026-01-02T10:00:00+00:00"
+        (self.root / "research" / "b06").mkdir(parents=True)
+        (self.root / "research" / "b06" / "x.md").write_text("lavoro")
+        self.scrivi_grafo(chiuso)
+        self.commit("2026-01-02T10:05:00+00:00", "feat(n1): lavoro e chiusura")
+        base = gitscan.closing_commit(self.root, GRAFO, "N1", chiuso)
+        self.assertIs(gitscan.changed_since(self.root, "research/b06", chiuso, base), False)
+        self.assertTrue(gitscan.tracked(self.root, "research/b06"))
+        self.assertTrue(gitscan.contiene(gitscan.indice(self.root), "research/b06"))
+        (self.root / "research" / "b06" / "y.md").write_text("postumo")
+        self.assertIs(gitscan.changed_since(self.root, "research/b06", chiuso, base), True)
+        self.assertFalse(gitscan.contiene({"research/b06x/z.md"}, "research/b06"),
+                         "un prefisso di nome non e' una cartella che contiene")
+
 
 if __name__ == "__main__":
     unittest.main()

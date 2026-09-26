@@ -482,9 +482,9 @@ def _avviso_artefatti_non_tracciati(ref: Graph, artifacts: list[str] | None) -> 
     if not artifacts:
         return None
     root = ref.workspace.project_root
-    mancanti = [a for a in artifacts if not (root / a).is_file()]
+    mancanti = [a for a in artifacts if not (root / a).exists()]
     non_tracciati = [a for a in artifacts
-                     if (root / a).is_file() and gitscan.tracked(root, a) is False]
+                     if (root / a).exists() and gitscan.tracked(root, a) is False]
     avvisi = []
     if mancanti:
         avvisi.append(t("close.artifacts_mancanti", elenco=", ".join(mancanti)))

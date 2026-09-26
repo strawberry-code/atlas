@@ -77,58 +77,69 @@ def _chiusure(root: Path, commit: str, graph_path: str) -> dict:
         return {}
 
 
-def changed_since(root: Path, artifact_path: str, closed_at: str,
-                  base: str | None = None) -> bool | None:
-    """Verifica se un artefatto e' davvero cambiato dopo la chiusura di un nodo,
-    guardando il contenuto versionato in git invece dell'mtime del filesystem.
+def non_committati(root: Path) -> set[str]:
+    """I file modificati o untracked nel working tree. Non dipende dall'artefatto:
+    doctor lo calcola una volta per esecuzione, non una per artefatto (issue #35,
+    su 642 artefatti erano due processi git ciascuno e 30 s di attesa)."""
+    if not (root / ".git").exists():
+        return set()
+    return set(_git(root, "diff", "--name-only", "HEAD")) | set(
+        _git(root, "ls-files", "--others", "--exclude-standard"))
 
-    Restituisce:
-    - True se il file e' cambiato (committato dopo closed_at O modifiche non committate)
-    - False se il file non e' cambiato rispetto al commit precedente
-    - None se non possiamo verificare (repo non git O rev-list non ha trovato un commit)
 
-    Quando restituisce None, il chiamante puo' fallback all'mtime come ultimo ricorso.
+def postumi(root: Path, closed_at: str, base: str | None = None) -> set[str] | None:
+    """I file committati dopo la chiusura di un nodo: uno 'git diff' per nodo invece
+    che uno per artefatto.
 
-    Nota sulla prudenza: quando rev-list non trova niente (repo creata dopo la chiusura,
-    o chiusura piu' vecchia del primo commit), restituiamo None perche' non possiamo
-    sapere se il file e' stato modificato dopo. L'obiettivo e' togliere falsi positivi,
-    non aggiungermi di nuovi: dichiarare "non so" e lasciare decidere al caller e'
-    meglio di inventare una risposta errata.
+    base, se data, e' il commit di chiusura (closing_commit). Altrimenti si ripiega sul
+    commit piu' recente prima della chiusura, che pero' conta come postumo anche il
+    commit del lavoro del nodo stesso.
+
+    None se non si puo' verificare (repo non git, closedAt illeggibile, nessun commit
+    prima della chiusura): dichiarare "non so" e lasciare al chiamante il ripiego
+    sull'mtime e' meglio di inventare una risposta, perche' l'obiettivo e' togliere
+    falsi positivi, non aggiungerne.
     """
     if not (root / ".git").exists():
         return None
-
     try:
         datetime.fromisoformat(closed_at)   # solo per rifiutare un closedAt illeggibile
     except (ValueError, TypeError):
         return None
-
-    # base, se data, e' il commit di chiusura (closing_commit). Altrimenti si ripiega
-    # sul commit piu' recente prima della chiusura, che pero' conta come postumo anche
-    # il commit del lavoro del nodo stesso.
     commit = [base] if base else _git(root, "rev-list", "-1", f"--before={closed_at}", "HEAD")
     if not commit:
-        # Non c'e' un commit prima di closed_at: non possiamo verificare.
-        # Restituiamo None per forzare il fallback all'mtime nel caller.
         return None
+    return set(_git(root, "diff", "--name-only", f"{commit[0]}...HEAD"))
 
-    base_commit = commit[0]
 
-    # Controlla se l'artefatto compare in git diff fra il commit base e HEAD.
-    # Se si', il file e' stato modificato dopo la chiusura.
-    diff_risultato = _git(root, "diff", "--name-only", f"{base_commit}...HEAD", "--", artifact_path)
-    if diff_risultato and artifact_path in diff_risultato:
-        return True
+def contiene(percorsi: set[str], artifact_path: str) -> bool:
+    """L'artefatto e' fra i percorsi, o ne e' una cartella che ne contiene qualcuno."""
+    cartella = artifact_path.rstrip("/") + "/"
+    return artifact_path in percorsi or any(p.startswith(cartella) for p in percorsi)
 
-    # Controlla se l'artefatto ha modifiche non committate nel working tree.
-    # Questo copre sia i file modificati che gli untracked.
-    uncommitted = set(_git(root, "diff", "--name-only", "HEAD"))
-    uncommitted.update(_git(root, "ls-files", "--others", "--exclude-standard"))
-    if artifact_path in uncommitted:
-        return True
 
-    # L'artefatto non e' cambiato.
-    return False
+def changed_since(root: Path, artifact_path: str, closed_at: str,
+                  base: str | None = None) -> bool | None:
+    """Se un artefatto (file o cartella) e' cambiato dopo la chiusura del nodo,
+    secondo git: committato dopo la base o sporco nel working tree. None se non si
+    puo' verificare (vedi postumi). Per molti artefatti doctor usa direttamente
+    postumi e non_committati, calcolati una volta sola."""
+    cambiati = postumi(root, closed_at, base)
+    if cambiati is None:
+        return None
+    return contiene(cambiati, artifact_path) or contiene(non_committati(root), artifact_path)
+
+
+def indice(root: Path) -> set[str] | None:
+    """Tutti i file nell'indice git, None fuori da una repo. Per doctor, che altrimenti
+    lancerebbe un 'git ls-files' per ogni artefatto di ogni nodo chiuso."""
+    if not (root / ".git").exists():
+        return None
+    try:
+        esito = subprocess.run(["git", "ls-files"], cwd=root, capture_output=True, text=True)
+    except OSError:
+        return None
+    return set(esito.stdout.splitlines()) if esito.returncode == 0 else None
 
 
 def tracked(root: Path, artifact_path: str) -> bool | None:
@@ -146,7 +157,10 @@ def tracked(root: Path, artifact_path: str) -> bool | None:
                                cwd=root, capture_output=True, text=True)
     except OSError:
         return None
-    return esito.returncode == 0 and artifact_path in esito.stdout.splitlines()
+    righe = esito.stdout.splitlines()
+    if (root / artifact_path).is_dir():
+        return esito.returncode == 0 and bool(righe)   # cartella: tracciata se ha file nell'indice
+    return esito.returncode == 0 and artifact_path in righe
 
 
 def move(root: Path, src: Path, dst: Path) -> bool:
