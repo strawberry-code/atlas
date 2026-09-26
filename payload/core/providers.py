@@ -251,6 +251,9 @@ def _prompt(context: LaunchContext) -> str:
     risultava gia' preso, e la scelta fra rubare il lucchetto e fermarsi restava
     sua. Fermarsi in AFK vuol dire un run morto su una domanda che nessuno
     leggera', quindi il divieto di chiedere conferma e' parte del briefing.
+    Per la stessa ragione lo e' il divieto di chiudere il turno in attesa di una
+    notifica in background (issue #31): il processo e' a un colpo solo, nessuno
+    riceve la notifica, e il nodo resta rivendicato fino al fallimento.
     """
     node_id = str(context.node["id"])
     question = str(context.node.get("question", ""))
@@ -278,6 +281,11 @@ def _prompt(context: LaunchContext) -> str:
         f"run 'atlas suspend {node_id} -m \"<where you got to and what is left>\"': the node stays "
         f"on the frontier with your log for whoever resumes it. You are running unattended: never stop to ask for "
         f"confirmation or authorization outside of ask-human, decide and finish the work. "
+        f"Nobody receives background notifications in this run: never end your turn waiting "
+        f"for a background task, subagent or monitor to report back. Wait for it inside the "
+        f"turn, or run it in the foreground, and keep working until the node is closed, "
+        f"suspended, given up or handed to ask-human: a turn that ends with the node still "
+        f"claimed fails as an ambiguous termination. "
         f"Node question: {question}"
     )
 

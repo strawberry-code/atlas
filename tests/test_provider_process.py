@@ -227,6 +227,14 @@ class ProviderProcessTest(unittest.TestCase):
         self.assertIn("never", prompt.lower())
         self.assertIn("handle $(unsafe) && value", prompt)
 
+    def test_il_briefing_vieta_di_chiudere_il_turno_in_attesa_di_notifiche(self):
+        """Issue #31: un agente AFK che finisce il turno 'in attesa della notifica'
+        del proprio subagent lascia il nodo rivendicato, e nessuno la ricevera'."""
+        prompt = providers._prompt(self.context)
+
+        self.assertIn("Nobody receives background notifications", prompt)
+        self.assertIn("never end your turn waiting", prompt)
+
     @mock.patch.object(providers.subprocess, "Popen")
     def test_quota_finita_vale_provider_assente_non_errore_del_lavoro(self, popen):
         """Regressione del run del 2026-08-31: quota Codex esaurita per un mese.
