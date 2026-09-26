@@ -45,6 +45,15 @@ def touched(root: Path, since: str | None = None) -> list[str]:
     return sorted(tenuti)
 
 
+def vicini(root: Path, dedotti: list[str]) -> list[str]:
+    """I file non committati nelle stesse cartelle degli artefatti dedotti ma rimasti
+    fuori dalla finestra di deduzione: il lavoro di una presa precedente dello stesso
+    nodo, rilasciata e ripresa (issue #32). La radice del progetto non conta come
+    cartella comune, altrimenti ogni file sporco del repo diventerebbe un vicino."""
+    cartelle = {str(Path(a).parent) for a in dedotti} - {"."}
+    return [f for f in touched(root) if f not in dedotti and str(Path(f).parent) in cartelle]
+
+
 def closing_commit(root: Path, graph_path: str, node_id: str, closed_at: str,
                    limite: int = 20) -> str | None:
     """Il primo commit dopo closed_at in cui graph_path registra la chiusura del nodo.

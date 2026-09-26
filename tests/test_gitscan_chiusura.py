@@ -89,6 +89,17 @@ class CommitDiChiusura(unittest.TestCase):
         self.assertFalse(gitscan.contiene({"research/b06x/z.md"}, "research/b06"),
                          "un prefisso di nome non e' una cartella che contiene")
 
+    def test_vicini_trova_il_lavoro_della_presa_precedente(self):
+        """Issue #32: i file della presa precedente stanno nella stessa cartella di
+        quelli dedotti, la radice del progetto invece non conta come cartella comune."""
+        (self.root / "research" / "s06").mkdir(parents=True)
+        for nome in ("vecchio.md", "nuovo.md"):
+            (self.root / "research" / "s06" / nome).write_text(nome)
+        (self.root / "sparso.md").write_text("altro")
+        self.assertEqual(["research/s06/vecchio.md"],
+                         gitscan.vicini(self.root, ["research/s06/nuovo.md"]))
+        self.assertEqual([], gitscan.vicini(self.root, ["radice.md"]))
+
 
 if __name__ == "__main__":
     unittest.main()

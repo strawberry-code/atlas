@@ -241,7 +241,9 @@ class GitFuoriDalLock(Base):
              mock.patch.object(self.docs, "answer_written", return_value=True), \
              mock.patch.object(self.claims.worklog, "written", return_value=True):
             self.claims.close(self.ref, "F01", "sintesi")
-        self.assertEqual([True], libero, "git e' stato chiamato con il lock in mano")
+        # Due scansioni: la deduzione e la ricerca dei file fuori finestra (issue #32),
+        # entrambe fuori dal lock.
+        self.assertTrue(libero and all(libero), "git e' stato chiamato con il lock in mano")
 
 
 if __name__ == "__main__":

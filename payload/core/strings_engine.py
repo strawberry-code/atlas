@@ -143,6 +143,16 @@ STRINGS: dict[str, dict[str, str]] = {
                                                "  Aggiungili a Git o correggi la contabilità; la chiusura prosegue.",
                                        "en": "warning: these artifacts exist but are not tracked by Git: {elenco}.\n"
                                                "  Add them to Git or fix the bookkeeping; closing continues."},
+    "close.artifacts_fuori_finestra": {"it": "avviso: questi file non committati stanno nelle cartelle degli artefatti dedotti ma sono "
+                                                "fuori dalla finestra della presa corrente: {elenco}.\n"
+                                                "  Se sono lavoro di una presa precedente di {id}, correggi la lista con "
+                                                "'atlas amend {id} --artefatti <path> ...', che la sostituisce per intero: "
+                                                "ripeti anche gli artefatti già registrati. La chiusura prosegue.",
+                                          "en": "warning: these uncommitted files sit in the folders of the deduced artifacts but "
+                                                "fall outside the current claim's window: {elenco}.\n"
+                                                "  If they are work from an earlier claim of {id}, fix the list with "
+                                                "'atlas amend {id} --artefatti <path> ...', which replaces it entirely: "
+                                                "repeat the artifacts already recorded too. Closing continues."},
     "close.artifacts_mancanti": {"it": "avviso: questi artefatti non esistono nel progetto: {elenco}.\n"
                                           "  Controlla i path dichiarati; la chiusura prosegue.",
                                   "en": "warning: these artifacts do not exist in the project: {elenco}.\n"

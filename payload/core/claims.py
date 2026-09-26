@@ -520,6 +520,8 @@ def close(ref: Graph, node_id: str, summary: str, force: bool = False,
         artifacts, avviso = _artefatti(ref, node_id)
         if avviso:
             raise StateError(t("close.artifacts_required", dettaglio=avviso))
+        if fuori := gitscan.vicini(ref.workspace.project_root, artifacts or []):
+            avviso = t("close.artifacts_fuori_finestra", id=node_id, elenco=", ".join(fuori))
     non_tracciati = _avviso_artefatti_non_tracciati(ref, artifacts)
     if non_tracciati:
         avviso = non_tracciati if avviso is None else avviso + "\n" + non_tracciati
