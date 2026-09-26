@@ -20,7 +20,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .config import ENV_IDENTITY, Graph
-from .identity import IGNOTA, session
+from .identity import IGNOTA, nota, session
 from .model import node_of
 from .store import CLAIMED, StateError, scrivi_atomico, transaction
 from .strings import t
@@ -29,9 +29,17 @@ from .strings import t
 def author(ref: Graph, node: dict) -> str:
     """Chi firma la voce: l'identita' dichiarata (ATLAS_IDENTITY o --identity), che
     e' anche il nome del provider lanciato da Autopilot; dentro una sessione Claude
-    il nome dell'agente scritto nel claim; altrimenti chi dice 'atlas whoami'."""
+    il nome dell'agente scritto nel claim; altrimenti chi dice 'atlas whoami'.
+
+    Senza identita' dichiarata, se il claim ne porta una dichiarata (diversa dal PID
+    che il claim registra comunque), si firma con quella: il lucchetto ha un solo
+    detentore, e un subagente che ha preso il nodo con --identity e poi scorda il flag
+    su 'log' firmerebbe altrimenti col nome di un altro attore (issue #37)."""
     if dichiarata := os.environ.get(ENV_IDENTITY):
         return dichiarata
+    claim = node.get("claim") or {}
+    if nota(claim.get("identity")) and claim["identity"] != str(claim.get("pid")):
+        return claim["identity"]
     if session()[0] and node.get("assignee"):
         return node["assignee"]
     return ref.workspace.whoami() or node.get("assignee") or IGNOTA

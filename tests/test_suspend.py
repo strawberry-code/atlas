@@ -65,6 +65,17 @@ class Registro(Base):
             self.worklog.log(self.ref, "F01", "lavoro")
         self.assertEqual(["claude"], [m.group("chi") for m in VOCE.finditer(self.ticket())])
 
+    def test_log_senza_flag_firma_con_l_identita_dichiarata_nel_claim(self):
+        """Issue #37: il nodo preso con --identity orch-R01 e poi 'log' senza flag.
+        Il lucchetto ha un solo detentore, e la voce va firmata col suo nome."""
+        with self.store.transaction(self.ref.json_path) as data:
+            claim = self.model.node_of(data, "F01")["claim"]
+            claim.update(identity="orch-R01", pid=4242)
+        with mock.patch.dict(os.environ, {"CLAUDE_PID": "4242"}, clear=False):
+            os.environ.pop("ATLAS_IDENTITY", None)
+            self.worklog.log(self.ref, "F01", "lavoro")
+        self.assertEqual(["orch-R01"], [m.group("chi") for m in VOCE.finditer(self.ticket())])
+
     def test_log_rifiuta_testo_vuoto_e_nodo_non_rivendicato(self):
         with self.assertRaises(self.store.StateError):
             self.worklog.log(self.ref, "F01", "   ")
