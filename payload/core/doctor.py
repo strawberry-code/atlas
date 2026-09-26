@@ -71,6 +71,12 @@ def doctor_avvisi(data: dict, ref: Graph, agente: dict) -> list[str]:
         mancanti = []
         non_tracciati = []
         tocchi = []
+        radice = ref.workspace.project_root
+        try:
+            grafo = ref.json_path.resolve().relative_to(radice.resolve()).as_posix()
+        except ValueError:
+            grafo = None
+        base = gitscan.closing_commit(radice, grafo, nodo["id"], chiuso) if grafo else None
         for a in nodo["artifacts"]:
             try:
                 if not (ref.workspace.project_root / a).is_file():
@@ -80,7 +86,7 @@ def doctor_avvisi(data: dict, ref: Graph, agente: dict) -> list[str]:
                     non_tracciati.append(a)
                 # Usa git se siamo in una repo per verificare se il file e' davvero cambiato.
                 # Se gitscan non puo' verificare (repo non git O rev-list vuoto), fallback all'mtime.
-                result = gitscan.changed_since(ref.workspace.project_root, a, chiuso)
+                result = gitscan.changed_since(ref.workspace.project_root, a, chiuso, base)
                 if result is True:
                     tocchi.append(a)
                 elif result is None:

@@ -6,8 +6,10 @@ sconfinamento di doctor resta inerte.
 """
 from __future__ import annotations
 
+import json
 import subprocess
 from datetime import datetime
+from functools import lru_cache
 from pathlib import Path
 
 ESCLUSI = (".atlas/",)
@@ -43,7 +45,40 @@ def touched(root: Path, since: str | None = None) -> list[str]:
     return sorted(tenuti)
 
 
-def changed_since(root: Path, artifact_path: str, closed_at: str) -> bool | None:
+def closing_commit(root: Path, graph_path: str, node_id: str, closed_at: str,
+                   limite: int = 20) -> str | None:
+    """Il primo commit dopo closed_at in cui graph_path registra la chiusura del nodo.
+
+    Il contratto vuole close prima del commit: il commit che porta il lavoro del nodo
+    arriva dopo closedAt. Misurare le scritture postume dall'ultimo commit prima della
+    chiusura conterebbe quel commit come una scrittura postuma, su ogni nodo chiuso.
+    La base giusta e' il commit che contiene la chiusura. None se non lo trova entro
+    limite commit (chiusura mai committata, grafo riscritto): il chiamante ripiega.
+    """
+    if not (root / ".git").exists():
+        return None
+    for commit in _git(root, "log", "--reverse", "--format=%H", f"--since={closed_at}",
+                       "--", graph_path)[:limite]:
+        if _chiusure(root, commit, graph_path).get(node_id) == closed_at:
+            return commit
+    return None
+
+
+@lru_cache(maxsize=256)
+def _chiusure(root: Path, commit: str, graph_path: str) -> dict:
+    """id -> closedAt del grafo in quel commit. In cache perche' doctor interroga
+    gli stessi pochi commit per ogni nodo chiuso: senza, rilegge il grafo N volte."""
+    esito = subprocess.run(["git", "show", f"{commit}:{graph_path}"], cwd=root,
+                           capture_output=True, text=True)
+    try:
+        nodi = json.loads(esito.stdout)["nodes"] if esito.returncode == 0 else []
+        return {n["id"]: n.get("closedAt") for n in nodi if isinstance(n, dict) and "id" in n}
+    except (ValueError, KeyError, TypeError):
+        return {}
+
+
+def changed_since(root: Path, artifact_path: str, closed_at: str,
+                  base: str | None = None) -> bool | None:
     """Verifica se un artefatto e' davvero cambiato dopo la chiusura di un nodo,
     guardando il contenuto versionato in git invece dell'mtime del filesystem.
 
@@ -68,9 +103,10 @@ def changed_since(root: Path, artifact_path: str, closed_at: str) -> bool | None
     except (ValueError, TypeError):
         return None
 
-    # Trova il commit piu' recente prima della chiusura.
-    # --before usa un formato che git capisce: "before:<ISO-timestamp>"
-    commit = _git(root, "rev-list", "-1", f"--before={closed_at}", "HEAD")
+    # base, se data, e' il commit di chiusura (closing_commit). Altrimenti si ripiega
+    # sul commit piu' recente prima della chiusura, che pero' conta come postumo anche
+    # il commit del lavoro del nodo stesso.
+    commit = [base] if base else _git(root, "rev-list", "-1", f"--before={closed_at}", "HEAD")
     if not commit:
         # Non c'e' un commit prima di closed_at: non possiamo verificare.
         # Restituiamo None per forzare il fallback all'mtime nel caller.
