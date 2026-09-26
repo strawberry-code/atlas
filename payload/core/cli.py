@@ -460,7 +460,7 @@ def aggiungi_comandi(sub) -> None:
     p.add_argument("node")
     p.add_argument("step", choices=list(claims.PASSI), help=t("help.progress_step"))
     p.add_argument("nota", nargs="?", default=None, help=t("help.progress_nota"))
-    _grafo(p)
+    _identity(p); _grafo(p)
     p = sub.add_parser("log", help=t("help.log")); p.add_argument("node")
     p.add_argument("testo", help=t("help.log_testo")); _identity(p); _grafo(p)
     p = sub.add_parser("ask", help=t("help.ask")); p.add_argument("node")

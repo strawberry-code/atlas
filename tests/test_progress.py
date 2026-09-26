@@ -142,6 +142,17 @@ class ProgressCLI(Base):
         self.assertEqual(0, codice)
         self.assertIn("F02", uscita)
 
+    def test_comando_accetta_identity(self):
+        """Issue #36: un subagente che lancia ogni comando da una shell nuova non ha
+        ATLAS_IDENTITY, e il flag deve esistere anche qui come su claim e log."""
+        import os
+        try:
+            codice, uscita = self._run("progress", "F01", "implementing", "--identity", "orch-R01")
+        finally:
+            os.environ.pop("ATLAS_IDENTITY", None)
+        self.assertEqual(0, codice)
+        self.assertIn("implementing", uscita)
+
     def test_comando_rifiuta_un_passo_fuori_elenco_in_fase_di_parsing(self):
         """Il vincolo sintattico lo ferma argparse, prima ancora del motore: e' un
         errore di battitura correggibile subito, non un guasto a runtime."""
